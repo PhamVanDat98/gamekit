@@ -1,0 +1,3 @@
+#!/bin/sh
+# GameKit: chặn asset gốc, code decompile, asset chưa có nhãn provenance.
+exec node scripts/gk.mjs precommit

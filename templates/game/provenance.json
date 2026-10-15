@@ -1,0 +1,7 @@
+{
+  "$schema": "./.gamekit/schemas/provenance.schema.json",
+  "entries": [
+    { "path": "public/TemplateData/favicon.svg", "label": "own", "source": "GameKit template", "license": null, "note": null, "at": null },
+    { "path": "public/TemplateData/style.css", "label": "own", "source": "GameKit template", "license": null, "note": null, "at": null }
+  ]
+}

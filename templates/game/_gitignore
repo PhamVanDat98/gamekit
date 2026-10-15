@@ -1,0 +1,10 @@
+node_modules
+dist/
+# Tư liệu từ game gốc: chỉ để tham khảo, không bao giờ commit hay đóng gói
+reference/
+decompiled/
+# Dữ liệu riêng từng máy
+.gamekit/local/
+.gamekit/ghidra/
+*.log
+.DS_Store

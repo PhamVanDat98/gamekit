@@ -1,0 +1,11 @@
+{
+  "name": "gamekit-dev",
+  "owner": { "name": "Dat" },
+  "plugins": [
+    {
+      "name": "gamekit",
+      "source": "./",
+      "description": "GameKit: port & reskin web game cho portal"
+    }
+  ]
+}

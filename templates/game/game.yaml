@@ -1,0 +1,32 @@
+# Trạng thái game trong GameKit. Script đọc và ghi file này; sửa tay được, giữ đúng schema.
+name: {{NAME}}
+title: {{TITLE}}            # tên mới, không dùng tên game gốc
+version: 0.1.0
+phase: P0
+source:
+  engine: {{ENGINE}}
+  engineVersion: null
+  path: null                # đường dẫn local tới game gốc (không bao giờ đóng gói)
+  notes: null
+runtime:
+  kind: 2d
+  renderer: canvas
+  physics: none
+  fixedStepHz: 60
+portals:
+  - dev-mock
+pilot: false
+budget:
+  initialLoadMB: 10
+  timeToPlaySec: 5
+  minFpsDesktop: 60
+  minFpsMobile: 30
+  plannedDays: {}
+release:
+  forbiddenTerms: []        # tên, thương hiệu game gốc — release-check chặn nếu còn trong gói
+  allowedHosts: []          # host ngoài được phép (CDN SDK của portal)
+gates: {}
+timings:
+  P0:
+    start: {{CREATED}}
+    end: null

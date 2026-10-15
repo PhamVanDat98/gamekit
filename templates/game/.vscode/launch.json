@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Chrome: game với dev-mock",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173/?ad=ok",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "Dev server"
+    },
+    {
+      "name": "Chrome: thử ad lỗi",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173/?ad=fail",
+      "webRoot": "${workspaceFolder}"
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+---
+name: using-gamekit
+description: Dùng khi làm việc với một game port/reskin bằng GameKit (thư mục có game.yaml), hoặc khi người dùng muốn port một game có sẵn sang web, reskin, gắn SDK portal, đóng gói phát hành. Cho biết pipeline 6 pha, luật cứng, lệnh gamekit và skill nào dùng tiếp.
+---
+
+# Dùng GameKit
+
+GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, reskin và phát hành lên portal. Trạng thái mỗi game nằm trong `game.yaml`. **Trước khi làm gì trong một game, chạy `gamekit status`** để biết pha hiện tại, việc còn mở ở cổng và skill nên dùng.
+
+## Gọi CLI
+- Trong thư mục game: `npm run gk -- <lệnh>` (shim `scripts/gk.mjs` trỏ tới plugin).
+- Từ Claude Code ở bất kỳ đâu: `node "${CLAUDE_PLUGIN_ROOT}/scripts/gamekit.mjs" <lệnh>`.
+- Lệnh: `init`, `status`, `gate [--advance]`, `validate`, `provenance add|list`, `pack`, `release-check`, `fanout`, `check-ownership`, `integrate`. `gamekit help` để xem đủ.
+
+## Pipeline 6 pha
+| Pha | Việc | Skill | Người dùng quyết |
+| --- | --- | --- | --- |
+| P0 Intake | Nhận diện engine, kiểm kê, chấm khả thi | game-recon, triage | Làm hay bỏ |
+| P1 Phân tích | Trích logic, số liệu, asset, UI từ game gốc | engine-*, re-notes, gameplay-spec, asset-inventory, ui-extract | |
+| P2 Dựng lại | Dựng lại bằng JS/TS, chơi được với placeholder | runtime-select, **module-plan**, **rebuild-game**, **integrate**, parity-check | |
+| P3 Reskin | Bố cục web, style mới, asset mới theo spec | web-relayout, style-*, asset-spec, apply-style, replace-* | Chọn style |
+| P4 Tích hợp | SDK portal, analytics, leaderboard, save | **platform-sdk**, add-* | |
+| P5 Phát hành | Đóng gói, hiệu năng, QA, ảnh store | **package-web-build**, perf-budget, qa-smoke, store-assets, **release-check** | Playtest cuối |
+
+Skill **in đậm** có trong bản này. Skill khác chưa có: làm theo luật dưới đây và checklist trong `gates/<pha>.md`, ghi lại cách làm để sau đúc thành skill.
+
+Mỗi pha kết thúc bằng một cổng (`gates/P*.md`). `gamekit gate` kiểm tra; mục `{auto: …}` do script chấm; mục `(bạn)` **chỉ người dùng được tick** — hỏi họ, không tự tick. Chỉ chạy `gamekit gate --advance` khi người dùng đồng ý.
+
+## Luật cứng
+1. **Dữ liệu và logic gameplay bám sát game gốc.** Mọi số gameplay nằm trong `params/*.json`, mỗi giá trị có `source` (file + hàm/offset, hoặc đo từ video). Không tự đặt số. Sai khác chỉ khi web bắt buộc (điều khiển cảm ứng, bố cục, hiệu năng): thêm `deviation` + mục `D-n` trong `DECISIONS.md`, chờ người dùng duyệt. Không áp cho đồ hoạ, âm thanh, tên, text — phần đó phải làm mới.
+2. **Bám hành vi, không chép code.** Ghi chú RE viết bằng lời của mình trong `notes/`. Không commit code decompile (hook chặn).
+3. **Asset gốc chỉ là tư liệu**, nằm trong `reference/` (gitignored). Mọi file trong `assets/`, `public/` phải có nhãn provenance: `reference | generated | own | licensed | placeholder`. Bản phát hành không được còn `reference` hay `placeholder`.
+4. **Chỉ phân tích file tĩnh.** Không can thiệp vào game đang chạy của người khác.
+5. **Art brief mô tả thiết kế mới**, không viết "vẽ lại nhân vật X của game gốc".
+
+## Cấu trúc một game
+`src/core/` logic thuần, deterministic (không DOM, không render, `Rng` có seed, fixed timestep) · `src/view/` render + input, chỉ đọc state · `src/platform/` interface chung cho mọi portal · `src/contracts/` type dùng chung · `params/` số liệu có nguồn · `spec/`, `notes/` · `gates/` · `DECISIONS.md` · `provenance.json` · `module-plan.yaml` (khi dựng song song).
+
+## Test
+- `core/` và adapter: **TDD** (dùng skill test-driven-development của Superpowers nếu có). Giá trị kỳ vọng lấy từ `params/` = game gốc, kèm `tolerance`.
+- Gameplay tổng thể: replay test (ghi input, phát lại, so `worldHash`).
+- `view/`: không unit test; dùng screenshot và checklist.
+
+## Kết hợp Superpowers
+GameKit không viết lại brainstorming, plan, TDD, review, worktree, điều phối subagent — dùng skill của Superpowers cho phần đó. GameKit thêm kiến thức chuyên ngành game, luật và script.
+
+## Harness
+Skill viết trung lập. Phần riêng: `references/claude-code.md`, `references/codex.md`. Chuẩn phát triển đầy đủ: `references/standards.md`.

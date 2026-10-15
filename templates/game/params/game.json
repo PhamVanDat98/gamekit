@@ -1,0 +1,21 @@
+{
+  "$schema": "../.gamekit/schemas/params.schema.json",
+  "world": {
+    "width": { "value": 480, "unit": "px", "source": "template-demo: thiết kế mẫu, không phải port" },
+    "height": { "value": 720, "unit": "px", "source": "template-demo: thiết kế mẫu, không phải port" }
+  },
+  "player": {
+    "speed": { "value": 320, "unit": "px/s", "source": "template-demo: thiết kế mẫu, không phải port", "tolerance": 0.02 },
+    "size": { "value": 36, "unit": "px", "source": "template-demo: thiết kế mẫu, không phải port" },
+    "y": { "value": 640, "unit": "px", "source": "template-demo: thiết kế mẫu, không phải port" }
+  },
+  "obstacle": {
+    "size": { "value": 32, "unit": "px", "source": "template-demo: thiết kế mẫu, không phải port" },
+    "speedStart": { "value": 180, "unit": "px/s", "source": "template-demo: thiết kế mẫu, không phải port", "tolerance": 0.02 },
+    "speedPerSecond": { "value": 6, "unit": "px/s²", "source": "template-demo: thiết kế mẫu, không phải port" },
+    "spawnEvery": { "value": 0.8, "unit": "s", "source": "template-demo: thiết kế mẫu, không phải port" }
+  },
+  "score": {
+    "perSecond": { "value": 10, "unit": "điểm/s", "source": "template-demo: thiết kế mẫu, không phải port" }
+  }
+}

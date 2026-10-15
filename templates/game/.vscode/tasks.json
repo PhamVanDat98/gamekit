@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "GameKit: status", "type": "shell", "command": "npm run --silent gk -- status", "problemMatcher": [] },
+    { "label": "GameKit: validate", "type": "shell", "command": "npm run --silent gk -- validate", "problemMatcher": [], "group": "test" },
+    { "label": "GameKit: gate", "type": "shell", "command": "npm run --silent gk -- gate", "problemMatcher": [] },
+    { "label": "Test", "type": "shell", "command": "npm test", "problemMatcher": [], "group": { "kind": "test", "isDefault": true } },
+    { "label": "Dev server", "type": "shell", "command": "npm run dev", "isBackground": true, "problemMatcher": [] },
+    { "label": "GameKit: pack (mọi portal)", "type": "shell", "command": "npm run --silent gk -- pack --all", "problemMatcher": [], "group": { "kind": "build", "isDefault": true } },
+    { "label": "GameKit: release-check", "type": "shell", "command": "npm run --silent gk -- release-check", "problemMatcher": [] },
+    { "label": "GameKit: integrate (hỏi đợt)", "type": "shell", "command": "npm run --silent gk -- integrate --wave ${input:wave}", "problemMatcher": [] }
+  ],
+  "inputs": [{ "id": "wave", "type": "promptString", "description": "Đợt số", "default": "1" }]
+}

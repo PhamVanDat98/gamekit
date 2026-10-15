@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gamekit/params.schema.json",
+  "title": "params/*.json — số liệu gameplay, mỗi giá trị có nguồn từ game gốc",
+  "type": "object",
+  "properties": { "$schema": { "type": "string" } },
+  "additionalProperties": { "$ref": "#/definitions/node" },
+  "definitions": {
+    "param": {
+      "type": "object",
+      "required": ["value", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "value": { "description": "Giá trị dùng trong game" },
+        "unit": { "type": "string" },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Nguồn trong game gốc: file + hàm/offset, hoặc đo từ video. 'TODO' chỉ được phép trước cổng P2"
+        },
+        "tolerance": { "type": "number", "minimum": 0, "description": "Sai số tương đối cho parity test (0.02 = 2%)" },
+        "deviation": {
+          "type": "object",
+          "required": ["reason", "decision", "approved"],
+          "additionalProperties": false,
+          "description": "Chỉ khi buộc phải khác game gốc. Phải có mục trong DECISIONS.md và được duyệt",
+          "properties": {
+            "original": {},
+            "reason": { "type": "string", "minLength": 1 },
+            "decision": { "type": "string", "pattern": "^D-\\d+$", "description": "Mã quyết định trong DECISIONS.md, vd D-3" },
+            "approved": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "not": { "required": ["value"] },
+      "additionalProperties": { "$ref": "#/definitions/node" }
+    },
+    "node": {
+      "if": { "type": "object", "required": ["value"] },
+      "then": { "$ref": "#/definitions/param" },
+      "else": { "$ref": "#/definitions/group" }
+    }
+  }
+}

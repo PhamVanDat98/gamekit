@@ -1,0 +1,252 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gamekit/game.schema.json",
+  "title": "game.yaml — trạng thái một game trong GameKit",
+  "type": "object",
+  "required": [
+    "name",
+    "title",
+    "version",
+    "phase",
+    "source",
+    "portals"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Slug, dùng cho thư mục và gói build"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tên hiển thị (tên mới, không dùng tên game gốc)"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semver"
+    },
+    "phase": {
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5",
+        "released"
+      ],
+      "description": "Pha hiện tại"
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "engine"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "enum": [
+            "unknown",
+            "unity",
+            "cocos",
+            "godot",
+            "unreal",
+            "flash",
+            "construct",
+            "laya",
+            "html5",
+            "other"
+          ]
+        },
+        "engineVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Đường dẫn local tới game gốc. Không bao giờ được đóng gói"
+        },
+        "notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "2d",
+            "3d"
+          ]
+        },
+        "renderer": {
+          "type": "string",
+          "description": "canvas, pixi, phaser, three…"
+        },
+        "physics": {
+          "type": "string",
+          "description": "none, custom, rapier, matter, planck…"
+        },
+        "fixedStepHz": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 240
+        }
+      }
+    },
+    "portals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "Adapter cần đóng gói, vd dev-mock"
+    },
+    "pilot": {
+      "type": "boolean"
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "initialLoadMB": {
+          "type": "number"
+        },
+        "timeToPlaySec": {
+          "type": "number"
+        },
+        "minFpsDesktop": {
+          "type": "number"
+        },
+        "minFpsMobile": {
+          "type": "number"
+        },
+        "plannedDays": {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "P0",
+              "P1",
+              "P2",
+              "P3",
+              "P4",
+              "P5"
+            ]
+          },
+          "additionalProperties": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "P0",
+          "P1",
+          "P2",
+          "P3",
+          "P4",
+          "P5"
+        ]
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "passed"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "passed": {
+            "type": "boolean"
+          },
+          "at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "timings": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "P0",
+          "P1",
+          "P2",
+          "P3",
+          "P4",
+          "P5"
+        ]
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "start": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "ghidra": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": true,
+      "description": "Đường dẫn project Ghidra và trạng thái phân tích (dự án con 4)"
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "forbiddenTerms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tên, thương hiệu của game gốc. release-check chặn nếu còn xuất hiện trong gói"
+        },
+        "allowedHosts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Host ngoài được phép xuất hiện trong gói (CDN SDK của portal…)"
+        }
+      }
+    }
+  }
+}

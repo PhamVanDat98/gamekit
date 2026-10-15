@@ -1,0 +1,103 @@
+// gamekit gate — check the current phase's gate checklist; --advance moves to the next phase when it passes.
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { exists } from './lib/io.mjs';
+import { log, GkError } from './lib/log.mjs';
+import { requireGameRoot, loadGame, updateGame, nowIso } from './lib/game.mjs';
+import { PHASES, PHASE_INFO, nextPhase } from './lib/phases.mjs';
+import { validateGame } from './validate.mjs';
+
+/**
+ * Gate file syntax (gates/P2.md):
+ *   - [ ] Item an agent may tick once it verified it
+ *   - [ ] Item only the user decides (bạn)
+ *   - [ ] Item checked by a script {auto: validate}
+ * Auto items are re-run every time; their checkbox is ignored.
+ */
+export function parseGate(text) {
+  const items = [];
+  for (const line of text.split('\n')) {
+    const m = line.match(/^\s*[-*]\s+\[( |x|X)\]\s+(.*)$/);
+    if (!m) continue;
+    let body = m[2].trim();
+    const auto = body.match(/\{auto:\s*([^}]+)\}/);
+    if (auto) body = body.replace(auto[0], '').trim();
+    const human = /\(bạn\)\s*$/i.test(body);
+    items.push({ text: body, checked: m[1] !== ' ', auto: auto ? auto[1].trim() : null, human });
+  }
+  return items;
+}
+
+function runAuto(root, name, phase) {
+  if (name === 'validate') {
+    const { problems } = validateGame(root, { stage: PHASES.indexOf(phase) });
+    return { ok: problems.ok, detail: problems.errors.slice(0, 5).join('; ') };
+  }
+  if (name.startsWith('file:')) {
+    const f = path.join(root, name.slice(5).trim());
+    const ok = exists(f) && fs.statSync(f).size > 0;
+    return { ok, detail: ok ? '' : `thiếu ${name.slice(5).trim()}` };
+  }
+  const cmds = {
+    test: ['npm', ['test', '--silent']],
+    typecheck: ['npm', ['run', 'typecheck', '--silent']],
+    lint: ['npm', ['run', 'lint', '--silent']],
+    pack: [process.execPath, [path.join(import.meta.dirname, 'gamekit.mjs'), 'pack', '--all']],
+    'release-check': [process.execPath, [path.join(import.meta.dirname, 'gamekit.mjs'), 'release-check']],
+  };
+  const cmd = cmds[name];
+  if (!cmd) return { ok: false, detail: `không biết kiểm tra tự động "${name}"` };
+  const r = spawnSync(cmd[0], cmd[1], { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' });
+  const tail = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim().split('\n').slice(-3).join(' | ');
+  return { ok: r.status === 0, detail: r.status === 0 ? '' : tail };
+}
+
+export function evaluateGate(root, phase) {
+  const file = path.join(root, 'gates', `${phase}.md`);
+  if (!exists(file)) throw new GkError(`Không có checklist cổng gates/${phase}.md`);
+  const items = parseGate(fs.readFileSync(file, 'utf8'));
+  return items.map((it) => {
+    if (it.auto) {
+      const r = runAuto(root, it.auto, phase);
+      return { ...it, ok: r.ok, detail: r.detail };
+    }
+    return { ...it, ok: it.checked, detail: '' };
+  });
+}
+
+export async function run(args) {
+  const root = requireGameRoot(args.cwd);
+  const game = loadGame(root);
+  const phase = game.phase;
+  if (phase === 'released') {
+    log.ok('Game đã phát hành. Bản mới: tăng version rồi đặt phase về P5.');
+    return 0;
+  }
+  log.head(`Cổng ra khỏi ${phase} ${PHASE_INFO[phase].name}`);
+  const results = evaluateGate(root, phase);
+  for (const r of results) {
+    const tag = r.auto ? ` [auto: ${r.auto}]` : r.human ? ' [bạn quyết]' : '';
+    (r.ok ? log.ok : log.fail)(`${r.text}${tag}${r.detail ? ` — ${r.detail}` : ''}`);
+  }
+  const passed = results.every((r) => r.ok);
+  if (!passed) {
+    log.info(`\nChưa qua cổng ${phase}.`);
+    return 1;
+  }
+  if (!args.advance) {
+    log.info(`\nĐã đủ điều kiện. Chạy \`gamekit gate --advance\` để sang ${nextPhase(phase)}.`);
+    return 0;
+  }
+  const to = nextPhase(phase);
+  const at = nowIso();
+  const edits = [
+    [['gates', phase], { passed: true, at, by: args.by ?? 'gamekit' }],
+    [['timings', phase, 'end'], at],
+    [['phase'], to],
+  ];
+  if (to !== 'released') edits.push([['timings', to], { start: at, end: null }]);
+  updateGame(root, edits);
+  log.ok(`Qua cổng ${phase} → ${to}`);
+  return 0;
+}

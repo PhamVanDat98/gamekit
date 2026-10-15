@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gamekit/provenance.schema.json",
+  "title": "provenance.json — nguồn gốc mọi asset",
+  "type": "object",
+  "required": ["entries"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "label"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "description": "Đường dẫn tương đối từ gốc game" },
+          "label": { "enum": ["reference", "generated", "own", "licensed", "placeholder"] },
+          "source": { "type": ["string", "null"], "description": "Tool/prompt tạo ra, tác giả, hoặc nơi mua" },
+          "license": { "type": ["string", "null"], "description": "Bắt buộc với licensed" },
+          "note": { "type": ["string", "null"] },
+          "at": { "type": ["string", "null"] }
+        },
+        "if": { "properties": { "label": { "const": "licensed" } } },
+        "then": { "required": ["license"], "properties": { "license": { "type": "string", "minLength": 1 } } }
+      }
+    }
+  }
+}

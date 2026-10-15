@@ -1,0 +1,29 @@
+# Ví dụ module-plan.yaml (skill module-plan sinh file thật). Đổi tên thành module-plan.yaml khi dùng.
+base: main
+maxParallel: 4
+shared:            # chỉ agent chính được sửa
+  - src/contracts/
+  - params/
+  - package.json
+  - package-lock.json
+  - game.yaml
+  - module-plan.yaml
+modules:
+  - id: core-player
+    wave: 1
+    owns: [src/core/player/, tests/core/player/]
+    contracts: [src/contracts/world.ts, src/contracts/input.ts]
+    tests: [tests/core/player]
+    brief: >
+      Di chuyển nhân vật theo spec mục 2.1: tốc độ player.speed, giới hạn trong world.width.
+      Test parity: sau 1 giây giữ phải, x tăng đúng player.speed trong sai số tolerance.
+  - id: core-spawner
+    wave: 1
+    owns: [src/core/spawner/, tests/core/spawner/]
+    tests: [tests/core/spawner]
+    brief: Sinh chướng ngại theo spec mục 2.2, chu kỳ obstacle.spawnEvery, vị trí từ Rng.
+  - id: view-hud
+    wave: 2
+    owns: [src/view/hud/]
+    dependsOn: [core-player]
+    brief: HUD điểm và màn game over; đọc WorldState, không sửa state.

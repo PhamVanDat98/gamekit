@@ -1,0 +1,17 @@
+{
+  "name": "gamekit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "GameKit plugin: skill + script cho port & reskin web game",
+  "bin": { "gamekit": "scripts/gamekit.mjs" },
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "gamekit": "node scripts/gamekit.mjs"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "yaml": "^2.8.0"
+  }
+}

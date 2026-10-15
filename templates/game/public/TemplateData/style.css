@@ -1,0 +1,58 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #0d0f12;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+#stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+#game {
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 2 / 3;
+  outline: none;
+  image-rendering: auto;
+}
+#loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0d0f12;
+}
+#loader-track {
+  width: min(60vw, 320px);
+  height: 8px;
+  border-radius: 4px;
+  background: #2a2e35;
+  overflow: hidden;
+}
+#loader-bar {
+  width: 0;
+  height: 100%;
+  background: #4fb3ff;
+  transition: width 0.2s;
+}
+.gk-fake-ad {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font: 600 20px system-ui, sans-serif;
+}

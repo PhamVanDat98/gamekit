@@ -1,0 +1,16 @@
+{
+  "json.schemas": [
+    { "fileMatch": ["/params/*.json"], "url": "./.gamekit/schemas/params.schema.json" },
+    { "fileMatch": ["/provenance.json"], "url": "./.gamekit/schemas/provenance.schema.json" },
+    { "fileMatch": ["/asset-manifest.json"], "url": "./.gamekit/schemas/asset-manifest.schema.json" }
+  ],
+  "yaml.schemas": {
+    "./.gamekit/schemas/game.schema.json": "game.yaml",
+    "./.gamekit/schemas/module-plan.schema.json": ["module-plan.yaml", "module-plan.example.yaml"]
+  },
+  "files.exclude": { "**/node_modules": true },
+  "search.exclude": { "dist": true, "reference": true, "decompiled": true },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "editor.formatOnSave": true,
+  "eslint.useFlatConfig": true
+}
