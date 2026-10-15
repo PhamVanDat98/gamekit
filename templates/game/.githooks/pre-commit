@@ -1,3 +1,9 @@
 #!/bin/sh
 # GameKit: chặn asset gốc, code decompile, asset chưa có nhãn provenance.
-exec node scripts/gk.mjs precommit
+node scripts/gk.mjs precommit
+code=$?
+if [ "$code" -eq 3 ]; then
+  echo "⚠ GameKit chưa được cài trên máy này — bỏ qua kiểm tra pre-commit. Cài plugin hoặc đặt GAMEKIT_ROOT."
+  exit 0
+fi
+exit $code

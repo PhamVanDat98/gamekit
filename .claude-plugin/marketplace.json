@@ -1,11 +1,14 @@
 {
   "name": "gamekit-dev",
-  "owner": { "name": "Dat" },
+  "owner": {
+    "name": "Dat"
+  },
   "plugins": [
     {
       "name": "gamekit",
       "source": "./",
       "description": "GameKit: port & reskin web game cho portal"
     }
-  ]
+  ],
+  "description": "GameKit — port & reskin web game cho portal (bản phát triển)"
 }

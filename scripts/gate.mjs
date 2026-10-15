@@ -2,7 +2,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { exists } from './lib/io.mjs';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 import { log, GkError } from './lib/log.mjs';
 import { requireGameRoot, loadGame, updateGame, nowIso } from './lib/game.mjs';
 import { PHASES, PHASE_INFO, nextPhase } from './lib/phases.mjs';
@@ -34,6 +37,13 @@ function runAuto(root, name, phase) {
     const { problems } = validateGame(root, { stage: PHASES.indexOf(phase) });
     return { ok: problems.ok, detail: problems.errors.slice(0, 5).join('; ') };
   }
+  if (name.startsWith('field:')) {
+    // field:release.forbiddenTerms → the game.yaml value must be non-empty
+    const key = name.slice(6).trim();
+    const v = key.split('.').reduce((o, k) => (o == null ? o : o[k]), loadGame(root));
+    const ok = v != null && v !== '' && !(Array.isArray(v) && v.length === 0) && v !== 'unknown';
+    return { ok, detail: ok ? '' : `game.yaml: ${key} chưa điền` };
+  }
   if (name.startsWith('file:')) {
     const f = path.join(root, name.slice(5).trim());
     const ok = exists(f) && fs.statSync(f).size > 0;
@@ -43,8 +53,8 @@ function runAuto(root, name, phase) {
     test: ['npm', ['test', '--silent']],
     typecheck: ['npm', ['run', 'typecheck', '--silent']],
     lint: ['npm', ['run', 'lint', '--silent']],
-    pack: [process.execPath, [path.join(import.meta.dirname, 'gamekit.mjs'), 'pack', '--all']],
-    'release-check': [process.execPath, [path.join(import.meta.dirname, 'gamekit.mjs'), 'release-check']],
+    pack: [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'pack', '--all']],
+    'release-check': [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'release-check']],
   };
   const cmd = cmds[name];
   if (!cmd) return { ok: false, detail: `không biết kiểm tra tự động "${name}"` };

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { exists, walk } from './lib/io.mjs';
 import { Problems, log } from './lib/log.mjs';
+import { git } from './lib/git.mjs';
 import { requireGameRoot } from './lib/game.mjs';
 import { PHASES } from './lib/phases.mjs';
 import { validateGame, loadProvenance } from './validate.mjs';
@@ -12,6 +13,9 @@ const TEXT = /\.(html|js|mjs|css|json|svg|txt|xml)$/i;
 const SHIP_OK = new Set(['own', 'generated', 'licensed']);
 
 const hostAllowed = (host, allowed) => allowed.some((a) => host === a || host.endsWith('.' + a));
+// http(s)/ws(s) URLs to a domain, localhost or an IPv4 address.
+const URL_RE = /(?:https?|wss?):\/\/((?:[a-z0-9-]+\.)+[a-z]{2,}|localhost|\d{1,3}(?:\.\d{1,3}){3})/gi;
+const BINARY_SCAN_LIMIT = 64 * 1024 * 1024;
 
 export function checkPackage(root, portal, game, prov) {
   const pr = new Problems();
@@ -27,10 +31,14 @@ export function checkPackage(root, portal, game, prov) {
   const allowed = [...ALWAYS_ALLOWED_HOSTS, ...(game.release?.allowedHosts ?? [])];
   let initialBytes = 0;
 
+  checkFreshness(root, dir, where, pr);
+
   for (const rel of files) {
     const abs = path.join(dir, rel);
     const top = rel.split('/')[0];
     if (/\.(gz|br)$/.test(rel)) continue;
+    const relLower = rel.toLowerCase();
+    for (const t of terms) if (relLower.includes(t)) pr.error(where, `${rel}: tên file còn tên game gốc "${t}"`);
     if (/(^|\/)(reference|decompiled)(\/|$)/.test(rel)) pr.error(where, `${rel}: thư mục cấm nằm trong gói`);
     if (rel.endsWith('.map')) pr.warn(where, `${rel}: source map lộ mã nguồn — tắt build.sourcemap khi phát hành`);
     if (rel === 'index.html' || top === 'Build' || top === 'TemplateData') initialBytes += fs.statSync(abs).size;
@@ -46,12 +54,19 @@ export function checkPackage(root, portal, game, prov) {
       const text = fs.readFileSync(abs, 'utf8');
       const lower = text.toLowerCase();
       for (const t of terms) if (lower.includes(t)) pr.error(where, `${rel}: còn tên/thương hiệu game gốc "${t}"`);
-      for (const m of text.matchAll(/https?:\/\/([a-z0-9.-]+\.[a-z]{2,})/gi)) {
+      for (const m of text.matchAll(URL_RE)) {
         if (!hostAllowed(m[1].toLowerCase(), allowed)) pr.error(where, `${rel}: link ngoài tới ${m[1]} (thêm vào release.allowedHosts nếu là SDK portal)`);
       }
       if (rel === 'index.html') {
-        for (const m of text.matchAll(/\b(?:src|href)\s*=\s*["'](\/[^"']*)["']/gi)) pr.error(where, `index.html: đường dẫn tuyệt đối ${m[1]} — phải là đường dẫn tương đối`);
+        for (const m of text.matchAll(/\b(?:src|href)\s*=\s*["'](\/\/?[^"']*)["']/gi)) {
+          if (m[1].startsWith('//')) pr.error(where, `index.html: link ngoài dạng ${m[1]}`);
+          else pr.error(where, `index.html: đường dẫn tuyệt đối ${m[1]} — phải là đường dẫn tương đối`);
+        }
       }
+    } else if (terms.length && fs.statSync(abs).size <= BINARY_SCAN_LIMIT) {
+      // Binaries (.wasm, .data, .unityweb…) can still carry original names as strings.
+      const lower = fs.readFileSync(abs).toString('latin1').toLowerCase();
+      for (const t of terms) if (/^[\x20-\x7e]+$/.test(t) && lower.includes(t)) pr.error(where, `${rel}: file nhị phân còn chuỗi "${t}"`);
     }
   }
   const mb = initialBytes / 1024 / 1024;
@@ -59,6 +74,19 @@ export function checkPackage(root, portal, game, prov) {
   if (budget && mb > budget) pr.error(where, `tải đầu ${mb.toFixed(2)}MB vượt ngân sách ${budget}MB`);
   else log.dim(`${where}: tải đầu ${mb.toFixed(2)}MB${budget ? ` / ${budget}MB` : ''}`);
   return pr;
+}
+
+/** The package must come from the current commit with no pending code/asset changes. */
+function checkFreshness(root, dir, where, pr) {
+  const f = path.join(dir, 'StreamingAssets', 'build-manifest.json');
+  if (!exists(f)) {
+    pr.error(where, 'thiếu StreamingAssets/build-manifest.json — đóng gói bằng `gamekit pack`');
+    return;
+  }
+  const man = JSON.parse(fs.readFileSync(f, 'utf8'));
+  const head = git(root, ['rev-parse', '--short', 'HEAD'], { allowFail: true });
+  if (man.dirty) pr.error(where, `đóng gói từ bản chưa commit (${man.buildId}) — commit rồi pack lại`);
+  else if (head && man.commit && man.commit !== head) pr.error(where, `gói build từ commit ${man.commit}, HEAD là ${head} — pack lại`);
 }
 
 export async function run(args) {

@@ -14,7 +14,11 @@ export interface PlatformOptions {
   saveNamespace: string;
   storage?: StorageLike | null;
   log?: (msg: string, err?: unknown) => void;
+  /** An ad that never reports back (ad blocker, SDK bug) is abandoned after this long. */
+  adTimeoutMs?: number;
 }
+
+const DEFAULT_AD_TIMEOUT_MS = 60_000;
 
 /**
  * Wraps a thin PortalAdapter with the rules that must hold on every portal:
@@ -25,9 +29,43 @@ export function createPlatform(adapter: PortalAdapter, opts: PlatformOptions): P
   const { bus } = opts;
   const log = opts.log ?? ((m: string, e?: unknown) => console.warn(`[platform:${adapter.name}] ${m}`, e ?? ''));
   const storage = opts.storage === undefined ? safeLocalStorage() : opts.storage;
-  let inGameplay = false;
+  const adTimeoutMs = opts.adTimeoutMs ?? DEFAULT_AD_TIMEOUT_MS;
+  // What the game asked for vs. what the SDK was told. An ad forces "stopped";
+  // when it closes, the SDK follows whatever the game wants at that moment.
+  let wantGameplay = false;
+  let sdkGameplay = false;
   let adRunning = false;
   let loadingDone = false;
+
+  const safe = (what: string, fn: () => void) => {
+    try {
+      fn();
+    } catch (e) {
+      log(`${what} failed`, e);
+    }
+  };
+
+  const syncGameplay = () => {
+    const target = wantGameplay && !adRunning;
+    if (target === sdkGameplay) return;
+    sdkGameplay = target;
+    safe(target ? 'gameplayStart' : 'gameplayStop', () => (target ? adapter.gameplayStart?.() : adapter.gameplayStop?.()));
+  };
+
+  const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error(`ad timed out after ${ms} ms`)), ms);
+      p.then(
+        (v) => {
+          clearTimeout(t);
+          resolve(v);
+        },
+        (e) => {
+          clearTimeout(t);
+          reject(e);
+        },
+      );
+    });
 
   const track = (event: AnalyticsEvent, data: EventData = {}) => {
     if (!isAnalyticsEvent(event)) {
@@ -46,13 +84,12 @@ export function createPlatform(adapter: PortalAdapter, opts: PlatformOptions): P
     if (!supported) return 'unavailable';
     if (adRunning) return 'skipped';
     adRunning = true;
-    const resumeGameplay = inGameplay;
-    if (inGameplay) platform.gameplayStop();
+    syncGameplay();
     bus.pause('ad');
     track('ad_requested', { kind, placement });
     let result: AdResult;
     try {
-      result = await adapter.showAd(kind, placement);
+      result = await withTimeout(adapter.showAd(kind, placement), adTimeoutMs);
     } catch (e) {
       log(`${kind} ad failed`, e);
       result = 'error';
@@ -63,7 +100,7 @@ export function createPlatform(adapter: PortalAdapter, opts: PlatformOptions): P
     if (result === 'shown' || result === 'rewarded') track('ad_shown', { kind, placement });
     if (result === 'rewarded') track('ad_rewarded', { placement });
     if (result === 'error') track('ad_failed', { kind, placement });
-    if (resumeGameplay) platform.gameplayStart();
+    syncGameplay();
     return result;
   };
 
@@ -88,30 +125,20 @@ export function createPlatform(adapter: PortalAdapter, opts: PlatformOptions): P
       track('game_load_end');
     },
     gameplayStart() {
-      if (inGameplay || adRunning) return;
-      inGameplay = true;
-      try {
-        adapter.gameplayStart?.();
-      } catch (e) {
-        log('gameplayStart failed', e);
-      }
+      wantGameplay = true;
+      syncGameplay();
     },
     gameplayStop() {
-      if (!inGameplay) return;
-      inGameplay = false;
-      try {
-        adapter.gameplayStop?.();
-      } catch (e) {
-        log('gameplayStop failed', e);
-      }
+      wantGameplay = false;
+      syncGameplay();
     },
     interstitial: (placement) => showAd('interstitial', placement),
     rewarded: (placement) => showAd('rewarded', placement),
     showBanner(slot) {
-      if (adapter.capabilities.banner) adapter.showBanner?.(slot);
+      if (adapter.capabilities.banner) safe('showBanner', () => adapter.showBanner?.(slot));
     },
     hideBanner(slot) {
-      if (adapter.capabilities.banner) adapter.hideBanner?.(slot);
+      if (adapter.capabilities.banner) safe('hideBanner', () => adapter.hideBanner?.(slot));
     },
     track,
     async submitScore(board, score) {

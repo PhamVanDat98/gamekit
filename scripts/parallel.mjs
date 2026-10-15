@@ -9,6 +9,16 @@ import { git, isClean, currentBranch, branchExists } from './lib/git.mjs';
 import { loadModulePlan, checkModulePlan, pathUnder } from './validate.mjs';
 
 export const branchOf = (id) => `mod/${id}`;
+const mergeMessage = (id, wave) => `merge: ${id} (đợt ${wave})`;
+
+/** A module counts as merged only when its merge commit is in base — survives branch deletion, ignores empty branches. */
+export function isMerged(root, base, id) {
+  const hits = git(root, ['log', base, '--merges', '--fixed-strings', `--grep=merge: ${id} (`, '--format=%H'], { allowFail: true });
+  return Boolean(hits);
+}
+
+const commitsAhead = (root, base, br) => Number(git(root, ['rev-list', '--count', `${base}..${br}`]) || 0);
+const worktreeDirty = (wt) => exists(wt) && (git(wt, ['status', '--porcelain'], { allowFail: true }) ?? '') !== '';
 export const worktreeOf = (root, game, id) => path.join(path.dirname(root), `${game.name}.worktrees`, id);
 
 function loadPlanOrDie(root) {
@@ -81,8 +91,7 @@ export async function fanout(args) {
   if (currentBranch(root) !== plan.base) throw new GkError(`Phải đứng ở nhánh ${plan.base} để fanout`);
   if (!isClean(root)) throw new GkError('Working tree chưa sạch — commit contracts/params/stub trước khi chia việc');
   for (const m of mods) for (const d of m.dependsOn ?? []) {
-    const merged = git(root, ['branch', '--merged', plan.base, '--list', branchOf(d)]);
-    if (!merged) throw new GkError(`${m.id} cần ${d} đã merge vào ${plan.base} (chạy integrate đợt trước)`);
+    if (!isMerged(root, plan.base, d)) throw new GkError(`${m.id} cần ${d} đã merge vào ${plan.base} (chạy integrate đợt trước)`);
   }
   const max = plan.maxParallel ?? 4;
   if (mods.length > max) log.warn(`Đợt ${wave} có ${mods.length} module, vượt maxParallel ${max}: chạy thành nhiều lượt`);
@@ -119,15 +128,16 @@ export async function fanout(args) {
 }
 
 /** Files changed on `ref` since it left base, plus uncommitted changes when checking the current tree. */
-function changedFiles(root, base, ref, includeWorking) {
-  const out = new Set((git(root, ['diff', '--name-only', `${base}...${ref}`]) || '').split('\n').filter(Boolean));
+export function changedFiles(root, base, ref, includeWorking) {
+  // -z: paths verbatim (Vietnamese names are not quoted); --no-renames: a move counts as delete + add, so both paths are checked.
+  const diff = git(root, ['diff', '--name-only', '--no-renames', '-z', `${base}...${ref}`], { raw: true }) || '';
+  const out = new Set(diff.split('\0').filter(Boolean));
   if (includeWorking) {
-    // -z keeps paths verbatim (no quoting, no trimmed status column); renames carry the old path as an extra entry.
     const parts = (git(root, ['status', '--porcelain', '-uall', '-z'], { raw: true }) || '').split('\0').filter(Boolean);
     for (let i = 0; i < parts.length; i++) {
       const status = parts[i].slice(0, 2);
       out.add(parts[i].slice(3));
-      if (status.includes('R') || status.includes('C')) i++; // skip rename source
+      if (status.includes('R') || status.includes('C')) out.add(parts[++i]); // rename/copy source path
     }
   }
   return [...out].filter((f) => !f.startsWith('.gamekit/local/'));
@@ -175,10 +185,13 @@ export async function integrate(args) {
   for (const m of mods) {
     const br = branchOf(m.id);
     if (!branchExists(root, br)) throw new GkError(`Chưa có nhánh ${br}`);
-    if (git(root, ['branch', '--merged', plan.base, '--list', br])) {
+    if (isMerged(root, plan.base, m.id)) {
       log.dim(`${m.id}: đã merge trước đó`);
       continue;
     }
+    const wt = worktreeOf(root, game, m.id);
+    if (worktreeDirty(wt)) throw new GkError(`${m.id}: worktree còn thay đổi chưa commit (${wt}) — subagent commit trước khi integrate`);
+    if (commitsAhead(root, plan.base, br) === 0) throw new GkError(`${m.id}: nhánh ${br} chưa có commit nào — module chưa làm xong`);
     const own = ownershipProblems(plan, m, changedFiles(root, plan.base, br, false));
     if (!own.ok) {
       own.report(`check-ownership ${m.id}`);
@@ -189,7 +202,7 @@ export async function integrate(args) {
       log.info(`[dry-run] merge ${br}`);
       continue;
     }
-    const mr = git(root, ['merge', '--no-ff', '--no-edit', '-m', `merge: ${m.id} (đợt ${wave})`, br], { allowFail: true });
+    const mr = git(root, ['merge', '--no-ff', '--no-edit', '-m', mergeMessage(m.id, wave), br], { allowFail: true });
     if (mr === null) {
       git(root, ['merge', '--abort'], { allowFail: true });
       throw new GkError(`${m.id}: xung đột khi merge — sửa contract hoặc giao lại module, rồi chạy lại integrate`);
@@ -206,9 +219,18 @@ export async function integrate(args) {
   if (args.cleanup && !args['dry-run']) {
     for (const m of mods) {
       const wt = worktreeOf(root, game, m.id);
-      if (exists(wt)) git(root, ['worktree', 'remove', '--force', wt], { allowFail: true });
+      if (!exists(wt)) continue;
+      if (!isMerged(root, plan.base, m.id)) log.warn(`${m.id}: chưa merge — giữ worktree ${wt}`);
+      else if (worktreeDirty(wt)) log.warn(`${m.id}: worktree còn thay đổi chưa commit — giữ ${wt}`);
+      else {
+        // node_modules is a symlink we created; remove it so git sees a clean tree.
+        const nm = path.join(wt, 'node_modules');
+        if (exists(nm) && fs.lstatSync(nm).isSymbolicLink()) fs.unlinkSync(nm);
+        fs.rmSync(path.join(wt, '.gamekit', 'local'), { recursive: true, force: true });
+        if (git(root, ['worktree', 'remove', wt], { allowFail: true }) === null) log.warn(`${m.id}: không gỡ được ${wt}`);
+        else log.ok(`${m.id}: đã gỡ worktree`);
+      }
     }
-    log.ok('Đã gỡ worktree của đợt này');
   }
   log.ok(`Đợt ${wave}: ${merged} module mới được merge vào ${plan.base}`);
   return 0;

@@ -10,8 +10,17 @@ import { loadProvenance, SHIPPED_DIRS, FORBIDDEN_DIRS, pathUnder } from './valid
 export async function run(args) {
   const root = requireGameRoot(args.cwd);
   const pr = new Problems();
-  const staged = (git(root, ['diff', '--cached', '--name-only', '--diff-filter=ACMR']) || '').split('\n').filter(Boolean);
-  const labels = new Map((loadProvenance(root).entries ?? []).map((e) => [e.path, e.label]));
+  // -z keeps non-ASCII (Vietnamese) paths verbatim instead of quoting them.
+  const staged = (git(root, ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z'], { raw: true }) || '').split('\0').filter(Boolean);
+  // Judge by the provenance.json being committed, not the working copy.
+  const stagedProv = git(root, ['show', ':provenance.json'], { allowFail: true, raw: true });
+  let prov;
+  try {
+    prov = stagedProv ? JSON.parse(stagedProv) : loadProvenance(root);
+  } catch {
+    prov = loadProvenance(root);
+  }
+  const labels = new Map((prov.entries ?? []).map((e) => [e.path, e.label]));
   for (const f of staged) {
     if (FORBIDDEN_DIRS.some((d) => pathUnder(f, d + '/'))) pr.error(f, 'thư mục cấm commit (asset gốc / code decompile / dữ liệu local)');
     if (/\.(il|cs\.decompiled|decompiled)$|(^|\/)(Assembly-CSharp|dump)\.cs$/i.test(f)) pr.error(f, 'trông như code decompile — chỉ commit ghi chú RE viết bằng lời của mình');

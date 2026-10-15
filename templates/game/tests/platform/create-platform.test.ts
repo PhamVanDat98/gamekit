@@ -63,6 +63,51 @@ describe('ads', () => {
   });
 });
 
+describe('ads that misbehave', () => {
+  it('an ad that never closes is abandoned after the timeout and the game resumes', async () => {
+    const hang: PortalAdapter = { ...createDevMock({ log: quiet }), showAd: () => new Promise(() => {}) };
+    const bus = new PauseBus();
+    const platform = createPlatform(hang, { bus, saveNamespace: 't', storage: memory(), log: quiet, adTimeoutMs: 20 });
+    expect(await platform.interstitial('x')).toBe('error');
+    expect(bus.paused).toBe(false);
+    expect(await platform.interstitial('y')).toBe('error'); // not stuck on 'skipped'
+  });
+
+  it('a throwing banner never crashes the game', () => {
+    const bad: PortalAdapter = {
+      ...createDevMock({ log: quiet }),
+      capabilities: { interstitial: true, rewarded: true, banner: true, leaderboard: false, cloudSave: false, user: false },
+      showBanner: () => {
+        throw new Error('boom');
+      },
+    };
+    const { platform } = setup(bad);
+    expect(() => platform.showBanner('bottom')).not.toThrow();
+  });
+});
+
+describe('gameplay around ads', () => {
+  it('game stops during the ad (quit to menu) → gameplay is not restarted after', async () => {
+    const mock = createDevMock({ adMs: 5, log: quiet });
+    const { platform } = setup(mock);
+    platform.gameplayStart();
+    const ad = platform.interstitial('x');
+    platform.gameplayStop();
+    await ad;
+    expect(mock.calls.filter((c) => c.startsWith('gameplay'))).toEqual(['gameplayStart', 'gameplayStop']);
+  });
+
+  it('game starts during the ad → gameplay starts once the ad closes', async () => {
+    const mock = createDevMock({ adMs: 5, log: quiet });
+    const { platform } = setup(mock);
+    const ad = platform.interstitial('x');
+    platform.gameplayStart();
+    expect(mock.calls.some((c) => c === 'gameplayStart')).toBe(false);
+    await ad;
+    expect(mock.calls.filter((c) => c.startsWith('gameplay'))).toEqual(['gameplayStart']);
+  });
+});
+
 describe('gameplay events', () => {
   it('start/stop are balanced and idempotent', () => {
     const mock = createDevMock({ log: quiet });

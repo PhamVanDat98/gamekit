@@ -30,20 +30,35 @@ function compress(dir) {
 }
 
 function zipDir(dir, out) {
-  const which = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['zip']);
-  if (which.status !== 0) return false;
   if (exists(out)) fs.rmSync(out);
-  const r = spawnSync('zip', ['-qr', '-X', out, '.'], { cwd: dir });
-  return r.status === 0;
+  if (process.platform === 'win32') {
+    const ps = `Compress-Archive -Path '${path.join(dir, '*').replace(/'/g, "''")}' -DestinationPath '${out.replace(/'/g, "''")}' -Force`;
+    return spawnSync('powershell', ['-NoProfile', '-Command', ps]).status === 0;
+  }
+  if (spawnSync('which', ['zip']).status !== 0) return false;
+  return spawnSync('zip', ['-qr', '-X', out, '.'], { cwd: dir }).status === 0;
 }
+
+/** Pull the meaningful line out of a failed build log instead of the stack tail. */
+function buildError(text = '') {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const pick = lines.find((l) => l.includes('GameKit:')) ?? lines.find((l) => /error/i.test(l)) ?? lines.at(-1) ?? '';
+  return pick.slice(0, 400);
+}
+
+/** Paths whose edits don't change the build (checklists, notes) — not counted as "dirty". */
+const DOC_PATHS = [':!gates', ':!notes', ':!spec', ':!DECISIONS.md', ':!game.yaml', ':!provenance.json'];
 
 export async function run(args) {
   const root = requireGameRoot(args.cwd);
   const game = loadGame(root);
   const portals = args.all || !args.portal ? game.portals : String(args.portal).split(',');
-  for (const p of portals) if (!game.portals.includes(p)) throw new GkError(`Portal ${p} chưa khai báo trong game.yaml (portals)`);
+  for (const p of portals) {
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(p)) throw new GkError(`Tên portal không hợp lệ: "${p}"`);
+    if (!game.portals.includes(p)) throw new GkError(`Portal ${p} chưa khai báo trong game.yaml (portals)`);
+  }
   const commit = git(root, ['rev-parse', '--short', 'HEAD'], { allowFail: true }) ?? 'nogit';
-  const dirty = (git(root, ['status', '--porcelain'], { allowFail: true }) ?? '') !== '';
+  const dirty = (git(root, ['status', '--porcelain', '--', '.', ...DOC_PATHS], { allowFail: true }) ?? '') !== '';
   const buildId = `${game.version}+${commit}${dirty ? '.dirty' : ''}`;
 
   for (const portal of portals) {
@@ -57,12 +72,12 @@ export async function run(args) {
       shell: process.platform === 'win32',
       env: { ...process.env, GK_PORTAL: portal, GK_BUILD: buildId },
     });
-    if (r.status !== 0) throw new GkError(`vite build lỗi cho ${portal}${r.stderr ? `: ${r.stderr.slice(-500)}` : ''}`);
+    if (r.status !== 0) throw new GkError(`vite build lỗi cho ${portal}${args.quiet ? `: ${buildError(`${r.stdout}\n${r.stderr}`)}` : ''}`);
     for (const d of ['Build', 'StreamingAssets', 'TemplateData']) fs.mkdirSync(path.join(out, d), { recursive: true });
     if (args.compress) compress(out);
     const manifestRel = 'StreamingAssets/build-manifest.json';
     const buildHash = hashDir(out, { exclude: [manifestRel] });
-    writeJson(path.join(out, manifestRel), { name: game.name, title: game.title, version: game.version, portal, buildId, buildHash, builtAt: nowIso() });
+    writeJson(path.join(out, manifestRel), { name: game.name, title: game.title, version: game.version, portal, buildId, commit, dirty, buildHash, builtAt: nowIso() });
     log.ok(`dist/${portal}  build ${buildId}  hash ${buildHash}`);
     if (args.zip) {
       const z = path.join(root, 'dist', `${game.name}-${portal}-v${game.version}.zip`);

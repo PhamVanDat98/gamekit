@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { exists, readJson, readYaml, walk } from './lib/io.mjs';
 import { check } from './lib/schema.mjs';
-import { Problems } from './lib/log.mjs';
+import { Problems, GkError } from './lib/log.mjs';
+import { git } from './lib/git.mjs';
 import { requireGameRoot, loadGame } from './lib/game.mjs';
 import { PHASES } from './lib/phases.mjs';
 import { pngInfo } from './lib/png.mjs';
@@ -134,6 +135,9 @@ function validateProvenance(root, st, pr) {
 }
 
 function isIgnored(root, dir) {
+  const viaGit = git(root, ['check-ignore', '-q', dir + '/'], { allowFail: true });
+  if (viaGit !== null) return true; // exit 0 = ignored
+  if (git(root, ['rev-parse', '--git-dir'], { allowFail: true }) !== null) return false;
   const gi = path.join(root, '.gitignore');
   if (!exists(gi)) return false;
   const lines = fs.readFileSync(gi, 'utf8').split('\n').map((l) => l.trim().replace(/^\//, '').replace(/\/$/, ''));
@@ -218,7 +222,11 @@ function validateAssetManifest(root, pr) {
 
 export async function run(args) {
   const root = requireGameRoot(args.cwd);
-  const stage = args.stage ? PHASES.indexOf(args.stage) : undefined;
+  let stage;
+  if (args.stage) {
+    stage = args.stage === 'released' ? PHASES.length : PHASES.indexOf(args.stage);
+    if (stage < 0) throw new GkError(`--stage phải là một trong: ${PHASES.join(', ')}, released`);
+  }
   const { problems } = validateGame(root, { stage });
   return problems.report('validate') ? 0 : 1;
 }

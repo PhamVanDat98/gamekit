@@ -1,28 +1,39 @@
 #!/usr/bin/env node
-// SessionStart: load using-gamekit into context and, inside a game folder, its current status.
-// Never fails the session: any error just means less context.
+// SessionStart. Inside a game folder (has game.yaml): load using-gamekit + current status.
+// Elsewhere: one line, so other projects aren't flooded. Never fails the session.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-let context = '';
-try {
-  if (!fs.existsSync(path.join(root, 'node_modules'))) {
-    spawnSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--silent'], { cwd: root, stdio: 'ignore', timeout: 60000, shell: process.platform === 'win32' });
+
+function findGameRoot(start) {
+  let dir = path.resolve(start);
+  for (;;) {
+    if (fs.existsSync(path.join(dir, 'game.yaml'))) return dir;
+    const up = path.dirname(dir);
+    if (up === dir) return null;
+    dir = up;
   }
-  const skill = fs.readFileSync(path.join(root, 'skills', 'using-gamekit', 'SKILL.md'), 'utf8').replace(/^---[\s\S]*?---\n/, '');
-  context += `<gamekit>\nGameKit plugin đang bật. Hướng dẫn using-gamekit:\n\n${skill}\n`;
-  const cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-  const { findGameRoot } = await import('../scripts/lib/game.mjs');
-  const gameRoot = findGameRoot(cwd);
-  if (gameRoot) {
+}
+
+let context;
+try {
+  const gameRoot = findGameRoot(process.env.CLAUDE_PROJECT_DIR || process.cwd());
+  if (!gameRoot) {
+    context = '<gamekit>GameKit đã cài. Khi người dùng muốn port/reskin game cho web hoặc làm việc trong thư mục có game.yaml, dùng skill using-gamekit.</gamekit>';
+  } else {
+    if (!fs.existsSync(path.join(root, 'node_modules'))) {
+      spawnSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--silent'], { cwd: root, stdio: 'ignore', timeout: 90000, shell: process.platform === 'win32' });
+    }
+    const skill = fs.readFileSync(path.join(root, 'skills', 'using-gamekit', 'SKILL.md'), 'utf8').replace(/^---[\s\S]*?---\n/, '');
+    context = `<gamekit>\nThư mục này là một game GameKit. Hướng dẫn using-gamekit:\n\n${skill}\n`;
     const r = spawnSync(process.execPath, [path.join(root, 'scripts', 'gamekit.mjs'), 'status'], { cwd: gameRoot, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 15000 });
     if (r.stdout) context += `\nTrạng thái game hiện tại (gamekit status):\n${r.stdout}`;
+    context += '</gamekit>';
   }
-  context += '</gamekit>';
 } catch (e) {
-  context = context ? context + '</gamekit>' : `<gamekit>GameKit: không nạp được hướng dẫn (${e.message}).</gamekit>`;
+  context = `<gamekit>GameKit: không nạp được hướng dẫn (${e.message}). Dùng skill using-gamekit.</gamekit>`;
 }
 process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context } }));

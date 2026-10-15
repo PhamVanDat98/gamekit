@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 // GameKit CLI. Every agent (Claude Code, Codex) and every IDE task calls this same entry point.
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { log } from './lib/log.mjs';
 
 const HELP = `GameKit — port & reskin web game
@@ -69,7 +71,15 @@ export async function main(argv = process.argv.slice(2)) {
   return fn({ ...args, _: rest, cmd });
 }
 
-const isMain = import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('gamekit.mjs');
+// Resolve symlinks so `npm link` / npx bins (…/bin/gamekit) count as running this file.
+const realArgv1 = (() => {
+  try {
+    return fs.realpathSync(process.argv[1] ?? '');
+  } catch {
+    return '';
+  }
+})();
+const isMain = realArgv1 === fileURLToPath(import.meta.url);
 if (isMain) {
   main()
     .then((code) => process.exit(code ?? 0))

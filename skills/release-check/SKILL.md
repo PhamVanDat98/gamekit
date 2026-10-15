@@ -12,9 +12,10 @@ description: Dùng trước khi phát hành hoặc nộp game lên portal (cổn
 | Lỗi | Sửa |
 | --- | --- |
 | asset `reference` / `placeholder` | Thay bằng asset mới (P3), gắn nhãn `generated`/`own`/`licensed` |
+| đóng gói từ bản chưa commit / commit khác HEAD | Commit code và asset, `gamekit pack` lại (sửa gates/notes/spec/game.yaml không tính) |
 | file không có nhãn provenance | `gamekit provenance add <file> --label … --source …` (licensed cần `--license`) |
-| còn tên/thương hiệu game gốc | Đổi text, tên file, metadata; kiểm tra `release.forbiddenTerms` đủ chưa |
-| link ngoài tới host X | Bỏ link; nếu là CDN SDK portal thì thêm vào `release.allowedHosts` |
+| còn tên/thương hiệu game gốc (text, tên file, chuỗi trong file nhị phân) | Đổi text, tên file, metadata; kiểm tra `release.forbiddenTerms` đủ chưa |
+| link ngoài tới host X (kể cả localhost, IP, ws://, `//host` trong index.html) | Bỏ link; nếu là CDN SDK portal thì thêm vào `release.allowedHosts`. URL tài liệu nằm trong thư viện minified cũng bị báo — kiểm tra rồi thêm host vào allowedHosts nếu vô hại |
 | đường dẫn tuyệt đối trong index.html | Dùng `./…`; `base: './'` trong vite.config.ts |
 | tải đầu vượt ngân sách | Chuyển asset lớn sang `StreamingAssets/` tải sau, nén texture/audio, tách code |
 | source map | Tắt `build.sourcemap` |

@@ -110,7 +110,8 @@
     "portals": {
       "type": "array",
       "items": {
-        "type": "string"
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
       },
       "minItems": 1,
       "description": "Adapter cần đóng gói, vd dev-mock"

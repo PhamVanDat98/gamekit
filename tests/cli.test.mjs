@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { gk, newGame, sh, write, read, editJson } from './helpers.mjs';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
@@ -103,6 +104,10 @@ test('gate: parses items, runs auto checks, advances and records timings', () =>
   const dir = newGame();
   assert.equal(gk(dir, 'gate').code, 1);
   write(dir, 'gates/P0.md', read(dir, 'gates/P0.md').replaceAll('- [ ]', '- [x]'));
+  const fieldFail = gk(dir, 'gate');
+  assert.equal(fieldFail.code, 1, 'source.path and forbiddenTerms still empty');
+  assert.match(fieldFail.out, /source\.path chưa điền/);
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig').replace('forbiddenTerms: []', 'forbiddenTerms: [OldName]'));
   assert.equal(gk(dir, 'gate').code, 0);
   assert.equal(gk(dir, 'gate', '--advance').code, 0);
   const y = read(dir, 'game.yaml');
@@ -188,7 +193,14 @@ test('release-check: provenance, original names, foreign links, absolute paths, 
   write(dir, 'dist/p/TemplateData/logo.png', 'x');
   write(dir, 'dist/p/StreamingAssets/level1.json', '{}');
   const prov = { entries: [{ path: 'public/TemplateData/logo.png', label: 'placeholder' }] };
+  write(dir, 'dist/p/StreamingAssets/build-manifest.json', JSON.stringify({ buildId: '0.1.0+abc.dirty', commit: 'abc', dirty: true }));
+  write(dir, 'dist/p/Build/oldname-core.wasm', Buffer.from('\0asm OLDNAME \0').toString());
+  write(dir, 'dist/p/Build/b.js', 'new WebSocket("wss://10.0.0.5:9000");fetch("http://localhost:8080")');
   const errs = checkPackage(dir, 'p', game, prov).errors.join('\n');
+  assert.match(errs, /chưa commit/);
+  assert.match(errs, /tên file còn tên game gốc/);
+  assert.match(errs, /10\.0\.0\.5/);
+  assert.match(errs, /localhost/);
   assert.match(errs, /evil\.example\.com/);
   assert.doesNotMatch(errs, /sdk\.portal\.com|w3\.org/);
   assert.match(errs, /oldname/);
@@ -210,4 +222,82 @@ test('session-start hook emits context JSON', () => {
   assert.equal(json.hookSpecificOutput.hookEventName, 'SessionStart');
   assert.match(json.hookSpecificOutput.additionalContext, /Luật cứng/);
   assert.match(json.hookSpecificOutput.additionalContext, /P0 Intake/);
+});
+
+test('non-ASCII (Vietnamese) paths are checked, not quoted away', () => {
+  const dir = newGame('vn');
+  write(dir, 'assets/nhân vật.png', 'x');
+  sh(dir, 'git', 'add', '-A');
+  assert.throws(() => sh(dir, 'git', 'commit', '-qm', 'x'), /chưa có nhãn/);
+  gk(dir, 'provenance', 'add', 'assets/nhân vật.png', '--label', 'own');
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'ok');
+});
+
+test('pre-commit judges the staged provenance.json, not the working copy', () => {
+  const dir = newGame('stg');
+  write(dir, 'assets/a.png', 'x');
+  sh(dir, 'git', 'add', 'assets/a.png');
+  gk(dir, 'provenance', 'add', 'assets/a.png', '--label', 'own'); // labelled but provenance.json not staged
+  assert.throws(() => sh(dir, 'git', 'commit', '-qm', 'x'));
+});
+
+test('integrate: moving a shared file is caught; empty branches are not "merged"; deleted branches still count', () => {
+  const dir = newGame('edge');
+  write(dir, 'module-plan.yaml', `base: main
+shared: [src/contracts/, params/, package.json, game.yaml, module-plan.yaml]
+modules:
+  - { id: a, wave: 1, owns: [src/core/a/], brief: A }
+  - { id: e, wave: 1, owns: [src/core/e/], brief: E }
+  - { id: c, wave: 2, owns: [src/core/c/], dependsOn: [a], brief: C }
+`);
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  assert.equal(gk(dir, 'fanout', '--wave', '1').code, 0);
+  const wt = (id) => path.join(path.dirname(dir), 'edge.worktrees', id);
+  sh(wt('a'), 'git', 'config', 'user.email', 't@e');
+  fs.mkdirSync(path.join(wt('a'), 'src/core/a'), { recursive: true });
+  sh(wt('a'), 'git', 'mv', 'src/contracts/input.ts', 'src/core/a/input.ts');
+  sh(wt('a'), 'git', 'commit', '-qm', 'move');
+  const moved = gk(dir, 'integrate', '--wave', '1', '--test', 'exit 0');
+  assert.equal(moved.code, 1);
+  assert.match(moved.out, /src\/contracts\/input\.ts/);
+  sh(wt('a'), 'git', 'reset', '-q', '--hard', 'HEAD~1');
+  write(wt('a'), 'src/core/a/x.ts', 'export const x = 1;\n');
+  sh(wt('a'), 'git', 'add', '-A');
+  sh(wt('a'), 'git', 'commit', '-qm', 'a');
+  // e has no commits but an uncommitted file: must not be treated as merged nor have its work deleted
+  write(wt('e'), 'src/core/e/wip.ts', 'export const w = 1;\n');
+  const r = gk(dir, 'integrate', '--wave', '1', '--test', 'exit 0', '--cleanup');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /chưa commit/);
+  assert.ok(fs.existsSync(path.join(wt('e'), 'src/core/e/wip.ts')), 'uncommitted work kept');
+  sh(dir, 'git', 'worktree', 'remove', wt('a'));
+  sh(dir, 'git', 'branch', '-D', 'mod/a');
+  assert.equal(gk(dir, 'fanout', '--wave', '2').code, 0, 'a counted as merged via its merge commit');
+});
+
+test('init: titles with YAML/HTML special characters stay valid', () => {
+  const parent = (() => fs.mkdtempSync(path.join(os.tmpdir(), 'gk-')))();
+  const { code, out } = gk(parent, 'init', 'zr', '--title', 'Zombie: Run #2 <A & B>', '--no-install', '--no-git');
+  assert.equal(code, 0, out);
+  const dir = path.join(parent, 'zr');
+  assert.match(read(dir, 'game.yaml'), /title: "Zombie: Run #2 <A & B>"/);
+  assert.match(read(dir, 'index.html'), /<title>Zombie: Run #2 &lt;A &amp; B&gt;<\/title>/);
+  assert.equal(gk(dir, 'validate').code, 0);
+});
+
+test('validate rejects unknown --stage; portal names are restricted', () => {
+  const dir = newGame('stage');
+  assert.equal(gk(dir, 'validate', '--stage', 'P9').code, 1);
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('  - dev-mock', '  - ".."'));
+  assert.equal(gk(dir, 'validate').code, 1);
+  assert.equal(gk(dir, 'pack', '--portal', '..').code, 1);
+});
+
+test('CLI runs through a symlinked bin (npm link)', () => {
+  const link = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gk-')), 'gamekit');
+  fs.symlinkSync(path.join(import.meta.dirname, '..', 'scripts', 'gamekit.mjs'), link);
+  const out = sh(os.tmpdir(), process.execPath, link, 'help');
+  assert.match(out, /GameKit/);
 });

@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { copyDir, exists, writeJson } from './lib/io.mjs';
+import { copyDir, exists, readYaml, writeJson } from './lib/io.mjs';
 import { log, GkError } from './lib/log.mjs';
 import { git } from './lib/git.mjs';
 import { nowIso } from './lib/game.mjs';
-import { SCHEMA_DIR } from './lib/schema.mjs';
+import { SCHEMA_DIR, check } from './lib/schema.mjs';
 
 export const GAMEKIT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TEMPLATE = path.join(GAMEKIT_ROOT, 'templates', 'game');
@@ -23,7 +23,18 @@ export async function run(args) {
   if (exists(dest) && fs.readdirSync(dest).length) throw new GkError(`${dest} đã có và không rỗng`);
 
   const vars = { NAME: name, TITLE: title, ENGINE: engine, CREATED: nowIso() };
-  copyDir(TEMPLATE, dest, { transform: (s) => s.replace(/\{\{(NAME|TITLE|ENGINE|CREATED)\}\}/g, (_, k) => vars[k]) });
+  // Escape per file type so titles like "Zombie: Run #2" or "A & B" stay valid.
+  const esc = (k, rel) => {
+    const v = vars[k];
+    if (k !== 'TITLE') return v;
+    if (/\.ya?ml$/.test(rel)) return JSON.stringify(v);
+    if (/\.html$/.test(rel)) return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    if (/\.json$/.test(rel)) return JSON.stringify(v).slice(1, -1);
+    return v;
+  };
+  copyDir(TEMPLATE, dest, { transform: (s, rel) => s.replace(/\{\{(NAME|TITLE|ENGINE|CREATED)\}\}/g, (_, k) => esc(k, rel)) });
+  const gameErrors = check('game', readYaml(path.join(dest, 'game.yaml')));
+  if (gameErrors.length) throw new GkError(`game.yaml sinh ra không hợp lệ: ${gameErrors.join('; ')}`);
 
   // Schemas travel with the game so editors validate offline and versions stay pinned.
   fs.mkdirSync(path.join(dest, '.gamekit', 'schemas'), { recursive: true });

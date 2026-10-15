@@ -6,8 +6,9 @@ description: Dùng ở pha P4 khi gắn game vào một portal hoặc SDK quản
 # Gắn SDK portal
 
 Gameplay chỉ gọi `Platform` (`src/platform/types.ts`). Mỗi portal là một **adapter mỏng** trong `src/platform/adapters/<portal>.ts`. Các luật bắt buộc trên mọi portal đã nằm sẵn trong `createPlatform()` — adapter không cần (và không được) tự làm lại:
-- pause + tắt tiếng khi ad chạy (PauseBus), resume khi ad đóng, kể cả khi SDK lỗi;
-- `gameplayStop` trước ad và `gameplayStart` lại sau, start/stop cân bằng;
+- pause + tắt tiếng khi ad chạy (PauseBus), resume khi ad đóng, kể cả khi SDK ném lỗi hoặc không bao giờ báo lại (hết `adTimeoutMs`, mặc định 60 giây → `error`);
+- SDK tải lỗi hoặc `init()` quá 10 giây → game vẫn chạy với adapter offline (không ad), ghi event `error`;
+- gameplay start/stop theo đúng ý game: ad buộc dừng, ad đóng thì theo trạng thái game muốn lúc đó (game thoát ra menu giữa ad thì không bật lại);
 - không chồng hai ad; ad không hỗ trợ → `unavailable` mà không pause;
 - chỉ nhận tên event trong `src/platform/events.ts`;
 - save fallback localStorage có namespace.
