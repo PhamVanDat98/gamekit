@@ -1,0 +1,13 @@
+{
+  "$schema": "../../.gamekit/schemas/oracle.schema.json",
+  "source": "template-demo: tính từ params mẫu, không phải game gốc. Khi port: lấy từ game gốc (bảng data, hằng số đọc trong binary, hoặc đo)",
+  "confidence": "derived",
+  "description": "Tốc độ rơi (px/s) theo thời gian chơi t (s)",
+  "tolerance": 0.001,
+  "cases": [
+    { "in": { "t": 0 }, "out": 180 },
+    { "in": { "t": 5 }, "out": 210 },
+    { "in": { "t": 10 }, "out": 240 },
+    { "in": { "t": 30 }, "out": 360 }
+  ]
+}

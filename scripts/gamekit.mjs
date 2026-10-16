@@ -11,7 +11,8 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   init <tên> [--title] [--engine] [--dir]   Tạo game mới từ template
   status | next                             Game đang ở pha nào, việc gì tiếp
   gate [--advance]                          Kiểm tra cổng của pha hiện tại
-  validate [--stage P2]                     Kiểm tra game.yaml, params, provenance, module-plan, asset-manifest
+  validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
+  parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)
   provenance add <file…> --label <nhãn>     Gắn nguồn gốc asset (reference|generated|own|licensed|placeholder)
   provenance list [--label]
   pack [--portal a,b | --all] [--compress] [--zip]   Đóng gói mỗi portal một bản trong dist/
@@ -45,6 +46,7 @@ const COMMANDS = {
   next: () => import('./status.mjs').then((m) => m.run),
   gate: () => import('./gate.mjs').then((m) => m.run),
   validate: () => import('./validate.mjs').then((m) => m.run),
+  parity: () => import('./parity.mjs').then((m) => m.run),
   provenance: () => import('./provenance.mjs').then((m) => m.run),
   pack: () => import('./pack.mjs').then((m) => m.run),
   'release-check': () => import('./release-check.mjs').then((m) => m.run),

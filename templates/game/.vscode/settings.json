@@ -2,10 +2,12 @@
   "json.schemas": [
     { "fileMatch": ["/params/*.json"], "url": "./.gamekit/schemas/params.schema.json" },
     { "fileMatch": ["/provenance.json"], "url": "./.gamekit/schemas/provenance.schema.json" },
-    { "fileMatch": ["/asset-manifest.json"], "url": "./.gamekit/schemas/asset-manifest.schema.json" }
+    { "fileMatch": ["/asset-manifest.json"], "url": "./.gamekit/schemas/asset-manifest.schema.json" },
+    { "fileMatch": ["/spec/oracles/*.json"], "url": "./.gamekit/schemas/oracle.schema.json" }
   ],
   "yaml.schemas": {
     "./.gamekit/schemas/game.schema.json": "game.yaml",
+    "./.gamekit/schemas/obligations.schema.json": "spec/obligations.yaml",
     "./.gamekit/schemas/module-plan.schema.json": ["module-plan.yaml", "module-plan.example.yaml"]
   },
   "files.exclude": { "**/node_modules": true },

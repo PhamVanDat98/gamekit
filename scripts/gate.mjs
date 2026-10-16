@@ -10,6 +10,7 @@ import { log, GkError } from './lib/log.mjs';
 import { requireGameRoot, loadGame, updateGame, nowIso } from './lib/game.mjs';
 import { PHASES, PHASE_INFO, nextPhase } from './lib/phases.mjs';
 import { validateGame } from './validate.mjs';
+import { parityDetail, parityForGame } from './parity.mjs';
 
 /**
  * Gate file syntax (gates/P2.md):
@@ -36,6 +37,14 @@ function runAuto(root, name, phase) {
   if (name === 'validate') {
     const { problems } = validateGame(root, { stage: PHASES.indexOf(phase) });
     return { ok: problems.ok, detail: problems.errors.slice(0, 5).join('; ') };
+  }
+  if (name === 'parity') {
+    try {
+      const r = parityForGame(root);
+      return { ok: r.ok, detail: r.ok ? '' : parityDetail(r) };
+    } catch (e) {
+      return { ok: false, detail: e.message };
+    }
   }
   if (name.startsWith('field:')) {
     // field:release.forbiddenTerms → the game.yaml value must be non-empty

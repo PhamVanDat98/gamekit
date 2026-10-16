@@ -27,14 +27,14 @@ function playScripted(seed: number) {
 }
 
 describe('replay', () => {
-  it('same seed + recorded input → identical final state', () => {
+  it('[run.replay:replay] same seed + recorded input → identical final state', () => {
     const live = playScripted(1234);
     const w = createWorld(PARAMS, 1234);
     for (let t = 0; t < live.ticks; t++) stepWorld(w, PARAMS, { tick: w.tick, actions: inputAt(live.frames, w.tick) }, DT);
     expect(worldHash(w)).toBe(live.hash);
   });
 
-  it('different seed → different run', () => {
+  it('[run.replay:replay] different seed → different run', () => {
     expect(playScripted(1).hash).not.toBe(playScripted(2).hash);
   });
 });

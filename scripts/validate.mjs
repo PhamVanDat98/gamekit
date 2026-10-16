@@ -33,7 +33,9 @@ export function validateGame(root, { stage } = {}) {
   }
   const st = stage ?? Math.max(0, phaseIndex(game.phase));
 
-  validateParams(root, st, pr);
+  const paramKeys = validateParams(root, st, pr);
+  validateObligations(root, st, pr, paramKeys);
+  validateOracles(root, pr);
   validateProvenance(root, st, pr);
   validateModulePlan(root, pr);
   validateAssetManifest(root, pr);
@@ -51,7 +53,7 @@ export function collectParams(obj, prefix = '', out = []) {
   return out;
 }
 
-function decisionIds(root) {
+export function decisionIds(root) {
   const f = path.join(root, 'DECISIONS.md');
   if (!exists(f)) return new Set();
   const text = fs.readFileSync(f, 'utf8').replace(/```[\s\S]*?```/g, ''); // ignore the template example
@@ -64,6 +66,7 @@ function validateParams(root, st, pr) {
   const files = walk(dir).filter((f) => f.endsWith('.json'));
   const strict = st >= PHASES.indexOf('P2'); // from P2 on, no TODO sources and no unapproved deviations
   const decisions = decisionIds(root);
+  const keys = new Set();
   for (const rel of files) {
     const where = `params/${rel}`;
     let data;
@@ -74,15 +77,70 @@ function validateParams(root, st, pr) {
       continue;
     }
     for (const e of check('params', data)) pr.error(where, e);
+    const stem = rel.replace(/\.json$/, '').replaceAll('/', '.');
     for (const [key, p] of collectParams(data)) {
+      keys.add(key).add(`${stem}.${key}`);
       const src = String(p.source ?? '').trim();
       if (!src) pr.error(where, `${key}: thiếu source (luật cứng: số liệu phải có nguồn từ game gốc)`);
       else if (/^todo\b/i.test(src)) (strict ? pr.error : pr.warn).call(pr, where, `${key}: source còn TODO`);
+      if (p.confidence === 'inferred' && p.tolerance == null)
+        (strict ? pr.error : pr.warn).call(pr, where, `${key}: giá trị ước lượng (inferred) cần tolerance để parity test so được`);
       if (p.deviation) {
         const d = p.deviation;
         if (!decisions.has(d.decision)) pr.error(where, `${key}: deviation trỏ tới ${d.decision} nhưng DECISIONS.md không có mục này`);
         if (!d.approved) (strict ? pr.error : pr.warn).call(pr, where, `${key}: sai khác game gốc chưa được duyệt (${d.decision})`);
       }
+    }
+  }
+  return keys;
+}
+
+// ---------- spec/obligations.yaml: parity obligations ----------
+export const OBLIGATIONS_FILE = 'spec/obligations.yaml';
+
+export function loadObligations(root) {
+  const f = path.join(root, OBLIGATIONS_FILE);
+  return exists(f) ? readYaml(f) : null;
+}
+
+function validateObligations(root, st, pr, paramKeys) {
+  const where = OBLIGATIONS_FILE;
+  let data;
+  try {
+    data = loadObligations(root);
+  } catch (e) {
+    pr.error(where, e.message);
+    return;
+  }
+  if (!data) return;
+  const errs = check('obligations', data);
+  for (const e of errs) pr.error(where, e);
+  if (errs.length) return;
+  const strict = st >= PHASES.indexOf('P2');
+  const decisions = decisionIds(root);
+  const seen = new Set();
+  for (const o of data.obligations) {
+    if (seen.has(o.id)) pr.error(where, `trùng id ${o.id}`);
+    seen.add(o.id);
+    for (const k of o.params ?? []) if (!paramKeys.has(k)) pr.error(where, `${o.id}: params ${k} không có trong params/`);
+    if (o.oracle && !exists(path.join(root, o.oracle))) pr.error(where, `${o.id}: không có file oracle ${o.oracle}`);
+    if ((o.status ?? 'active') !== 'active') {
+      if (!o.decision) pr.error(where, `${o.id}: ${o.status} cần decision D-n trong DECISIONS.md`);
+      else if (!decisions.has(o.decision)) pr.error(where, `${o.id}: trỏ tới ${o.decision} nhưng DECISIONS.md không có mục này`);
+      if (!o.approved) (strict ? pr.error : pr.warn).call(pr, where, `${o.id}: ${o.status} chưa được người dùng duyệt (${o.decision ?? 'thiếu D-n'})`);
+    }
+  }
+}
+
+// ---------- spec/oracles/*.json: input → output tables from the original game ----------
+function validateOracles(root, pr) {
+  const dir = path.join(root, 'spec', 'oracles');
+  for (const rel of walk(dir).filter((f) => f.endsWith('.json'))) {
+    const where = `spec/oracles/${rel}`;
+    try {
+      for (const e of check('oracle', readJson(path.join(dir, rel)))) pr.error(where, e);
+    } catch (e) {
+      pr.error(where, e.message);
     }
   }
 }

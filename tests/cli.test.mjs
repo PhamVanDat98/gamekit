@@ -9,6 +9,8 @@ import { checkModulePlan } from '../scripts/validate.mjs';
 import { checkPackage } from '../scripts/release-check.mjs';
 import { ownershipProblems, topo } from '../scripts/parallel.mjs';
 import { parseArgs } from '../scripts/gamekit.mjs';
+import { evaluateParity, testsFromVitestReport } from '../scripts/parity.mjs';
+import YAML from 'yaml';
 
 test('init creates a valid game with git, hook and schemas', () => {
   const dir = newGame();
@@ -300,4 +302,140 @@ test('CLI runs through a symlinked bin (npm link)', () => {
   fs.symlinkSync(path.join(import.meta.dirname, '..', 'scripts', 'gamekit.mjs'), link);
   const out = sh(os.tmpdir(), process.execPath, link, 'help');
   assert.match(out, /GameKit/);
+});
+
+// ---------- parity: obligations ledger (spec/obligations.yaml) closed by tagged tests ----------
+const ob = (id, extra = {}) => ({ id, title: id, cases: ['normal'], ...extra });
+const t = (name, status = 'passed') => ({ name, status });
+
+test('parity: an obligation closes only when every required case has a passing tagged test', () => {
+  const two = [ob('move', { cases: ['normal', 'edge'] })];
+  const open = evaluateParity({ obligations: two, tests: [t('[move:normal] moves')] });
+  assert.equal(open.ok, false);
+  assert.equal(open.items[0].state, 'open');
+  assert.deepEqual(open.items[0].missing, ['edge']);
+  const closed = evaluateParity({ obligations: two, tests: [t('[move:normal] a'), t('parity [move:edge] b')] });
+  assert.equal(closed.ok, true, closed.errors.join('\n'));
+  assert.equal(closed.items[0].state, 'closed');
+});
+
+test('parity: failed, skipped or todo tagged tests never count as pass', () => {
+  for (const [status, state] of [['failed', 'failed'], ['skipped', 'unknown'], ['todo', 'unknown'], ['pending', 'unknown']]) {
+    const r = evaluateParity({ obligations: [ob('a')], tests: [t('[a:normal] x'), t('[a:normal] y', status)] });
+    assert.equal(r.ok, false, status);
+    assert.equal(r.items[0].state, state, status);
+  }
+});
+
+test('parity: stale tags, unknown case kinds and a ledger without required obligations fail', () => {
+  const stale = evaluateParity({ obligations: [ob('a')], tests: [t('[a:normal] x'), t('[gone:normal] y')] });
+  assert.equal(stale.ok, false);
+  assert.match(stale.errors.join('\n'), /gone/);
+  const kind = evaluateParity({ obligations: [ob('a')], tests: [t('[a:normal] x'), t('[a:weird] y')] });
+  assert.equal(kind.ok, false);
+  assert.match(kind.errors.join('\n'), /weird/);
+  assert.equal(evaluateParity({ obligations: [], tests: [] }).ok, false);
+  const optional = evaluateParity({ obligations: [ob('a', { required: false })], tests: [] });
+  assert.equal(optional.ok, false, 'không có nghĩa vụ bắt buộc nào');
+  const mixed = evaluateParity({ obligations: [ob('a'), ob('b', { required: false })], tests: [t('[a:normal] x')] });
+  assert.equal(mixed.ok, true, 'nghĩa vụ tuỳ chọn còn mở không chặn');
+  assert.equal(mixed.items[1].state, 'open');
+});
+
+test('parity: out-of-scope/blocked needs an approved decision and never counts as closed', () => {
+  const decisions = new Set(['D-2']);
+  const base = [ob('a')];
+  const tests = [t('[a:normal] x')];
+  const waived = evaluateParity({ obligations: [...base, ob('b', { status: 'out-of-scope', decision: 'D-2', approved: true })], tests, decisions });
+  assert.equal(waived.ok, true, waived.errors.join('\n'));
+  assert.equal(waived.items[1].state, 'waived');
+  const unapproved = evaluateParity({ obligations: [...base, ob('b', { status: 'blocked', decision: 'D-2', approved: false })], tests, decisions });
+  assert.equal(unapproved.ok, false);
+  const noEntry = evaluateParity({ obligations: [...base, ob('b', { status: 'blocked', decision: 'D-9', approved: true })], tests, decisions });
+  assert.equal(noEntry.ok, false);
+  assert.match(noEntry.errors.join('\n'), /D-9/);
+});
+
+test('parity: reads vitest JSON reports', () => {
+  const report = { testResults: [{ name: '/g/tests/a.test.ts', assertionResults: [
+    { ancestorTitles: ['parity'], title: '[a:normal] x', fullName: 'parity [a:normal] x', status: 'passed' },
+    { ancestorTitles: ['p'], title: '[a:edge] y', status: 'failed' },
+  ] }] };
+  assert.deepEqual(testsFromVitestReport(report), [
+    { name: 'parity [a:normal] x', file: '/g/tests/a.test.ts', status: 'passed' },
+    { name: 'p [a:edge] y', file: '/g/tests/a.test.ts', status: 'failed' },
+  ]);
+});
+
+test('parity command: template ledger, --report, exit 1 until every obligation is closed', () => {
+  const dir = newGame('par');
+  const { obligations } = YAML.parse(read(dir, 'spec/obligations.yaml'));
+  assert.ok(obligations.length > 0, 'template có nghĩa vụ mẫu');
+  write(dir, '.gamekit/local/r.json', JSON.stringify({ testResults: [] }));
+  let r = gk(dir, 'parity', '--report', '.gamekit/local/r.json');
+  assert.equal(r.code, 1);
+  assert.ok(r.out.includes(obligations[0].id), r.out);
+  const assertionResults = obligations.flatMap((o) => o.cases.map((c) => ({ ancestorTitles: [], title: `[${o.id}:${c}] ok`, status: 'passed' })));
+  write(dir, '.gamekit/local/r.json', JSON.stringify({ testResults: [{ name: 'x', assertionResults }] }));
+  r = gk(dir, 'parity', '--report', '.gamekit/local/r.json');
+  assert.equal(r.code, 0, r.out);
+  fs.rmSync(path.join(dir, 'spec/obligations.yaml'));
+  r = gk(dir, 'parity', '--report', '.gamekit/local/r.json');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /obligations\.yaml/);
+  assert.match(read(dir, 'gates/P2.md'), /\{auto: parity\}/);
+});
+
+test('validate: obligations reference real params, ids are unique, waivers need DECISIONS and approval from P2', () => {
+  const dir = newGame('obl');
+  assert.equal(gk(dir, 'validate').code, 0);
+  const put = (body) => write(dir, 'spec/obligations.yaml', `obligations:\n${body}`);
+  put('  - { id: a, title: A, cases: [normal], params: [player.nope] }\n');
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /player\.nope/);
+  put('  - { id: a, title: A, cases: [normal] }\n  - { id: a, title: B, cases: [edge] }\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /trùng/);
+  put('  - { id: a, title: A, cases: [weird] }\n');
+  assert.equal(gk(dir, 'validate').code, 1);
+  put('  - { id: a, title: A, cases: [normal], params: [player.speed], status: out-of-scope, decision: D-4, approved: false }\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /D-4/);
+  fs.appendFileSync(path.join(dir, 'DECISIONS.md'), '\n## D-4 Bỏ chế độ online\n');
+  assert.equal(gk(dir, 'validate').code, 0);
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 1);
+});
+
+test('validate: oracle tables in spec/oracles need a source and cases', () => {
+  const dir = newGame('orc');
+  write(dir, 'spec/oracles/pan.json', JSON.stringify({ cases: [{ in: 1, out: 2 }] }));
+  const r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /source/);
+  write(dir, 'spec/oracles/pan.json', JSON.stringify({ source: 'Game.exe 0x406400, đọc hằng số', confidence: 'observed', cases: [] }));
+  assert.equal(gk(dir, 'validate').code, 1, 'cần ít nhất một case');
+  write(dir, 'spec/oracles/pan.json', JSON.stringify({ source: 'Game.exe 0x406400', confidence: 'observed', cases: [{ in: { x: 0 }, out: 0.5 }] }));
+  assert.equal(gk(dir, 'validate').code, 0);
+});
+
+test('params: confidence is observed|derived|inferred; inferred needs a tolerance from P2', () => {
+  const dir = newGame('conf');
+  editJson(dir, 'params/game.json', (p) => {
+    p.player.size.confidence = 'guess';
+  });
+  assert.equal(gk(dir, 'validate').code, 1);
+  editJson(dir, 'params/game.json', (p) => {
+    p.player.size.confidence = 'inferred';
+  });
+  const r = gk(dir, 'validate');
+  assert.equal(r.code, 0);
+  assert.match(r.out, /player\.size.*tolerance/);
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 1);
+  editJson(dir, 'params/game.json', (p) => {
+    p.player.size.tolerance = 0.05;
+  });
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0);
 });

@@ -31,6 +31,7 @@ cd ~/games/my-game
 npm run dev                 # chơi thử với dev-mock (?ad=fail|skip|none|slow)
 npm run gk -- status        # pha hiện tại, việc còn mở, skill tiếp theo
 npm test                    # parity + replay + platform
+npm run gk -- parity        # mọi nghĩa vụ trong spec/obligations.yaml đã có test xanh?
 npm run gk -- gate          # kiểm tra cổng; --advance để sang pha sau
 npm run gk -- pack --all --zip
 npm run gk -- release-check
@@ -45,7 +46,8 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | `init <tên>` | Tạo game từ `templates/game`, git init, cài hook, cài dependency |
 | `status` / `next` | Pha, thời gian ở pha (cảnh báo vượt dự kiến), việc còn mở, skill tiếp theo |
 | `gate [--advance]` | Chấm `gates/<pha>.md`: mục `{auto: …}` chạy script, mục `(bạn)` chỉ người dùng tick |
-| `validate [--stage Px]` | Schema `game.yaml`, `params/*.json` (mọi giá trị có `source`), provenance, `module-plan.yaml`, `asset-manifest.json` |
+| `validate [--stage Px]` | Schema `game.yaml`, `params/*.json` (mọi giá trị có `source`; `confidence` = observed/derived/inferred, inferred cần `tolerance` từ P2), `spec/obligations.yaml`, `spec/oracles/*.json`, provenance, `module-plan.yaml`, `asset-manifest.json` |
+| `parity [--report file.json]` | Chạy vitest, đóng từng nghĩa vụ trong `spec/obligations.yaml` bằng test gắn thẻ `[id:case]`. Test đỏ, skip/todo, thiếu case hay thẻ lạ đều tính là chưa đạt |
 | `provenance add <file…> --label …` | Nhãn `reference / generated / own / licensed / placeholder` |
 | `pack [--portal] [--all] [--compress] [--zip]` | `dist/<portal>/{index.html, Build/, StreamingAssets/, TemplateData/}` + `build-manifest.json` |
 | `release-check` | Chặn asset reference/placeholder, tên game gốc, link ngoài, đường dẫn tuyệt đối, vượt ngân sách tải |

@@ -3,6 +3,7 @@ import type { InputFrame } from '../../src/contracts/input';
 import { PARAMS } from '../../src/core/params';
 import { createWorld, obstacleSpeed, stepWorld } from '../../src/core/world';
 import raw from '../../params/game.json';
+import speedOracle from '../../spec/oracles/obstacle-speed.json';
 
 const DT = 1 / 60;
 const hold = (tick: number, ...actions: InputFrame['actions'][number][]): InputFrame => ({ tick, actions });
@@ -10,9 +11,10 @@ const hold = (tick: number, ...actions: InputFrame['actions'][number][]): InputF
 /**
  * Parity tests: expected values come from params (= the original game), with the
  * tolerance recorded next to each value. When porting, add one per mechanic.
+ * The [id:case] tag in each name closes that obligation in spec/obligations.yaml (`gk parity`).
  */
 describe('parity with params', () => {
-  it('player moves player.speed px per second', () => {
+  it('[player.move:normal] player moves player.speed px per second', () => {
     const w = createWorld(PARAMS, 1);
     w.obstacles = [];
     w.spawnTimer = Infinity;
@@ -22,12 +24,17 @@ describe('parity with params', () => {
     expect(Math.abs(moved - raw.player.speed.value) / raw.player.speed.value).toBeLessThanOrEqual(raw.player.speed.tolerance);
   });
 
-  it('obstacle speed starts at speedStart and ramps by speedPerSecond', () => {
+  it('[obstacle.speed:normal] obstacle speed starts at speedStart and ramps by speedPerSecond', () => {
     expect(obstacleSpeed(PARAMS, 0)).toBeCloseTo(raw.obstacle.speedStart.value);
     expect(obstacleSpeed(PARAMS, 10)).toBeCloseTo(raw.obstacle.speedStart.value + 10 * raw.obstacle.speedPerSecond.value);
   });
 
-  it('spawns one obstacle every spawnEvery seconds', () => {
+  // Oracle: every row of the table taken from the original game must match within tolerance.
+  it.each(speedOracle.cases)('[obstacle.speed:oracle] t=$in.t s → $out px/s', (c) => {
+    expect(Math.abs(obstacleSpeed(PARAMS, c.in.t) - c.out) / c.out).toBeLessThanOrEqual(speedOracle.tolerance);
+  });
+
+  it('[obstacle.spawn:normal] spawns one obstacle every spawnEvery seconds', () => {
     const w = createWorld(PARAMS, 7);
     w.player.x = -1000; // out of the way
     let spawns = 0;
@@ -36,7 +43,7 @@ describe('parity with params', () => {
     expect(spawns).toBe(Math.ceil(seconds / raw.obstacle.spawnEvery.value));
   });
 
-  it('scores score.perSecond per second', () => {
+  it('[score.rate:normal] scores score.perSecond per second', () => {
     const w = createWorld(PARAMS, 3);
     w.spawnTimer = Infinity;
     for (let i = 0; i < 60; i++) stepWorld(w, PARAMS, hold(i), DT);
@@ -45,7 +52,7 @@ describe('parity with params', () => {
 });
 
 describe('rules', () => {
-  it('game ends on collision and stops updating', () => {
+  it('[rules.collision:normal] game ends on collision and stops updating', () => {
     const w = createWorld(PARAMS, 1);
     w.spawnTimer = Infinity;
     w.obstacles.push({ id: 99, x: w.player.x, y: w.player.y, size: PARAMS.obstacle.size });
@@ -57,7 +64,7 @@ describe('rules', () => {
     expect(w.tick).toBe(tick);
   });
 
-  it('player stays inside the field', () => {
+  it('[player.move:edge] player stays inside the field', () => {
     const w = createWorld(PARAMS, 1);
     w.spawnTimer = Infinity;
     for (let i = 0; i < 600; i++) stepWorld(w, PARAMS, hold(i, 'left'), DT);

@@ -13,7 +13,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 - `src/view/` render và input thiết bị; chỉ đọc state. Kiểm tra bằng screenshot/checklist, không unit test.
 - `src/platform/` interface chung cho mọi portal. Gameplay chỉ gọi `Platform`; adapter nằm trong `src/platform/adapters/`. Event analytics chỉ dùng tên trong `src/platform/events.ts`.
 - `src/contracts/` type dùng chung giữa các module — chỉ agent chính sửa.
-- `params/` số liệu có nguồn · `spec/` gameplay spec · `notes/` ghi chú RE · `gates/` checklist cổng · `DECISIONS.md` lý do và sai khác.
+- `params/` số liệu có nguồn và `confidence` · `spec/` gameplay spec, `obligations.yaml`, `oracles/` · `notes/` ghi chú RE, `QUESTIONS.md` · `gates/` checklist cổng · `DECISIONS.md` lý do và sai khác.
 
 ## Lệnh
 | Việc | Lệnh |
@@ -21,6 +21,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Trạng thái, việc tiếp theo | `npm run gk -- status` |
 | Kiểm tra dữ liệu | `npm run gk -- validate` |
 | Test / typecheck / lint | `npm test` · `npm run typecheck` · `npm run lint` |
+| Parity với game gốc | `npm run gk -- parity` (nghĩa vụ trong `spec/obligations.yaml`, test gắn thẻ `[id:case]`) |
 | Kiểm tra cổng, sang pha sau | `npm run gk -- gate` · `npm run gk -- gate --advance` |
 | Dựng song song | `npm run gk -- fanout --wave N` → subagent làm theo `.gamekit/local/BRIEF.md` → `npm run gk -- integrate --wave N` |
 | Đóng gói, kiểm tra phát hành | `npm run gk -- pack --all` · `npm run gk -- release-check` |

@@ -1,0 +1,29 @@
+# Nghĩa vụ parity: mỗi hành vi của game gốc mà bản web phải tái hiện (skill parity-check).
+# Đóng bằng test gắn thẻ [id:case] trong tên, vd it('[player.move:edge] …'). `gamekit parity` chấm.
+# Case: normal | edge | invalid | oracle (bảng spec/oracles) | replay.
+# Không làm một nghĩa vụ: status blocked|out-of-scope + decision D-n + approved (người dùng duyệt).
+# Các mục dưới đây là của game demo trong template — thay bằng cơ chế của game gốc ở P2.
+obligations:
+  - id: player.move
+    title: Người chơi đi ngang player.speed px/s và không ra khỏi sân
+    cases: [normal, edge]
+    params: [player.speed, player.size]
+  - id: obstacle.speed
+    title: Chướng ngại rơi với tốc độ speedStart, tăng speedPerSecond mỗi giây
+    cases: [normal, oracle]
+    params: [obstacle.speedStart, obstacle.speedPerSecond]
+    oracle: spec/oracles/obstacle-speed.json
+  - id: obstacle.spawn
+    title: Mỗi spawnEvery giây sinh một chướng ngại
+    cases: [normal]
+    params: [obstacle.spawnEvery]
+  - id: score.rate
+    title: Cộng score.perSecond điểm mỗi giây
+    cases: [normal]
+    params: [score.perSecond]
+  - id: rules.collision
+    title: Va chạm thì thua và thế giới ngừng cập nhật
+    cases: [normal]
+  - id: run.replay
+    title: Cùng seed và input ghi lại cho ra đúng trạng thái cuối
+    cases: [replay]
