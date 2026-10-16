@@ -1,0 +1,40 @@
+    <style>
+      html, body { margin: 0; height: 100%; background: #0d0f12; overflow: hidden; }
+      #gmLoader { --gm-c1: 167,139,250; --gm-c2: 129,140,248; --gm-c3: 236,72,153; position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; color: #fff; font: 600 16px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #0d0f12; }
+      .gmLoaderBackdrop { position: absolute; inset: -24px; background: center / cover no-repeat; filter: blur(18px) brightness(.35); }
+      .gmLoaderStage { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; width: min(80vw, 360px); }
+      .gmLoaderThumb { width: min(40vw, 180px); aspect-ratio: 1; object-fit: cover; border-radius: 22px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+      .gmLoaderTitle { margin: 0; font-size: 22px; font-weight: 800; text-align: center; }
+      .gmLoaderProgress { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+      .gmLoaderSpinner { width: 28px; height: 28px; border: 3px solid rgba(255,255,255,.25); border-top-color: #fff; border-radius: 50%; animation: gmSpin .9s linear infinite; }
+      .gmLoaderBar { display: none; width: 100%; height: 10px; border-radius: 5px; background: rgba(255,255,255,.15); overflow: hidden; }
+      #gmLoaderFill { width: 0; height: 100%; background: linear-gradient(90deg, rgb(var(--gm-c1)), rgb(var(--gm-c2)), rgb(var(--gm-c3))); transition: width .2s; }
+      #gmLoader.gmIsLoading .gmLoaderSpinner { display: none; }
+      #gmLoader.gmIsLoading .gmLoaderBar { display: block; }
+      #gmLoaderError { display: none; text-align: center; }
+      #gmLoader.gmHasError #gmLoaderError { display: block; }
+      #gmLoader.gmHasError .gmLoaderProgress { display: none; }
+      #gmLoaderRetry { margin-top: 8px; padding: 8px 18px; border: 0; border-radius: 8px; font: inherit; cursor: pointer; }
+      .gmLoaderBrand { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); height: 28px; opacity: .85; }
+      .gmLoaderVersion { position: absolute; right: 10px; bottom: 6px; font-size: 11px; opacity: .5; }
+      @keyframes gmSpin { to { transform: rotate(360deg); } }
+    </style>
+    <div id="gmLoader">
+      <div class="gmLoaderBackdrop" style="background-image: url('Icons/loading.webp')"></div>
+      <div class="gmLoaderStage">
+        <img class="gmLoaderThumb" src="Icons/loading.webp" alt="{{TITLE}}">
+        <h1 class="gmLoaderTitle">{{TITLE}}</h1>
+        <div class="gmLoaderProgress">
+          <div class="gmLoaderSpinner" aria-hidden="true"></div>
+          <div class="gmLoaderBar"><div id="gmLoaderFill"></div></div>
+          <div class="gmLoaderInfo">Loading...</div>
+        </div>
+        <div id="gmLoaderError" role="alert">
+          <div>Could not load the game.</div>
+          <button id="gmLoaderRetry" type="button">Retry</button>
+        </div>
+      </div>
+      <img class="gmLoaderBrand" src="Icons/domain.webp" alt="" aria-hidden="true">
+      <div class="gmLoaderVersion">{{VERSION}}</div>
+      <!--PRODUCT_VERSION:{{VERSION}}END-->
+    </div>
