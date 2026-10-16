@@ -24,6 +24,9 @@ function copy(from, to) {
  */
 export async function assemblePortal({ game, kit, settings = {}, version, viteOut, languages, outDir, buildLoader, obfuscate }) {
   if (!/^\d{8}$/.test(String(version))) throw new GkError(`version phải gồm 8 chữ số (YYMMDDNN), nhận được "${version}"`);
+  // The pre-az-v1 template built a page (index.html + Build/); the package now needs framework.js.
+  if (exists(path.join(viteOut, 'Build')) || (exists(path.join(viteOut, 'index.html')) && !exists(path.join(viteOut, 'framework.js'))))
+    throw new GkError('vite.config.ts của game là bản cũ (ra index.html + Build/) — xem mục Nâng cấp game cũ trong README của GameKit');
   for (const rel of walk(viteOut)) {
     const [top, kind] = rel.split('/');
     if (!VITE_TOP.has(top)) throw new GkError(`${rel}: không thuộc bố cục gói — public/ chỉ nên có Icons/ và StreamingAssets/`);

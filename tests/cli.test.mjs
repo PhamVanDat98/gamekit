@@ -284,6 +284,17 @@ test('pack: stops before building when a portal setting is missing, naming the f
   r = gk(dir, 'pack', '--portal', 'dev-mock', '--version', '123');
   assert.equal(r.code, 1);
   assert.match(r.out, /8 chữ số/);
+  r = gk(dir, 'pack', '--portal', 'azgames,azgames');
+  assert.equal(r.out.match(/azgames: thiếu gameCode/g)?.length, 1, 'portal trùng chỉ đóng gói một lần');
+  editYaml(dir, (g) => {
+    g.languages = ['es'];
+    g.language = 'fr';
+  });
+  r = gk(dir, 'pack', '--portal', 'dev-mock');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /languages phải có en/);
+  assert.match(r.out, /language fr không có trong languages/);
+  assert.ok(!fs.existsSync(path.join(dir, 'builds')));
 });
 
 test('CLI runs through a symlinked bin (npm link)', () => {

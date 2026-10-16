@@ -16,8 +16,9 @@ description: Dùng ở pha P5 (hoặc bất cứ khi nào cần bản build) đ�
 
 ```
 builds/<v>/
-  manifest.json                     name, title, semver, version, commit, dirty, builtAt, portals.<id>.hash — KHÔNG upload
-  <name>-<portal>-<v>.zip           (--zip) nội dung = thư mục portal
+  manifest.json                     name, title, semver, version, commit, dirty, builtAt,
+                                    portals.<id>.{hash, initialBytes} — KHÔNG upload
+  <name>-<portal>-<v>.zip           (--zip) nội dung = thư mục portal, đường dẫn dùng "/"
   azgames/                          đơn vị upload
     index.html                      = <v>/index.html + <base href="<v>/">
     preview.html                    giống index.html từng byte
@@ -32,7 +33,8 @@ builds/<v>/
 ```
 
 - `--compress` tạo `.gz`/`.br` cho js/css/json/wasm trong `<v>/` (cho server tự host). Portal ngoài thường tự nén.
-- `--zip` tạo `builds/<v>/<name>-<portal>-<v>.zip` để nộp portal.
+- `initialBytes` = số byte tải trước khi vào game: `index.html` ngoài + `<v>/loader.js`, `framework.js`, `css/style.css`, `Icons/*` + file `Language/*.json` lớn nhất (chưa nén). `release-check` so cùng con số này với `budget.initialLoadMB`.
+- `--zip` tạo `builds/<v>/<name>-<portal>-<v>.zip` để nộp portal. GameKit tự viết zip (không cần lệnh `zip`/PowerShell), tên file trong zip luôn dùng `/`, cùng nội dung thì cùng file zip.
 - Không bật source map khi phát hành.
 - Phiên bản có `dirty` nếu còn thay đổi chưa commit — phát hành thật thì commit hết trước khi pack.
 

@@ -74,11 +74,10 @@ const REPORT = '.gamekit/local/parity-report.json';
 
 function runVitest(root) {
   fs.rmSync(path.join(root, REPORT), { force: true });
-  const r = spawnSync('npx', ['--no-install', 'vitest', 'run', '--reporter=json', `--outputFile=${REPORT}`], {
-    cwd: root,
-    encoding: 'utf8',
-    shell: process.platform === 'win32',
-  });
+  // vitest's own bin with this node — no npx, no shell, so paths with spaces stay one argument.
+  const bin = path.join(root, 'node_modules', 'vitest', 'vitest.mjs');
+  if (!exists(bin)) throw new GkError('Game chưa cài vitest — chạy npm install');
+  const r = spawnSync(process.execPath, [bin, 'run', '--reporter=json', `--outputFile=${REPORT}`], { cwd: root, encoding: 'utf8' });
   if (!exists(path.join(root, REPORT))) {
     const tail = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim().split('\n').slice(-3).join(' | ');
     throw new GkError(`vitest không tạo được báo cáo (exit ${r.status}): ${tail}`);

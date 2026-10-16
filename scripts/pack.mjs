@@ -13,6 +13,8 @@ import { checkVersion, nextVersion } from './lib/version.mjs';
 import { checkSetting, loadPortal, missingSettings } from './lib/portals.mjs';
 import { loadLanguages } from './lib/languages.mjs';
 import { assemblePortal } from './lib/assemble.mjs';
+import { initialLoadBytes } from './lib/budget.mjs';
+import { zipDir } from './lib/zip.mjs';
 
 export function hashDir(dir, { exclude = [] } = {}) {
   const h = crypto.createHash('sha256');
@@ -32,16 +34,6 @@ function compress(dir) {
     fs.writeFileSync(f + '.gz', zlib.gzipSync(buf, { level: 9 }));
     fs.writeFileSync(f + '.br', zlib.brotliCompressSync(buf, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 11 } }));
   }
-}
-
-function zipDir(dir, out) {
-  if (exists(out)) fs.rmSync(out);
-  if (process.platform === 'win32') {
-    const ps = `Compress-Archive -Path '${path.join(dir, '*').replace(/'/g, "''")}' -DestinationPath '${out.replace(/'/g, "''")}' -Force`;
-    return spawnSync('powershell', ['-NoProfile', '-Command', ps]).status === 0;
-  }
-  if (spawnSync('which', ['zip']).status !== 0) return false;
-  return spawnSync('zip', ['-qr', '-X', out, '.'], { cwd: dir }).status === 0;
 }
 
 /** Pull the meaningful line out of a failed build log instead of the stack tail. */
@@ -76,6 +68,9 @@ export function gameTools(root) {
 /** Every setting a portal needs, checked before spending time on a build. */
 function settingProblems(game, kits) {
   const out = [];
+  const languages = game.languages ?? ['en'];
+  if (!languages.includes('en')) out.push('game.yaml: languages phải có en (bản gốc của mọi bản dịch)');
+  if (game.language && !languages.includes(game.language)) out.push(`game.yaml: language ${game.language} không có trong languages (${languages.join(', ')})`);
   for (const kit of kits) {
     const values = game.portalSettings?.[kit.id] ?? {};
     for (const k of missingSettings(kit, values)) out.push(`${kit.id}: thiếu ${k} (${kit.config.settings[k].label}) — gamekit config --portal ${kit.id}`);
@@ -90,7 +85,7 @@ function settingProblems(game, kits) {
 export async function run(args) {
   const root = requireGameRoot(args.cwd);
   const game = loadGame(root);
-  const portals = args.all || !args.portal ? game.portals : String(args.portal).split(',');
+  const portals = [...new Set(args.all || !args.portal ? game.portals : String(args.portal).split(',').map((p) => p.trim()))];
   for (const p of portals) {
     if (!/^[a-z0-9][a-z0-9-]*$/.test(p)) throw new GkError(`Tên portal không hợp lệ: "${p}"`);
     if (!game.portals.includes(p)) throw new GkError(`Portal ${p} chưa khai báo trong game.yaml (portals) — gamekit config --portal ${p}`);
@@ -103,6 +98,9 @@ export async function run(args) {
   const existing = exists(buildsDir) ? fs.readdirSync(buildsDir) : [];
   const version = args.version ? checkVersion(args.version, existing) : nextVersion(existing);
   const tools = gameTools(root);
+  // Run vite's own bin with this node — no npx, no shell, so paths with spaces stay one argument.
+  const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
+  if (!exists(viteBin)) throw new GkError('Game chưa cài vite — chạy npm install');
   const languages = loadLanguages(root);
   const commit = git(root, ['rev-parse', '--short', 'HEAD'], { allowFail: true }) ?? 'nogit';
   const dirty = (git(root, ['status', '--porcelain', '--', '.', ...DOC_PATHS], { allowFail: true }) ?? '') !== '';
@@ -113,11 +111,10 @@ export async function run(args) {
     for (const kit of kits) {
       log.head(`Đóng gói ${game.name} ${version} cho ${kit.id}`);
       const tmp = path.join(base, `.vite-${kit.id}`);
-      const r = spawnSync('npx', ['vite', 'build', '--outDir', tmp, '--emptyOutDir'], {
+      const r = spawnSync(process.execPath, [viteBin, 'build', '--outDir', tmp, '--emptyOutDir'], {
         cwd: root,
         stdio: args.quiet ? 'pipe' : 'inherit',
         encoding: 'utf8',
-        shell: process.platform === 'win32',
         env: { ...process.env, GK_PORTAL: kit.id, GK_BUILD: `${version}+${commit}${dirty ? '.dirty' : ''}`, GK_PACK: '1' },
       });
       if (r.status !== 0) throw new GkError(`vite build lỗi cho ${kit.id}${args.quiet ? `: ${buildError(`${r.stdout}\n${r.stderr}`)}` : ''}`);
@@ -125,12 +122,12 @@ export async function run(args) {
       await assemblePortal({ game, kit, settings: game.portalSettings?.[kit.id] ?? {}, version, viteOut: tmp, languages, outDir, ...tools });
       fs.rmSync(tmp, { recursive: true, force: true });
       if (args.compress) compress(path.join(outDir, version));
-      manifest.portals[kit.id] = { hash: hashDir(outDir) };
+      manifest.portals[kit.id] = { hash: hashDir(outDir), initialBytes: initialLoadBytes(outDir, version) };
       log.ok(`builds/${version}/${kit.id}`);
       if (args.zip) {
         const z = path.join(base, `${game.name}-${kit.id}-${version}.zip`);
-        if (zipDir(outDir, z)) log.ok(`zip: ${path.relative(root, z)}`);
-        else log.warn('Không tìm thấy lệnh zip — bỏ qua bước nén zip.');
+        zipDir(outDir, z);
+        log.ok(`zip: ${path.relative(root, z)}`);
       }
     }
   } catch (e) {

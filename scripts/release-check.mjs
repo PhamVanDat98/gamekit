@@ -10,6 +10,7 @@ import { PHASES } from './lib/phases.mjs';
 import { latestVersion } from './lib/version.mjs';
 import { loadPortal } from './lib/portals.mjs';
 import { ASSET_KINDS } from './lib/assemble.mjs';
+import { initialLoadBytes } from './lib/budget.mjs';
 import { validateGame, loadProvenance } from './validate.mjs';
 
 const ALWAYS_ALLOWED_HOSTS = ['www.w3.org', 'w3.org'];
@@ -21,6 +22,7 @@ const hostAllowed = (host, allowed) => allowed.some((a) => host === a || host.en
 const URL_RE = /(?:https?|wss?):\/\/((?:[a-z0-9-]+\.)+[a-z]{2,}|localhost|\d{1,3}(?:\.\d{1,3}){3})/gi;
 const BINARY_SCAN_LIMIT = 64 * 1024 * 1024;
 const COMPRESSED = /\.(gz|br)$/;
+const SETTINGS_FOOTER = 'gk-settings-footer';
 
 function checkLayout(dir, version, kit, where, pr) {
   const shell = ['index.html', 'preview.html', 'version.txt', version];
@@ -66,8 +68,6 @@ function checkContent(root, dir, version, kit, game, prov, where, pr) {
   const terms = (game.release?.forbiddenTerms ?? []).filter(Boolean).map((t) => t.toLowerCase());
   const allowed = [...ALWAYS_ALLOWED_HOSTS, ...(game.release?.allowedHosts ?? []), ...(kit.config.allowedHosts ?? [])];
   const inner = `${version}/`;
-  let initialBytes = 0;
-  let biggestLanguage = 0;
   for (const rel of walk(dir)) {
     if (COMPRESSED.test(rel)) continue;
     const abs = path.join(dir, rel);
@@ -76,9 +76,6 @@ function checkContent(root, dir, version, kit, game, prov, where, pr) {
     const lower = rel.toLowerCase();
     for (const t of terms) if (lower.includes(t)) pr.error(where, `${rel}: tên file còn tên game gốc "${t}"`);
     if (rel.endsWith('.map')) pr.warn(where, `${rel}: source map lộ mã nguồn`);
-
-    if (rel === 'index.html' || ['loader.js', 'framework.js', 'css/style.css'].includes(sub) || sub?.startsWith('Icons/')) initialBytes += size;
-    if (sub?.startsWith('Language/')) biggestLanguage = Math.max(biggestLanguage, size);
 
     // Files copied from public/ keep their path and must carry a shippable label.
     const fromPublic = sub && (sub === 'Icons/web.png' || sub === 'Icons/loading.webp' || sub.startsWith('StreamingAssets/')) ? `public/${sub}` : null;
@@ -103,14 +100,15 @@ function checkContent(root, dir, version, kit, game, prov, where, pr) {
           else pr.error(where, `${rel}: đường dẫn tuyệt đối ${m[1]} — phải là đường dẫn tương đối`);
         }
       }
-      if (sub === 'framework.js' && !/\.copyright\b/.test(text))
-        pr.error(where, 'framework.js không đọc platform.info.copyright — popup Settings phải có footer bản quyền của portal');
+      // The footer class is a string literal in src/view/settings.ts, so it survives minification.
+      if (sub === 'framework.js' && !text.includes(SETTINGS_FOOTER))
+        pr.error(where, `framework.js không có footer bản quyền (${SETTINGS_FOOTER}) — popup Settings phải hiện platform.info.copyright của portal`);
     } else if (terms.length && size <= BINARY_SCAN_LIMIT) {
       const bin = fs.readFileSync(abs).toString('latin1').toLowerCase();
       for (const t of terms) if (/^[\x20-\x7e]+$/.test(t) && bin.includes(t)) pr.error(where, `${rel}: file nhị phân còn chuỗi "${t}"`);
     }
   }
-  const mb = (initialBytes + biggestLanguage) / 1024 / 1024;
+  const mb = initialLoadBytes(dir, version) / 1024 / 1024;
   const budget = game.budget?.initialLoadMB;
   if (budget && mb > budget) pr.error(where, `tải đầu ${mb.toFixed(2)}MB vượt ngân sách ${budget}MB`);
   else log.dim(`${where}: tải đầu ${mb.toFixed(2)}MB${budget ? ` / ${budget}MB` : ''}`);
@@ -127,6 +125,9 @@ function checkFreshness(root, version, where, pr) {
   try {
     man = JSON.parse(fs.readFileSync(f, 'utf8'));
   } catch {
+    man = null;
+  }
+  if (!man || typeof man !== 'object') {
     pr.error(where, `builds/${version}/manifest.json hỏng — pack lại`);
     return;
   }

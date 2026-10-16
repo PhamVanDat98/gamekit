@@ -5,7 +5,11 @@ import { escapeHtml, jsString, fillTemplate, withBase } from '../scripts/lib/htm
 import { listPortals, loadPortal, checkSetting, missingSettings, copyrightFor } from '../scripts/lib/portals.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
+import crypto from 'node:crypto';
 import { assemblePortal } from '../scripts/lib/assemble.mjs';
+import { initialLoadBytes } from '../scripts/lib/budget.mjs';
+import { zipDir } from '../scripts/lib/zip.mjs';
 import { tmpDir, write, read, solidPng, tinyWebp, token } from './helpers.mjs';
 import { PassThrough } from 'node:stream';
 import YAML from 'yaml';
@@ -122,7 +126,7 @@ test('questions: portal questions are skipped for portals not chosen', async () 
 
 function fakeVite(dir) {
   const vite = path.join(dir, 'vite');
-  write(vite, 'framework.js', 'console.log("game");const c=platform.info.copyright;');
+  write(vite, 'framework.js', 'console.log("game");const f=el("footer","gk-settings-footer",platform.info.copyright);');
   write(vite, 'css/style.css', 'body{}');
   write(vite, 'assets/img/hero-abc.png', 'x');
   write(vite, 'assets/audio/hit-abc.mp3', 'x');
@@ -262,7 +266,7 @@ test('release-check: every layout fault is caught', async () => {
       fs.writeFileSync(path.join(o, 'index.html'), html);
       fs.writeFileSync(path.join(o, 'preview.html'), html);
     }, /evil\.example\.com/],
-    ['thiếu bản quyền', (o) => fs.writeFileSync(path.join(o, '26101601/framework.js'), 'console.log(1) /* Copyright (c) lib */'), /copyright/i],
+    ['thiếu bản quyền', (o) => fs.writeFileSync(path.join(o, '26101601/framework.js'), 'console.log(1) /* Copyright (c) lib */ var x=platform.info.copyright'), /gk-settings-footer/],
     ['JS trong StreamingAssets', (o) => write(o, '26101601/StreamingAssets/data/x.js', '1'), /StreamingAssets/],
     ['thiếu Language/en.json', (o) => fs.rmSync(path.join(o, '26101601/Language/en.json')), /en\.json/],
     ['asset sai thư mục', (o) => write(o, '26101601/assets/misc/a.bin', 'x'), /assets\/misc/],
@@ -284,6 +288,97 @@ test('release-check: corrupt manifest and compressed code are reported, not thro
   const errors = checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir)).errors.join('\n');
   assert.match(errors, /manifest\.json hỏng/);
   assert.match(errors, /x\.js\.gz.*StreamingAssets|StreamingAssets.*x\.js\.gz/);
+  for (const text of ['null', '5', '"x"']) {
+    fs.writeFileSync(path.join(dir, 'builds/26101601/manifest.json'), text);
+    assert.match(checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir)).errors.join('\n'), /manifest\.json hỏng/, text);
+  }
+});
+
+test('budget: initial load = outer page + loader + framework + css + Icons + the biggest language; compressed copies and assets excluded', async () => {
+  const dir = tmpDir();
+  await assembleTo(dir);
+  const out = path.join(dir, 'out');
+  write(out, '26101601/Language/es.json', JSON.stringify({ a: 'x'.repeat(5000) }));
+  write(out, '26101601/framework.js.gz', 'y'.repeat(9000));
+  write(out, '26101601/Icons/web.png.br', 'y'.repeat(9000));
+  const size = (rel) => fs.statSync(path.join(out, rel)).size;
+  const expected = ['index.html', '26101601/loader.js', '26101601/framework.js', '26101601/css/style.css', '26101601/Icons/web.png', '26101601/Icons/loading.webp', '26101601/Icons/domain.webp']
+    .reduce((n, rel) => n + size(rel), 0) + Math.max(size('26101601/Language/en.json'), size('26101601/Language/es.json'));
+  assert.equal(initialLoadBytes(out, '26101601'), expected);
+  assert.ok(size('26101601/Language/es.json') > size('26101601/Language/en.json'));
+});
+
+test('assemble: a vite.config.ts from the old template (index.html + Build/) is named, with the upgrade hint', async () => {
+  const dir = tmpDir();
+  const vite = path.join(dir, 'vite');
+  write(vite, 'index.html', '<html></html>');
+  write(vite, 'Build/game.js', 'x');
+  await assert.rejects(() => assembleTo(dir, 'azgames', vite), /bản cũ.*Nâng cấp game cũ/);
+  const dir2 = tmpDir();
+  const vite2 = path.join(dir2, 'vite');
+  write(vite2, 'index.html', '<html></html>');
+  write(vite2, 'assets/index-abc.js', 'x');
+  await assert.rejects(() => assembleTo(dir2, 'azgames', vite2), /bản cũ/);
+});
+
+/** Read a zip with nothing but zlib: central directory → entries, each inflated from its local header. */
+function readZip(buf) {
+  let eocd = buf.length - 22;
+  while (eocd >= 0 && buf.readUInt32LE(eocd) !== 0x06054b50) eocd--;
+  assert.ok(eocd >= 0, 'có EOCD');
+  const count = buf.readUInt16LE(eocd + 10);
+  let p = buf.readUInt32LE(eocd + 16);
+  const entries = [];
+  for (let i = 0; i < count; i++) {
+    assert.equal(buf.readUInt32LE(p), 0x02014b50, 'chữ ký central directory');
+    const flags = buf.readUInt16LE(p + 8);
+    const method = buf.readUInt16LE(p + 10);
+    const crc = buf.readUInt32LE(p + 16);
+    const csize = buf.readUInt32LE(p + 20);
+    const size = buf.readUInt32LE(p + 24);
+    const n = buf.readUInt16LE(p + 28);
+    const m = buf.readUInt16LE(p + 30);
+    const k = buf.readUInt16LE(p + 32);
+    const local = buf.readUInt32LE(p + 42);
+    const name = buf.subarray(p + 46, p + 46 + n).toString(flags & 0x800 ? 'utf8' : 'latin1');
+    assert.equal(buf.readUInt32LE(local), 0x04034b50, 'chữ ký local header');
+    const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+    const raw = buf.subarray(start, start + csize);
+    const data = method === 8 ? zlib.inflateRawSync(raw) : Buffer.from(raw);
+    assert.equal(data.length, size, name);
+    entries.push({ name, flags, method, crc, data });
+    p += 46 + n + m + k;
+  }
+  return entries;
+}
+
+test('zip: pure-Node writer — "/" separators, nested folders, UTF-8 names, deflate or store, deterministic', () => {
+  const dir = tmpDir();
+  const src = path.join(dir, 'pkg');
+  const files = {
+    'index.html': '<html></html>',
+    'version.txt': '26101601',
+    '26101601/css/style.css': 'body{}'.repeat(200),
+    '26101601/Language/tiếng-việt.json': '{"a":"Xin chào"}',
+    '26101601/Icons/web.png': solidPng(4, 4),
+    '26101601/assets/art/noise.bin': crypto.randomBytes(2048),
+  };
+  for (const [rel, data] of Object.entries(files)) write(src, rel, data);
+  const outFile = path.join(dir, 'pkg.zip');
+  zipDir(src, outFile);
+  const buf = fs.readFileSync(outFile);
+  const entries = readZip(buf);
+  assert.deepEqual(entries.map((e) => e.name).sort(), Object.keys(files).sort());
+  for (const e of entries) {
+    assert.ok(!e.name.includes('\\'), e.name);
+    assert.ok(e.data.equals(Buffer.from(files[e.name])), e.name);
+    if (zlib.crc32) assert.equal(e.crc, zlib.crc32(e.data), `CRC ${e.name}`);
+  }
+  assert.ok(entries.find((e) => e.name === '26101601/css/style.css').method === 8, 'nén deflate');
+  assert.equal(entries.find((e) => e.name === '26101601/assets/art/noise.bin').method, 0, 'không nén được thì store');
+  assert.ok(entries.find((e) => e.name.includes('tiếng')).flags & 0x800, 'cờ UTF-8');
+  zipDir(src, outFile);
+  assert.ok(fs.readFileSync(outFile).equals(buf), 'cùng nội dung → cùng file zip');
 });
 
 test('release-check: unbuilt, dirty or stale packages are refused', async () => {
