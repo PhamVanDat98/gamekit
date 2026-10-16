@@ -89,6 +89,8 @@ export function withDefaults(questions, preset) {
 export function settingsFor(portals, answers, questions, existing = {}) {
   const out = structuredClone(existing ?? {});
   for (const q of questions) {
+    if (q.portal && q.key in answers && !portals.includes(q.portal))
+      throw new GkError(`--set ${q.key}: portal ${q.portal} chưa bật — thêm bằng --portal ${q.portal} (config) hoặc --set portals=…,${q.portal} (init)`);
     if (!q.portal || !portals.includes(q.portal)) continue;
     const key = q.key.slice(q.portal.length + 1);
     const cur = out[q.portal]?.[key];

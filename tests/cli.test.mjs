@@ -484,6 +484,26 @@ test('config: fills missing settings with --set, adds a portal and its checklist
   assert.equal(gk(dir, 'config', '--portal', 'nope').code, 1);
 });
 
+test('--set for a portal that is not enabled is an error with the fix, not silently dropped', () => {
+  const dir = newGame('cfgoff');
+  editYaml(dir, (g) => {
+    g.portals = ['dev-mock'];
+    delete g.portalSettings.azgames;
+  });
+  let r = gk(dir, 'config', '--set', 'azgames.gameCode=g1');
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /--set azgames\.gameCode: portal azgames chưa bật — thêm bằng --portal azgames \(config\) hoặc --set portals=…,azgames \(init\)/);
+  assert.equal(YAML.parse(read(dir, 'game.yaml')).portalSettings.azgames, undefined);
+  r = gk(dir, 'config', '--portal', 'azgames', '--set', 'azgames.gameCode=g1');
+  assert.equal(r.code, 0, r.out);
+  assert.equal(YAML.parse(read(dir, 'game.yaml')).portalSettings.azgames.gameCode, 'g1');
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'gk-'));
+  r = gk(parent, 'init', 'offg', '--no-install', '--set', 'portals=dev-mock', '--set', 'azgames.gameCode=g1');
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /portal azgames chưa bật/);
+  assert.ok(!fs.existsSync(path.join(parent, 'offg')), 'không tạo game dở');
+});
+
 test('status lists portal settings still missing', () => {
   const dir = newGame('st2');
   assert.match(gk(dir, 'status').out, /azgames.*gameCode/);
