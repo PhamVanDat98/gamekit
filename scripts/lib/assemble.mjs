@@ -23,9 +23,12 @@ function copy(from, to) {
  * Both are injected so tests run without esbuild/javascript-obfuscator (pack passes the game's own).
  */
 export async function assemblePortal({ game, kit, settings = {}, version, viteOut, languages, outDir, buildLoader, obfuscate }) {
+  if (!/^\d{8}$/.test(String(version))) throw new GkError(`version phải gồm 8 chữ số (YYMMDDNN), nhận được "${version}"`);
   for (const rel of walk(viteOut)) {
     const [top, kind] = rel.split('/');
     if (!VITE_TOP.has(top)) throw new GkError(`${rel}: không thuộc bố cục gói — public/ chỉ nên có Icons/ và StreamingAssets/`);
+    if (top === 'css' && rel !== 'css/style.css') throw new GkError(`${rel}: không thuộc bố cục gói — css/ chỉ có style.css`);
+    if (top === 'Icons' && rel !== 'Icons/web.png' && rel !== 'Icons/loading.webp') throw new GkError(`${rel}: không thuộc bố cục gói — Icons/ chỉ có web.png, loading.webp (domain.webp lấy từ bộ vỏ portal)`);
     if (top === 'assets' && !ASSET_KINDS.has(kind)) throw new GkError(`${rel}: asset phải nằm trong assets/{${[...ASSET_KINDS].join(',')}}`);
   }
   const need = (rel) => {
@@ -33,20 +36,24 @@ export async function assemblePortal({ game, kit, settings = {}, version, viteOu
     if (!exists(f)) throw new GkError(`Bản build thiếu ${rel}`);
     return f;
   };
+  const srcFramework = need('framework.js');
+  const srcCss = need('css/style.css');
+  const srcWeb = need('Icons/web.png');
+  const srcLoading = need('Icons/loading.webp');
+  const langs = buildLanguages(languages, game.languages ?? ['en']);
   fs.rmSync(outDir, { recursive: true, force: true });
   const inner = path.join(outDir, version);
 
-  copy(need('framework.js'), path.join(inner, 'framework.js'));
-  copy(need('css/style.css'), path.join(inner, 'css', 'style.css'));
+  copy(srcFramework, path.join(inner, 'framework.js'));
+  copy(srcCss, path.join(inner, 'css', 'style.css'));
   for (const rel of walk(path.join(viteOut, 'assets'))) copy(path.join(viteOut, 'assets', rel), path.join(inner, 'assets', rel));
   for (const rel of walk(path.join(viteOut, 'StreamingAssets'))) {
     if (path.basename(rel) !== '.gitkeep') copy(path.join(viteOut, 'StreamingAssets', rel), path.join(inner, 'StreamingAssets', rel));
   }
-  copy(need('Icons/web.png'), path.join(inner, 'Icons', 'web.png'));
-  copy(need('Icons/loading.webp'), path.join(inner, 'Icons', 'loading.webp'));
+  copy(srcWeb, path.join(inner, 'Icons', 'web.png'));
+  copy(srcLoading, path.join(inner, 'Icons', 'loading.webp'));
   copy(path.join(kit.dir, 'Icons', 'domain.webp'), path.join(inner, 'Icons', 'domain.webp'));
 
-  const langs = buildLanguages(languages, game.languages ?? ['en']);
   const sizes = { framework: fs.statSync(path.join(inner, 'framework.js')).size, lang: {} };
   fs.mkdirSync(path.join(inner, 'Language'), { recursive: true });
   for (const [code, text] of Object.entries(langs.files)) {

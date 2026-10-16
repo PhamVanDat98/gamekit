@@ -182,6 +182,30 @@ test('assemble: translations get every key from en, minified, _meta.name moved t
   assert.equal(fs.readFileSync(path.join(out, 'en.json'), 'utf8'), '{"a":"A","b":"B {x}"}');
 });
 
+test('assemble: a missing required file rejects and leaves the previous package intact', async () => {
+  const dir = tmpDir();
+  await assembleTo(dir);
+  const vite = path.join(dir, 'vite');
+  fs.rmSync(path.join(vite, 'css/style.css'));
+  await assert.rejects(() => assembleTo(dir, 'azgames', vite), /css\/style\.css/);
+  assert.ok(fs.existsSync(path.join(dir, 'out/26101601/framework.js')));
+  assert.ok(fs.existsSync(path.join(dir, 'out/26101601/loader.js')));
+  assert.ok(fs.existsSync(path.join(dir, 'out/version.txt')));
+});
+
+test('assemble: extra files in css/ and Icons/ and a bad version are rejected', async () => {
+  const dir = tmpDir();
+  const vite = fakeVite(dir);
+  write(vite, 'css/other.css', 'x');
+  await assert.rejects(() => assembleTo(dir, 'azgames', vite), /css\/other\.css/);
+  const dir2 = tmpDir();
+  const vite2 = fakeVite(dir2);
+  write(vite2, 'Icons/foo.png', 'x');
+  await assert.rejects(() => assembleTo(dir2, 'azgames', vite2), /Icons\/foo\.png/);
+  const dir3 = tmpDir();
+  await assert.rejects(() => assemblePortal({ game: GAME, kit: loadPortal('azgames'), settings: SETTINGS, version: '2610160', viteOut: fakeVite(dir3), languages: LANGS, outDir: path.join(dir3, 'out'), ...TOOLS }), /version|8/);
+});
+
 test('assemble: dev-mock has no sitelock and no SDK; stray files outside the layout are rejected', async () => {
   const dir = tmpDir();
   const { cfg } = await assembleTo(dir, 'dev-mock');
