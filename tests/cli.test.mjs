@@ -6,7 +6,6 @@ import os from 'node:os';
 import { gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
-import { checkPackage } from '../scripts/release-check.mjs';
 import { ownershipProblems, topo } from '../scripts/parallel.mjs';
 import { parseArgs } from '../scripts/gamekit.mjs';
 import { evaluateParity, testsFromVitestReport } from '../scripts/parity.mjs';
@@ -187,30 +186,6 @@ modules:
   assert.ok(!fs.existsSync(wt('a')), 'worktree removed');
 });
 
-test('release-check: provenance, original names, foreign links, absolute paths, budget', () => {
-  const dir = newGame('rel');
-  const game = { portals: ['p'], budget: { initialLoadMB: 0.001 }, release: { forbiddenTerms: ['OldName'], allowedHosts: ['sdk.portal.com'] } };
-  write(dir, 'dist/p/index.html', '<script src="/Build/a.js"></script><title>OldName</title>');
-  write(dir, 'dist/p/Build/a.js', 'load("https://sdk.portal.com/x.js");fetch("https://evil.example.com");"http://www.w3.org/2000/svg";' + 'x'.repeat(2000));
-  write(dir, 'dist/p/TemplateData/logo.png', 'x');
-  write(dir, 'dist/p/StreamingAssets/level1.json', '{}');
-  const prov = { entries: [{ path: 'public/TemplateData/logo.png', label: 'placeholder' }] };
-  write(dir, 'dist/p/StreamingAssets/build-manifest.json', JSON.stringify({ buildId: '0.1.0+abc.dirty', commit: 'abc', dirty: true }));
-  write(dir, 'dist/p/Build/oldname-core.wasm', Buffer.from('\0asm OLDNAME \0').toString());
-  write(dir, 'dist/p/Build/b.js', 'new WebSocket("wss://10.0.0.5:9000");fetch("http://localhost:8080")');
-  const errs = checkPackage(dir, 'p', game, prov).errors.join('\n');
-  assert.match(errs, /chưa commit/);
-  assert.match(errs, /tên file còn tên game gốc/);
-  assert.match(errs, /10\.0\.0\.5/);
-  assert.match(errs, /localhost/);
-  assert.match(errs, /evil\.example\.com/);
-  assert.doesNotMatch(errs, /sdk\.portal\.com|w3\.org/);
-  assert.match(errs, /oldname/);
-  assert.match(errs, /tuyệt đối/);
-  assert.match(errs, /placeholder không được phát hành/);
-  assert.match(errs, /level1\.json: không có nhãn/);
-  assert.match(errs, /vượt ngân sách/);
-});
 
 test('cli args: boolean flags never swallow positionals', () => {
   assert.deepEqual(parseArgs(['provenance', 'add', '--all', 'assets', '--label', 'own']), { _: ['provenance', 'add', 'assets'], all: true, label: 'own' });
@@ -570,4 +545,11 @@ test('validate: Icons/web.png must be PNG, loading.webp must be WebP; builds/ mu
   assert.match(gk(dir, 'validate').out, /WebP/);
   fs.rmSync(path.join(dir, 'public/Icons/web.png'));
   assert.match(gk(dir, 'validate').out, /web\.png/);
+});
+
+test('release-check command: no build yet is an error', () => {
+  const dir = newGame('rcn');
+  const r = gk(dir, 'release-check');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /chưa có bản build/);
 });

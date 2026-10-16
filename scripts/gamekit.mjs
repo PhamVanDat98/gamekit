@@ -18,7 +18,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   provenance add <file…> --label <nhãn>     Gắn nguồn gốc asset (reference|generated|own|licensed|placeholder)
   provenance list [--label]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
-  release-check [--portal]                  Cổng phát hành
+  release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)
   fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
   check-ownership [--module id]             Module chỉ sửa trong thư mục được giao
   integrate --wave N [--test "cmd"] [--cleanup]   Merge theo phụ thuộc, test sau mỗi lần

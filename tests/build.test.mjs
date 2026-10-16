@@ -8,6 +8,10 @@ import path from 'node:path';
 import { assemblePortal } from '../scripts/lib/assemble.mjs';
 import { tmpDir, write, read, solidPng, tinyWebp, token } from './helpers.mjs';
 import { PassThrough } from 'node:stream';
+import YAML from 'yaml';
+import { newGame, gk, sh } from './helpers.mjs';
+import { checkBuild } from '../scripts/release-check.mjs';
+import { loadProvenance } from '../scripts/validate.mjs';
 import { allQuestions, parseAnswer, checkAnswer, parseSets, withDefaults, settingsFor, ask } from '../scripts/lib/questions.mjs';
 
 test('version: YYMMDDNN from the build date, next number of the day, capped at 99', () => {
@@ -222,4 +226,62 @@ test('assemble: dev-mock has no sitelock and no SDK; stray files outside the lay
   const vite3 = fakeVite(dir3);
   write(vite3, 'assets/misc/a.bin', 'x');
   await assert.rejects(() => assembleTo(dir3, 'azgames', vite3), /assets\/misc/);
+});
+
+async function packedGame(name) {
+  const dir = newGame(name);
+  // ship-ready labels for the files the package carries from public/
+  write(dir, 'public/StreamingAssets/data/level1.json', '{}');
+  gk(dir, 'provenance', 'add', 'public/Icons', 'public/StreamingAssets/data/level1.json', '--label', 'own');
+  const out = path.join(dir, 'builds/26101601/azgames');
+  await assemblePortal({ game: { ...GAME, title: 'Demo' }, kit: loadPortal('azgames'), settings: SETTINGS, version: '26101601', viteOut: fakeVite(tmpDir()), languages: LANGS, outDir: out, ...TOOLS });
+  const head = sh(dir, 'git', 'rev-parse', '--short', 'HEAD').trim();
+  fs.writeFileSync(path.join(dir, 'builds/26101601/manifest.json'), JSON.stringify({ commit: head, dirty: false }));
+  return { dir, out, game: { ...YAML.parse(read(dir, 'game.yaml')), release: { forbiddenTerms: ['OldName'], allowedHosts: [] } } };
+}
+
+test('release-check: a correct az-v1 package passes', async () => {
+  const { dir, game } = await packedGame('rc-ok');
+  const pr = checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir));
+  assert.ok(pr.ok, pr.errors.join('\n'));
+  assert.match(pr.warnings.join('\n'), /domain\.webp/, 'logo portal còn là placeholder');
+});
+
+test('release-check: every layout fault is caught', async () => {
+  const faults = [
+    ['file lạ ở vỏ', (o) => write(o, 'notes.txt', 'x'), /notes\.txt/],
+    ['version.txt có newline', (o) => fs.writeFileSync(path.join(o, 'version.txt'), '26101601\n'), /version\.txt/],
+    ['preview khác index', (o) => fs.appendFileSync(path.join(o, 'preview.html'), ' '), /preview\.html/],
+    ['thiếu <base>', (o) => {
+      const inner = read(o, '26101601/index.html');
+      fs.writeFileSync(path.join(o, 'index.html'), inner);
+      fs.writeFileSync(path.join(o, 'preview.html'), inner);
+    }, /<base/],
+    ['script lạ', (o) => {
+      const html = read(o, 'index.html').replace('</body>', '<script src="https://evil.example.com/x.js"></script></body>');
+      fs.writeFileSync(path.join(o, 'index.html'), html);
+      fs.writeFileSync(path.join(o, 'preview.html'), html);
+    }, /evil\.example\.com/],
+    ['thiếu bản quyền', (o) => fs.writeFileSync(path.join(o, '26101601/framework.js'), 'console.log(1) /* Copyright (c) lib */'), /copyright/i],
+    ['JS trong StreamingAssets', (o) => write(o, '26101601/StreamingAssets/data/x.js', '1'), /StreamingAssets/],
+    ['thiếu Language/en.json', (o) => fs.rmSync(path.join(o, '26101601/Language/en.json')), /en\.json/],
+    ['asset sai thư mục', (o) => write(o, '26101601/assets/misc/a.bin', 'x'), /assets\/misc/],
+    ['tên game gốc', (o) => write(o, '26101601/Language/fr.json', '{"a":"OldName"}'), /OldName/i],
+    ['file lạ trong <v>/', (o) => write(o, '26101601/TemplateData/a.css', 'x'), /TemplateData/],
+  ];
+  for (const [what, mutate, expected] of faults) {
+    const { dir, out, game } = await packedGame(`rc-${faults.findIndex((f) => f[0] === what)}`);
+    mutate(out);
+    const errors = checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir)).errors.join('\n');
+    assert.match(errors, expected, what);
+  }
+});
+
+test('release-check: unbuilt, dirty or stale packages are refused', async () => {
+  const { dir, game } = await packedGame('rc-fresh');
+  fs.writeFileSync(path.join(dir, 'builds/26101601/manifest.json'), JSON.stringify({ commit: 'abc1234', dirty: true }));
+  assert.match(checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir)).errors.join('\n'), /chưa commit/);
+  fs.writeFileSync(path.join(dir, 'builds/26101601/manifest.json'), JSON.stringify({ commit: 'abc1234', dirty: false }));
+  assert.match(checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir)).errors.join('\n'), /HEAD/);
+  assert.match(checkBuild(dir, '26101601', 'dev-mock', game, loadProvenance(dir)).errors.join('\n'), /chưa có gói/);
 });
