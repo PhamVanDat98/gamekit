@@ -20,7 +20,7 @@ GameKit là plugin cho Claude Code giúp **chuyển game di động (Unity, Coco
 
 ## Cài
 
-**Từ GitHub** (bạn cần được mời vào repo):
+**Từ GitHub** (repo https://github.com/PhamVanDat98/gamekit):
 ```
 /plugin marketplace add PhamVanDat98/gamekit
 /plugin install gamekit@gamekit-dev
