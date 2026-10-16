@@ -13,6 +13,7 @@ export function installWebGuard(opts: { bus: PauseBus; platform: Platform; focus
   const onBlur = () => bus.pause('blur');
   const onFocus = () => bus.resume('blur');
   const onKey = (e: KeyboardEvent) => {
+    if (e.target instanceof Element && e.target.closest('.gk-settings')) return; // popup keeps its keys
     if (SCROLL_KEYS.has(e.key) || SCROLL_KEYS.has(e.code)) e.preventDefault();
   };
   const onPointer = () => focusEl.focus({ preventScroll: true });

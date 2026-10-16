@@ -44,6 +44,7 @@ async function main(): Promise<void> {
     onSound: (on) => bus.setUserMuted(!on),
     onOpen: () => bus.pause('menu'),
     onClose: () => bus.resume('menu'),
+    returnFocus: canvas,
   });
 
   const renderer = new Renderer(canvas, PARAMS);

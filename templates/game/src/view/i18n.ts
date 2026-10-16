@@ -12,7 +12,7 @@ export function translate(dict: Readonly<Record<string, unknown>>, code: string,
   }
   const s = dict[k];
   if (typeof s !== 'string') return key;
-  return s.replace(/\{(\w+)\}/g, (m, name: string) => (name in params ? String(params[name]) : m));
+  return s.replace(/\{(\w+)\}/g, (m, name: string) => (Object.hasOwn(params, name) ? String(params[name]) : m));
 }
 
 export const t = (key: string, params?: Params): string => translate(window.GM_LANG?.dict ?? {}, window.GM_LANG?.code ?? 'en', key, params);

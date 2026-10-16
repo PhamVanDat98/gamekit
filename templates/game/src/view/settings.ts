@@ -7,6 +7,8 @@ export interface SettingsOptions {
   onSound(on: boolean): void;
   onOpen?(): void;
   onClose?(): void;
+  /** Gets focus when the popup closes (the game canvas). */
+  returnFocus?: HTMLElement;
 }
 
 /**
@@ -21,6 +23,8 @@ export function mountSettings(parent: HTMLElement, opts: SettingsOptions): { ope
   overlay.hidden = true;
   const panel = el('div', 'gk-settings-panel');
   panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-labelledby', 'gk-settings-title');
 
   let sound = opts.sound;
   const soundBtn = el('button', 'gk-settings-toggle');
@@ -50,17 +54,21 @@ export function mountSettings(parent: HTMLElement, opts: SettingsOptions): { ope
   const closeBtn = el('button', 'gk-settings-close', t('settings.close'));
   closeBtn.type = 'button';
   const footer = el('footer', 'gk-settings-footer', opts.copyright);
-  panel.append(el('h2', 'gk-settings-title', t('settings.title')), soundBtn, langRow, closeBtn, footer);
+  const title = el('h2', 'gk-settings-title', t('settings.title'));
+  title.id = 'gk-settings-title';
+  panel.append(title, soundBtn, langRow, closeBtn, footer);
   overlay.append(panel);
   parent.append(gear, overlay);
 
   const api = {
     open() {
       overlay.hidden = false;
+      soundBtn.focus();
       opts.onOpen?.();
     },
     close() {
       overlay.hidden = true;
+      opts.returnFocus?.focus();
       opts.onClose?.();
     },
   };
@@ -69,6 +77,9 @@ export function mountSettings(parent: HTMLElement, opts: SettingsOptions): { ope
     api.open();
   };
   closeBtn.onclick = () => api.close();
+  overlay.onkeydown = (e) => {
+    if (e.key === 'Escape' && !overlay.hidden) api.close();
+  };
   overlay.onclick = (e) => {
     if (e.target === overlay) api.close();
   };

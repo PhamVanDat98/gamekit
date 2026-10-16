@@ -15,6 +15,9 @@ describe('i18n', () => {
   it('shows the key when missing so gaps are visible', () => {
     expect(translate(dict, 'en', 'nope')).toBe('nope');
   });
+  it('does not resolve inherited names like {constructor}', () => {
+    expect(translate({ k: 'a {constructor} b' }, 'en', 'k')).toBe('a {constructor} b');
+  });
   it('leaves unknown placeholders untouched', () => {
     expect(translate(dict, 'en', 'hud.score')).toBe('Score: {score}');
   });
