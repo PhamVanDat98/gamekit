@@ -7,12 +7,14 @@ import { Problems, GkError } from './lib/log.mjs';
 import { git } from './lib/git.mjs';
 import { requireGameRoot, loadGame } from './lib/game.mjs';
 import { PHASES } from './lib/phases.mjs';
-import { pngInfo } from './lib/png.mjs';
+import { pngInfo, isWebp } from './lib/png.mjs';
+import { loadLanguages, placeholders } from './lib/languages.mjs';
+import { checkSetting, loadPortal, missingSettings } from './lib/portals.mjs';
 
 /** Folders whose files end up in a build and therefore need provenance. */
 export const SHIPPED_DIRS = ['assets', 'public'];
 /** Folders that must never be committed or packaged. */
-export const FORBIDDEN_DIRS = ['reference', 'decompiled', '.gamekit/ghidra', '.gamekit/local'];
+export const FORBIDDEN_DIRS = ['reference', 'decompiled', 'builds', '.gamekit/ghidra', '.gamekit/local'];
 
 const phaseIndex = (p) => (p === 'released' ? PHASES.length : PHASES.indexOf(p));
 
@@ -36,6 +38,9 @@ export function validateGame(root, { stage } = {}) {
   const paramKeys = validateParams(root, st, pr);
   validateObligations(root, st, pr, paramKeys);
   validateOracles(root, pr);
+  validatePortalSettings(game, st, pr);
+  validateLanguages(root, game, pr);
+  validateIcons(root, pr);
   validateProvenance(root, st, pr);
   validateModulePlan(root, pr);
   validateAssetManifest(root, pr);
@@ -143,6 +148,75 @@ function validateOracles(root, pr) {
       pr.error(where, e.message);
     }
   }
+}
+
+// ---------- portalSettings: answers to each portal kit's questions ----------
+function validatePortalSettings(game, st, pr) {
+  const strict = st >= PHASES.indexOf('P4'); // needed to package for the portal
+  for (const p of game.portals ?? []) {
+    let kit;
+    try {
+      kit = loadPortal(p);
+    } catch (e) {
+      pr.error('game.yaml', e.message);
+      continue;
+    }
+    const values = game.portalSettings?.[p] ?? {};
+    for (const [k, v] of Object.entries(values)) {
+      const err = checkSetting(kit, k, v);
+      if (err) pr.error('game.yaml', `portalSettings.${p}.${k}: ${err}`);
+    }
+    for (const k of missingSettings(kit, values))
+      (strict ? pr.error : pr.warn).call(pr, 'game.yaml', `portalSettings.${p}.${k} chưa điền (${kit.config.settings[k].label}) — gamekit config --portal ${p}`);
+  }
+}
+
+// ---------- Language/: en is the source of every translation ----------
+function validateLanguages(root, game, pr) {
+  let langs;
+  try {
+    langs = loadLanguages(root);
+  } catch (e) {
+    pr.error('Language', e.message);
+    return;
+  }
+  const en = langs.en;
+  if (!en) {
+    pr.error('Language', 'thiếu Language/en.json (bản gốc của mọi bản dịch)');
+    return;
+  }
+  const codes = game.languages ?? ['en'];
+  if (!codes.includes('en')) pr.error('game.yaml', 'languages phải có en (bản gốc của mọi bản dịch)');
+  if (game.language && !codes.includes(game.language)) pr.error('game.yaml', `language ${game.language} không có trong languages`);
+  for (const c of codes) if (!langs[c]) pr.error('Language', `languages có ${c} nhưng thiếu Language/${c}.json`);
+  for (const [c, dict] of Object.entries(langs)) {
+    const where = `Language/${c}.json`;
+    for (const [k, v] of Object.entries(dict)) {
+      if (k === '_meta') continue;
+      if (typeof v !== 'string') pr.error(where, `${k}: phải là chuỗi`);
+      else if (c !== 'en' && !(k in en)) pr.error(where, `${k}: không có trong en.json`);
+      else if (c !== 'en' && placeholders(v) !== placeholders(en[k])) pr.error(where, `${k}: tham số {…} khác en.json`);
+    }
+    if (c === 'en') continue;
+    const miss = Object.keys(en).filter((k) => k !== '_meta' && !(k in dict));
+    if (miss.length) pr.warn(where, `thiếu ${miss.length} key, pack sẽ lấy từ en: ${miss.slice(0, 20).join(', ')}${miss.length > 20 ? '…' : ''}`);
+  }
+  for (const rel of walk(path.join(root, 'src')).filter((f) => /\.tsx?$/.test(f))) {
+    const text = fs.readFileSync(path.join(root, 'src', rel), 'utf8');
+    for (const m of text.matchAll(/\bt\(\s*['"]([\w.-]+)['"]/g))
+      if (!(m[1] in en) && !(`${m[1]}.other` in en)) pr.error(`src/${rel}`, `t('${m[1]}') không có trong Language/en.json`);
+  }
+}
+
+// ---------- public/Icons: what the portal page shows before any JS runs ----------
+function validateIcons(root, pr) {
+  const dir = path.join(root, 'public', 'Icons');
+  const web = path.join(dir, 'web.png');
+  const loading = path.join(dir, 'loading.webp');
+  if (!exists(web)) pr.error('public/Icons', 'thiếu web.png (favicon)');
+  else if (!pngInfo(web)) pr.error('public/Icons/web.png', 'không phải PNG');
+  if (!exists(loading)) pr.error('public/Icons', 'thiếu loading.webp (ảnh màn loading)');
+  else if (!isWebp(loading)) pr.error('public/Icons/loading.webp', 'không phải WebP');
 }
 
 // ---------- provenance: every shipped file has a label ----------

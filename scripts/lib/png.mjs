@@ -18,3 +18,15 @@ export function pngInfo(file) {
     fs.closeSync(fd);
   }
 }
+
+/** RIFF....WEBP header. */
+export function isWebp(file) {
+  const fd = fs.openSync(file, 'r');
+  try {
+    const buf = Buffer.alloc(12);
+    const n = fs.readSync(fd, buf, 0, 12, 0);
+    return n === 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP';
+  } finally {
+    fs.closeSync(fd);
+  }
+}

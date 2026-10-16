@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { gk, newGame, token, sh, write, read, editJson } from './helpers.mjs';
+import { gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
 import { checkPackage } from '../scripts/release-check.mjs';
@@ -489,4 +489,73 @@ test('config: fills missing settings with --set, adds a portal and its checklist
 test('status lists portal settings still missing', () => {
   const dir = newGame('st2');
   assert.match(gk(dir, 'status').out, /azgames.*gameCode/);
+});
+
+test('validate: portal settings — bad format always fails, missing warns before P4 and fails from P4', () => {
+  const dir = newGame('vps');
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 0);
+  assert.match(r.out, /portalSettings\.azgames\.gameCode chưa điền/);
+  assert.equal(gk(dir, 'validate', '--stage', 'P4').code, 1);
+  editYaml(dir, (g) => {
+    g.portalSettings.azgames.gameCode = 'g205';
+    g.portalSettings.azgames.signed = token({ signed: 'x', domain: 'azgame.io' });
+  });
+  assert.equal(gk(dir, 'validate', '--stage', 'P4').code, 0);
+  editYaml(dir, (g) => {
+    g.portalSettings.azgames.gameId = 'demo';
+  });
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /azgames\.gameId/);
+  editYaml(dir, (g) => {
+    g.portals.push('nope');
+  });
+  assert.match(gk(dir, 'validate').out, /Không có bộ vỏ portal "nope"/);
+});
+
+test('validate: Language — en required, extra keys and {param} mismatches fail, missing keys warn, t() keys exist', () => {
+  const dir = newGame('vlang');
+  editJson(dir, 'Language/en.json', (d) => {
+    d['hud.score'] = 'Score: {score}';
+    d['menu.play'] = 'Play';
+  });
+  editYaml(dir, (g) => {
+    g.languages = ['es'];
+  });
+  assert.match(gk(dir, 'validate').out, /languages phải có en/);
+  editYaml(dir, (g) => {
+    g.languages = ['en', 'es'];
+  });
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /es\.json/);
+  write(dir, 'Language/es.json', JSON.stringify({ 'hud.score': 'Puntos: {score}' }));
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /menu\.play/, 'thiếu key chỉ cảnh báo');
+  write(dir, 'Language/es.json', JSON.stringify({ 'hud.score': 'Puntos: {puntos}', extra: 'x' }));
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /tham số/);
+  assert.match(r.out, /extra/);
+  write(dir, 'Language/es.json', '{}');
+  write(dir, 'src/view/x.ts', "export const a = (t: (k: string) => string) => t('menu.nope');\n");
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /menu\.nope/);
+  fs.rmSync(path.join(dir, 'src/view/x.ts'));
+  editYaml(dir, (g) => {
+    g.language = 'fr';
+  });
+  assert.match(gk(dir, 'validate').out, /language fr/);
+});
+
+test('validate: Icons/web.png must be PNG, loading.webp must be WebP; builds/ must be gitignored', () => {
+  const dir = newGame('vicon');
+  assert.equal(gk(dir, 'validate').code, 0);
+  fs.writeFileSync(path.join(dir, 'public/Icons/loading.webp'), 'not webp');
+  assert.match(gk(dir, 'validate').out, /WebP/);
+  fs.rmSync(path.join(dir, 'public/Icons/web.png'));
+  assert.match(gk(dir, 'validate').out, /web\.png/);
 });
