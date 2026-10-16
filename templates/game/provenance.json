@@ -1,7 +1,7 @@
 {
   "$schema": "./.gamekit/schemas/provenance.schema.json",
   "entries": [
-    { "path": "public/TemplateData/favicon.svg", "label": "own", "source": "GameKit template", "license": null, "note": null, "at": null },
-    { "path": "public/TemplateData/style.css", "label": "own", "source": "GameKit template", "license": null, "note": null, "at": null }
+    { "path": "public/Icons/web.png", "label": "placeholder", "source": "GameKit template", "license": null, "note": "Favicon — thay bằng icon thật ở P3", "at": null },
+    { "path": "public/Icons/loading.webp", "label": "placeholder", "source": "GameKit template", "license": null, "note": "Key art màn loading — thay ở P3", "at": null }
   ]
 }

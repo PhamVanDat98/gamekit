@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { WorldState } from '../contracts/world';
 import type { Params } from '../core/params';
 
@@ -45,7 +46,7 @@ export class Renderer {
       ctx.fillText(overlay, params.world.width / 2, params.world.height / 2);
       ctx.fillStyle = COLORS.dim;
       ctx.font = '16px system-ui, sans-serif';
-      ctx.fillText('← → hoặc chạm hai bên màn hình', params.world.width / 2, params.world.height / 2 + 32);
+      ctx.fillText(t('game.controls'), params.world.width / 2, params.world.height / 2 + 32);
     }
   }
 }

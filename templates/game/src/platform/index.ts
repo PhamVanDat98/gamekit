@@ -40,7 +40,7 @@ export async function bootPlatform(bus: PauseBus, initTimeoutMs = INIT_TIMEOUT_M
     console.warn('[platform] SDK unavailable, continuing without it', e);
     adapter = offlineAdapter(PORTAL);
   }
-  const platform = createPlatform(adapter, { bus, saveNamespace: GAME_NAME });
+  const platform = createPlatform(adapter, { bus, saveNamespace: GAME_NAME, info: { portal: PORTAL, copyright: window.GM_LOADER?.copyright ?? '' } });
   platform.track('game_load_start', { portal: PORTAL, build: BUILD_ID });
   if (failure) platform.track('error', { message: `sdk_init: ${String(failure).slice(0, 150)}`, build: BUILD_ID });
   return platform;

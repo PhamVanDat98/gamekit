@@ -14,7 +14,7 @@
     "validate": "node scripts/gk.mjs validate",
     "gate": "node scripts/gk.mjs gate",
     "pack": "node scripts/gk.mjs pack --all",
-    "preview": "vite preview --outDir dist/dev-mock",
+    "preview": "vite preview --outDir builds",
     "release-check": "node scripts/gk.mjs release-check"
   },
   "devDependencies": {
@@ -22,6 +22,8 @@
     "eslint": "^10.0.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.71.0",
+    "esbuild": "^0.25.0",
+    "javascript-obfuscator": "^4.1.1",
     "vite": "^7.3.0",
     "vitest": "^3.2.4"
   }

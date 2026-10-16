@@ -1,7 +1,7 @@
 import type { AnalyticsEvent, EventData } from './events';
 import { isAnalyticsEvent } from './events';
 import type { PauseBus } from './pause-bus';
-import type { AdKind, AdResult, Platform, PortalAdapter } from './types';
+import type { AdKind, AdResult, Platform, PlatformInfo, PortalAdapter } from './types';
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -16,6 +16,7 @@ export interface PlatformOptions {
   log?: (msg: string, err?: unknown) => void;
   /** An ad that never reports back (ad blocker, SDK bug) is abandoned after this long. */
   adTimeoutMs?: number;
+  info?: PlatformInfo;
 }
 
 const DEFAULT_AD_TIMEOUT_MS = 60_000;
@@ -106,6 +107,7 @@ export function createPlatform(adapter: PortalAdapter, opts: PlatformOptions): P
 
   const platform: Platform = {
     name: adapter.name,
+    info: opts.info ?? { portal: adapter.name, copyright: '' },
     capabilities: adapter.capabilities,
     loadingProgress(p) {
       try {

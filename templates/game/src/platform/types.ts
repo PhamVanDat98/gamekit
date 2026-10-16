@@ -49,8 +49,15 @@ export interface PortalAdapter {
   user?(): Promise<PlatformUser | null>;
 }
 
+export interface PlatformInfo {
+  readonly portal: string;
+  /** Portal copyright line for the Settings footer (AZGAMES: "© <year> Azgames.io"). Never translated. */
+  readonly copyright: string;
+}
+
 /** What the game calls. Gameplay never knows which portal it runs on. */
 export interface Platform {
+  readonly info: PlatformInfo;
   readonly name: string;
   readonly capabilities: Capabilities;
   loadingProgress(progress: number): void;

@@ -154,3 +154,13 @@ describe('pause bus', () => {
     expect(bus.muted).toBe(true);
   });
 });
+
+describe('info', () => {
+  it('exposes the portal copyright given at boot, for the Settings footer', () => {
+    const platform = createPlatform(createDevMock({ adMs: 0, log: quiet }), { bus: new PauseBus(), saveNamespace: 't', storage: memory(), log: quiet, info: { portal: 'azgames', copyright: '© 2026 Azgames.io' } });
+    expect(platform.info).toEqual({ portal: 'azgames', copyright: '© 2026 Azgames.io' });
+  });
+  it('defaults to the adapter name and no copyright', () => {
+    expect(setup().platform.info).toEqual({ portal: 'dev-mock', copyright: '' });
+  });
+});

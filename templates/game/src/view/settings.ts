@@ -1,0 +1,83 @@
+import { t } from './i18n';
+
+export interface SettingsOptions {
+  /** platform.info.copyright — shown as-is in every language. */
+  copyright: string;
+  sound: boolean;
+  onSound(on: boolean): void;
+  onOpen?(): void;
+  onClose?(): void;
+}
+
+/**
+ * Gear button + Settings popup: sound, language, and the portal copyright in the footer.
+ * Portals require the footer (AZGAMES: "© <year> Azgames.io") — reskin may restyle it, never remove it.
+ */
+export function mountSettings(parent: HTMLElement, opts: SettingsOptions): { open(): void; close(): void } {
+  const gear = el('button', 'gk-gear', '⚙');
+  gear.type = 'button';
+  gear.setAttribute('aria-label', t('settings.title'));
+  const overlay = el('div', 'gk-settings');
+  overlay.hidden = true;
+  const panel = el('div', 'gk-settings-panel');
+  panel.setAttribute('role', 'dialog');
+
+  let sound = opts.sound;
+  const soundBtn = el('button', 'gk-settings-toggle');
+  soundBtn.type = 'button';
+  const paintSound = () => (soundBtn.textContent = `${t('settings.sound')}: ${t(sound ? 'settings.on' : 'settings.off')}`);
+  paintSound();
+  soundBtn.onclick = () => {
+    sound = !sound;
+    paintSound();
+    opts.onSound(sound);
+  };
+
+  const langs = window.GM_LANG?.available ?? [];
+  const langRow = el('label', 'gk-settings-row', t('settings.language'));
+  const select = document.createElement('select');
+  for (const l of langs) {
+    const o = document.createElement('option');
+    o.value = l.code;
+    o.textContent = l.name;
+    o.selected = l.code === window.GM_LANG?.code;
+    select.append(o);
+  }
+  select.onchange = () => window.GM_LOADER?.setLanguage(select.value);
+  langRow.append(select);
+  langRow.hidden = langs.length < 2;
+
+  const closeBtn = el('button', 'gk-settings-close', t('settings.close'));
+  closeBtn.type = 'button';
+  const footer = el('footer', 'gk-settings-footer', opts.copyright);
+  panel.append(el('h2', 'gk-settings-title', t('settings.title')), soundBtn, langRow, closeBtn, footer);
+  overlay.append(panel);
+  parent.append(gear, overlay);
+
+  const api = {
+    open() {
+      overlay.hidden = false;
+      opts.onOpen?.();
+    },
+    close() {
+      overlay.hidden = true;
+      opts.onClose?.();
+    },
+  };
+  gear.onclick = (e) => {
+    e.stopPropagation();
+    api.open();
+  };
+  closeBtn.onclick = () => api.close();
+  overlay.onclick = (e) => {
+    if (e.target === overlay) api.close();
+  };
+  return api;
+}
+
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string): HTMLElementTagNameMap[K] {
+  const e = document.createElement(tag);
+  e.className = cls;
+  if (text) e.textContent = text;
+  return e;
+}

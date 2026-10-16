@@ -1,0 +1,13 @@
+{
+  "_meta": { "name": "English" },
+  "game.start": "Tap or press Space to play",
+  "game.controls": "← → or tap either side of the screen",
+  "game.paused": "Paused",
+  "game.score": "Score: {score}",
+  "settings.title": "Settings",
+  "settings.sound": "Sound",
+  "settings.on": "On",
+  "settings.off": "Off",
+  "settings.language": "Language",
+  "settings.close": "Close"
+}
