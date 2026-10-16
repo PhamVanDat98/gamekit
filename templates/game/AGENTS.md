@@ -7,12 +7,15 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 2. **Bám hành vi, không chép code.** Logic viết lại từ ghi chú RE trong `notes/`. Không commit code decompile.
 3. **Asset gốc chỉ là tư liệu.** Để trong `reference/` (gitignored). Mọi file trong `assets/` và `public/` phải có nhãn trong `provenance.json` (`gamekit provenance add … --label …`).
 4. **Không tự đánh dấu việc "(bạn)"** trong `gates/*.md` — đó là quyết định của người dùng.
+5. **Popup Settings phải giữ footer bản quyền** (`platform.info.copyright`) — portal yêu cầu, không bỏ khi reskin.
+6. **Mọi text hiển thị đi qua `t()`** và `Language/en.json` (+ các ngôn ngữ khác), không viết cứng trong `src/`.
 
 ## Cấu trúc
 - `src/core/` logic thuần, deterministic: không DOM, không thư viện render, thời gian từ fixed step, ngẫu nhiên từ `Rng` có seed. **Viết test trước** (TDD).
 - `src/view/` render và input thiết bị; chỉ đọc state. Kiểm tra bằng screenshot/checklist, không unit test.
 - `src/platform/` interface chung cho mọi portal. Gameplay chỉ gọi `Platform`; adapter nằm trong `src/platform/adapters/`. Event analytics chỉ dùng tên trong `src/platform/events.ts`.
 - `src/contracts/` type dùng chung giữa các module — chỉ agent chính sửa.
+- `Language/` mỗi ngôn ngữ một file (`en.json` bắt buộc) · `public/Icons/` (`web.png`, `loading.webp`) · `builds/` đầu ra của pack (gitignored, không commit).
 - `params/` số liệu có nguồn và `confidence` · `spec/` gameplay spec, `obligations.yaml`, `oracles/` · `notes/` ghi chú RE, `QUESTIONS.md` · `gates/` checklist cổng · `DECISIONS.md` lý do và sai khác.
 
 ## Lệnh
@@ -24,7 +27,9 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Parity với game gốc | `npm run gk -- parity` (nghĩa vụ trong `spec/obligations.yaml`, test gắn thẻ `[id:case]`) |
 | Kiểm tra cổng, sang pha sau | `npm run gk -- gate` · `npm run gk -- gate --advance` |
 | Dựng song song | `npm run gk -- fanout --wave N` → subagent làm theo `.gamekit/local/BRIEF.md` → `npm run gk -- integrate --wave N` |
-| Đóng gói, kiểm tra phát hành | `npm run gk -- pack --all` · `npm run gk -- release-check` |
+| Thông tin portal còn thiếu | `npm run gk -- config --portal <id>` |
+| Đóng gói, kiểm tra phát hành | `npm run gk -- pack --all` → `builds/<v>/<portal>/` (`--zip`, `--compress`, `--version`) · `npm run gk -- release-check` |
+| Chơi thử bản build | `npm run preview` → `http://localhost:4173/<v>/dev-mock/<v>/index.html` |
 
 ## Nếu bạn là subagent trong một worktree
 Đọc `.gamekit/local/BRIEF.md`. Chỉ sửa trong thư mục được giao; cần đổi contract/params/package.json thì dừng và báo lại. Trước khi xong: test xanh, `npm run gk -- check-ownership` đạt, commit trên nhánh của module.

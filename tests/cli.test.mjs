@@ -560,3 +560,10 @@ test('release-check command: no build yet is an error', () => {
   assert.equal(r.code, 1);
   assert.match(r.out, /chưa có bản build/);
 });
+
+test('pre-commit blocks build output even when force-added', () => {
+  const dir = newGame('pcb');
+  write(dir, 'builds/26101601/dev-mock/index.html', 'x');
+  sh(dir, 'git', 'add', '-f', 'builds/26101601/dev-mock/index.html');
+  assert.throws(() => sh(dir, 'git', 'commit', '-qm', 'x'), /thư mục cấm/);
+});

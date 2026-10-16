@@ -13,6 +13,12 @@ Gameplay chỉ gọi `Platform` (`src/platform/types.ts`). Mỗi portal là mộ
 - chỉ nhận tên event trong `src/platform/events.ts`;
 - save fallback localStorage có namespace.
 
+## Bản quyền, vỏ portal
+- `Platform.info = { portal, copyright }`. Adapter `azgames` lấy `copyright` từ `GM_LOADER.copyright` (portal yêu cầu "© <năm> Azgames.io"); `dev-mock` trả "© <năm> GameKit (dev)".
+- Popup Settings (`src/view/settings.ts`) **bắt buộc giữ footer** `platform.info.copyright`, hiện ở mọi ngôn ngữ, không qua bản dịch. Reskin không được bỏ; `release-check` bắt nếu `framework.js` không đọc `info.copyright`.
+- Vỏ portal (trang HTML, loader, sitelock, khởi tạo SDK) nằm trong plugin: `portals/<id>/{portal.yaml, kit.mjs, shell.html, loader.entry.js}` (+ `Icons/domain.webp`). Adapter trong game không làm lại phần này.
+- Adapter `azgames` hiện chỉ có thông tin portal và analytics (`GMGameSDK.trackEvent`); quảng cáo báo `unavailable`, leaderboard chưa làm.
+
 ## Không đoán API
 Chỉ viết adapter từ **tài liệu chính thức hoặc tài liệu/tiêu chuẩn người dùng cung cấp**. Thiếu thông tin (vd Weegoo, SDK riêng) → hỏi người dùng, ghi câu hỏi vào DECISIONS.md, không bịa tên hàm.
 

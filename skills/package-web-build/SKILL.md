@@ -1,21 +1,42 @@
 ---
 name: package-web-build
-description: Dùng ở pha P5 (hoặc bất cứ khi nào cần bản build) để đóng gói game thành gói cho từng portal theo cấu trúc chuẩn index.html, Build/, StreamingAssets/, TemplateData/ — mỗi portal một gói, có build id, nén và zip.
+description: Dùng ở pha P5 (hoặc bất cứ khi nào cần bản build) để đóng gói game thành gói cho từng portal theo bố cục builds/<phiên bản>/<portal>/ (az-v1 của AZGAMES) — số phiên bản YYMMDDNN, nén và zip.
 ---
 
 # Đóng gói
 
-`gamekit pack [--portal a,b | --all] [--compress] [--zip]`
+`gamekit pack [--portal a,b | --all] [--version V] [--compress] [--zip]`
 
-- Mỗi portal trong `portals` (game.yaml) ra một thư mục `dist/<portal>/`, build bằng Vite với `GK_PORTAL=<portal>` — gói chỉ chứa adapter của portal đó.
-- Cấu trúc:
-  - `index.html` — entry, loader có thanh tiến độ, đường dẫn tương đối.
-  - `Build/` — JS đã bundle và asset import từ code (`assets/`).
-  - `StreamingAssets/` — chép từ `public/StreamingAssets/` (asset tải theo nhu cầu, params JSON, manifest) + `build-manifest.json` (name, version, portal, buildId, buildHash, builtAt).
-  - `TemplateData/` — chép từ `public/TemplateData/` (css, logo, favicon).
-- `buildId` = `version+commit` (thêm `.dirty` nếu còn thay đổi chưa commit) — được nhúng vào game để báo lỗi kèm phiên bản. Phát hành thật thì commit hết trước khi pack.
-- `--compress` tạo `.gz`/`.br` cho `Build/` (cho server tự host như nginx). Portal ngoài thường tự nén, không cần.
-- `--zip` tạo `dist/<game>-<portal>-v<version>.zip` để nộp portal (cần lệnh `zip`).
-- Không bật source map khi phát hành (`build.sourcemap: false` trong vite.config.ts).
+- Mỗi lần pack tạo một thư mục phiên bản `builds/<v>/`, mỗi portal trong `portals` (game.yaml) một thư mục con. Bản cũ giữ lại, không tự xoá. `builds/` bị gitignore và hook chặn commit.
+- `<v>` = `YYMMDDNN` (ngày build + số thứ tự trong ngày 01–99). `--version 26101605` để chỉ định: phải 8 chữ số và chưa tồn tại. Đây là `productVersion` gửi SDK, `GM_GAME.version` và nội dung `version.txt`; `version` semver trong game.yaml chỉ ghi vào `manifest.json`.
+- **Cần `portalSettings` đủ** cho portal được pack (gameCode, gameId, portalGid, signed với azgames). Thiếu thì pack dừng portal đó và liệt kê từng mục kèm lệnh `gamekit config --portal <id>`.
+- Vỏ portal (trang HTML, `loader.js`, màn loading, sitelock, khởi tạo SDK) nằm trong plugin (`portals/<id>/`), game không tự viết.
+
+## Bố cục
+
+```
+builds/<v>/
+  manifest.json                     commit, dirty, hash, kích thước — KHÔNG upload
+  <name>-<portal>-<v>.zip           (--zip) nội dung = thư mục portal
+  azgames/                          đơn vị upload
+    index.html                      = <v>/index.html + <base href="<v>/">
+    preview.html                    giống index.html từng byte
+    version.txt                     "<v>", 8 byte, không newline
+    <v>/
+      index.html  loader.js  framework.js  css/style.css
+      Icons/{web.png, loading.webp, domain.webp}
+      Language/en.json (+ <lang>.json)   mỗi ngôn ngữ một file
+      assets/{img,art,audio,fonts}/
+      StreamingAssets/data/
+  dev-mock/                         cùng bố cục, vỏ dev-mock (không sitelock, SDK giả)
+```
+
+- `--compress` tạo `.gz`/`.br` cho js/css/json/wasm trong `<v>/` (cho server tự host). Portal ngoài thường tự nén.
+- `--zip` tạo `builds/<v>/<name>-<portal>-<v>.zip` để nộp portal.
+- Không bật source map khi phát hành.
+- Phiên bản có `dirty` nếu còn thay đổi chưa commit — phát hành thật thì commit hết trước khi pack.
+
+## Test local
+`npm run preview` (= `vite preview --outDir builds`) rồi mở `http://localhost:4173/<v>/dev-mock/<v>/index.html`. Bản `azgames` có sitelock nên không chạy local — đúng chủ ý.
 
 Sau khi pack: skill **release-check**.
