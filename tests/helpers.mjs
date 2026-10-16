@@ -19,9 +19,9 @@ export function gk(cwd, ...args) {
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }
 
-export function newGame(name = 'demo') {
+export function newGame(name = 'demo', ...extra) {
   const parent = tmpDir();
-  const { code, out } = gk(parent, 'init', name, '--title', 'Demo', '--engine', 'unity', '--no-install');
+  const { code, out } = gk(parent, 'init', name, '--title', 'Demo', '--engine', 'unity', '--no-install', ...extra);
   if (code !== 0) throw new Error(out);
   const dir = path.join(parent, name);
   sh(dir, 'git', 'config', 'user.email', 'test@example.com');

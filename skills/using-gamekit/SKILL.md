@@ -23,8 +23,8 @@ GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, 
 | --- | --- | --- | --- |
 | P0 Intake | Nhận diện engine, kiểm kê, chấm khả thi | game-recon, triage | Làm hay bỏ |
 | P1 Phân tích | Trích logic, số liệu, asset, UI từ game gốc | engine-*, **re-notes**, gameplay-spec, asset-inventory, ui-extract | |
-| P2 Dựng lại | Dựng lại bằng JS/TS, chơi được với placeholder | runtime-select, **module-plan**, **rebuild-game**, **integrate**, **parity-check** | |
-| P3 Reskin | Bố cục web, style mới, asset mới theo spec | web-relayout, style-*, asset-spec, apply-style, replace-* | Chọn style |
+| P2 Dựng lại | Dựng lại bằng JS/TS, chơi được (asset gốc nếu là game của người dùng, placeholder nếu làm lại) | runtime-select, **module-plan**, **rebuild-game**, **integrate**, **parity-check** | |
+| P3 Chuyển sang web | Điều khiển, bố cục web, nén asset. `third-party`: thêm reskin (style, asset mới theo spec) | web-relayout; `third-party`: style-*, asset-spec, apply-style, replace-* | Duyệt bố cục; `third-party`: chọn style |
 | P4 Tích hợp | SDK portal, analytics, leaderboard, save | **platform-sdk**, add-* | |
 | P5 Phát hành | Đóng gói, hiệu năng, QA, ảnh store | **package-web-build**, perf-budget, qa-smoke, store-assets, **release-check** | Playtest cuối |
 
@@ -32,12 +32,18 @@ Skill **in đậm** có trong bản này. Skill khác chưa có: làm theo luậ
 
 Mỗi pha kết thúc bằng một cổng (`gates/P*.md`). `gamekit gate` kiểm tra; mục `{auto: …}` do script chấm; mục `(bạn)` **chỉ người dùng được tick** — hỏi họ, không tự tick. Chỉ chạy `gamekit gate --advance` khi người dùng đồng ý.
 
+## Game của ai: `source.ownership`
+- **`own` (mặc định)**: game của chính người dùng — có source, hoặc mất source chỉ còn bản build (APK…). Giữ nguyên hình, âm thanh, tên, text. Không hỏi lại điều này; chỉ đổi khi người dùng nói đây là game của người khác.
+- **`third-party`**: làm lại game của người khác (`gamekit init … --third-party`). Bắt buộc reskin, chặn tên gốc.
+
+Cổng tự bỏ các mục `{only: …}` không áp cho game này.
+
 ## Luật cứng
-1. **Dữ liệu và logic gameplay bám sát game gốc.** Mọi số gameplay nằm trong `params/*.json`, mỗi giá trị có `source` (file + hàm/offset, hoặc đo từ video). Không tự đặt số. Sai khác chỉ khi web bắt buộc (điều khiển cảm ứng, bố cục, hiệu năng): thêm `deviation` + mục `D-n` trong `DECISIONS.md`, chờ người dùng duyệt. Không áp cho đồ hoạ, âm thanh, tên, text — phần đó phải làm mới.
-2. **Bám hành vi, không chép code.** Ghi chú RE viết bằng lời của mình trong `notes/`. Không commit code decompile (hook chặn).
-3. **Asset gốc chỉ là tư liệu**, nằm trong `reference/` (gitignored). Mọi file trong `assets/`, `public/` phải có nhãn provenance: `reference | generated | own | licensed | placeholder`. Bản phát hành không được còn `reference` hay `placeholder`.
-4. **Chỉ phân tích file tĩnh.** Không can thiệp vào game đang chạy của người khác.
-5. **Art brief mô tả thiết kế mới**, không viết "vẽ lại nhân vật X của game gốc".
+1. **Dữ liệu và logic gameplay bám sát game gốc.** Mọi số gameplay nằm trong `params/*.json`, mỗi giá trị có `source` (file + hàm/offset, hoặc đo từ video). Không tự đặt số. Sai khác chỉ khi web bắt buộc (điều khiển cảm ứng, bố cục, hiệu năng): thêm `deviation` + mục `D-n` trong `DECISIONS.md`, chờ người dùng duyệt. `third-party`: không áp cho đồ hoạ, âm thanh, tên, text — phần đó phải làm mới.
+2. **Code gốc.** `own`: được dịch thẳng code gốc (C#, decompile của chính game này) sang TypeScript, nhưng viết lại cho hợp `core/`/`view/` chứ không dịch máy từng dòng; ghi chú trong `notes/` chỉ ra logic nằm ở đâu. `third-party`: bám hành vi, không chép code; ghi chú RE viết bằng lời của mình. Cả hai: không commit code gốc hay code decompile vào repo game (hook chặn).
+3. **Asset gốc.** `own`: xuất sang định dạng web, đưa vào `assets/`/`public/`, nhãn `own`. `third-party`: chỉ là tư liệu, nằm trong `reference/` (gitignored). Mọi file trong `assets/`, `public/` phải có nhãn provenance: `reference | generated | own | licensed | placeholder`. Bản phát hành không được còn `reference` hay `placeholder`.
+4. **Phân tích.** `own`: được chạy, debug, đo game gốc. `third-party`: chỉ phân tích file tĩnh, không can thiệp vào game đang chạy.
+5. **Art brief** (`third-party`) mô tả thiết kế mới, không viết "vẽ lại nhân vật X của game gốc".
 
 ## Cấu trúc một game
 `src/core/` logic thuần, deterministic (không DOM, không render, `Rng` có seed, fixed timestep) · `src/view/` render + input, chỉ đọc state · `src/platform/` interface chung cho mọi portal · `src/contracts/` type dùng chung · `params/` số liệu có nguồn · `spec/` (gameplay spec, `obligations.yaml` nghĩa vụ parity, `oracles/` bảng từ game gốc) · `notes/` (ghi chú RE, `QUESTIONS.md`) · `gates/` · `DECISIONS.md` · `provenance.json` · `module-plan.yaml` (khi dựng song song).

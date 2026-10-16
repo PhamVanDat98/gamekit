@@ -5,7 +5,9 @@ description: Dùng ở P1 khi phân tích game gốc để trích logic, số li
 
 # Ghi chú reverse engineering (P1)
 
-Mục tiêu: hiểu game gốc đủ để viết lại hành vi bằng lời của mình. Ghi chú nằm trong `notes/`; số liệu vào `params/`; code decompile chỉ nằm trong `decompiled/` (gitignored, hook chặn commit).
+Mục tiêu: hiểu game gốc đủ để viết lại hành vi. Ghi chú nằm trong `notes/`; số liệu vào `params/`; code decompile chỉ nằm trong `decompiled/` (gitignored, hook chặn commit).
+
+Game của người dùng (`source.ownership: own`, mặc định): có source thì đọc thẳng, không cần decompile; mất source (chỉ còn APK/bản build) thì decompile chính game đó, được chạy và debug để đo. Ghi chú chỉ cần nói logic nằm ở đâu và chỗ nào khó chuyển sang web. Làm lại game người khác (`third-party`): ghi chú viết bằng lời của mình, chỉ phân tích file tĩnh.
 
 ## 1. Câu hỏi trước, công cụ sau
 Mở `notes/QUESTIONS.md`. Biến yêu cầu thành danh sách câu hỏi, mỗi câu ghi rõ cần loại bằng chứng gì: "tốc độ đạn bao nhiêu px/s, tăng theo level thế nào?" → cần hằng số và hàm cập nhật đạn. Mỗi câu có trạng thái: `mở` · `một phần` · `đã trả lời`.
@@ -38,7 +40,7 @@ Chỉ phân tích file tĩnh của bản mà người dùng có. Không can thi�
 - RNG: ghi thuật toán và cách seed. Đây là thứ cần tái hiện để replay khớp.
 
 ## 4. Ghi kết luận
-Mỗi kết luận trong `notes/<chủ đề>.md` ghi bằng lời của mình:
+Mỗi kết luận trong `notes/<chủ đề>.md` (`third-party`: viết bằng lời của mình):
 - **Kết luận**: hành vi, công thức viết lại.
 - **Vị trí**: file + hàm/offset/class.method, hoặc video + mốc thời gian.
 - **Độ tin cậy**: `observed` (đọc thẳng), `derived` (suy từ logic), `inferred` (ước lượng).

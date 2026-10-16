@@ -19,12 +19,12 @@ description: Dùng trước khi phát hành hoặc nộp game lên portal (cổn
 ## Lỗi và cách sửa
 | Lỗi | Sửa |
 | --- | --- |
-| asset `reference` / `placeholder` | Thay bằng asset mới (P3), gắn nhãn `generated`/`own`/`licensed` |
+| asset `reference` / `placeholder` | Game của người dùng (`own`): đưa asset gốc vào, gắn nhãn `own`. `third-party`: thay bằng asset mới (P3), gắn nhãn `generated`/`own`/`licensed` |
 | lỗi bố cục (file lạ, `version.txt`, `preview.html`, `<base>`, thiếu file bắt buộc) | Không sửa tay trong `builds/`; sửa nguồn rồi `gamekit pack` lại |
 | thiếu footer bản quyền (`gk-settings-footer`) trong `framework.js` | Khôi phục footer `gk-settings-footer` hiện `platform.info.copyright` trong popup Settings |
 | đóng gói từ bản chưa commit / commit khác HEAD | Commit code và asset, `gamekit pack` lại (sửa gates/notes/spec/game.yaml không tính) |
 | file không có nhãn provenance | `gamekit provenance add <file> --label … --source …` (licensed cần `--license`) |
-| còn tên/thương hiệu game gốc (text, tên file, chuỗi trong file nhị phân) | Đổi text, tên file, metadata; kiểm tra `release.forbiddenTerms` đủ chưa |
+| còn tên/thương hiệu game gốc (text, tên file, chuỗi trong file nhị phân) — chỉ khi `release.forbiddenTerms` có mục, thường là `third-party` | Đổi text, tên file, metadata; kiểm tra `release.forbiddenTerms` đủ chưa |
 | link ngoài tới host X (kể cả localhost, IP, ws://, `//host` trong index.html) | Bỏ link; nếu là CDN SDK portal thì thêm vào `release.allowedHosts`. URL tài liệu nằm trong thư viện minified cũng bị báo — kiểm tra rồi thêm host vào allowedHosts nếu vô hại |
 | đường dẫn tuyệt đối | `<base href="<v>/">` ở index.html ngoài là đúng chủ ý, không phải lỗi. Lỗi là `src`/`href` bắt đầu bằng `/` trong trang hoặc code game: dùng đường dẫn tương đối, `base: './'` trong vite.config.ts |
 | tải đầu vượt ngân sách | Chuyển asset lớn sang `StreamingAssets/` tải sau, nén texture/audio, tách code |

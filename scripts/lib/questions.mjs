@@ -13,7 +13,7 @@ export const LANGUAGE_NAMES = {
 const LANG_PATTERN = '^[a-z]{2,3}(-[a-z0-9]{2,8})*$';
 
 const CORE_QUESTIONS = () => [
-  { key: 'title', label: 'Tên game mới', description: 'Tên hiển thị của bản web. Không dùng tên game gốc (luật cứng: tên và text phải làm mới).', default: '{{TITLE}}', required: true },
+  { key: 'title', label: 'Tên game', description: 'Tên hiển thị của bản web. Game của bạn: giữ tên gốc được. Làm lại game người khác (init --third-party): phải đặt tên mới.', default: '{{TITLE}}', required: true },
   { key: 'engine', label: 'Engine của game gốc', description: `Engine game gốc dùng, để GameKit gợi ý skill phân tích. Một trong: ${ENGINES.join(', ')}.`, default: 'unknown', required: true, enum: ENGINES },
   { key: 'sourcePath', label: 'Đường dẫn game gốc', description: 'Thư mục bản game gốc trên máy — chỉ để phân tích, không bao giờ đóng gói. Để trống nếu chưa có.', required: false },
   { key: 'portals', label: 'Portal phát hành', description: `Các portal sẽ phát hành, cách nhau dấu phẩy. Có: ${listPortals().filter((p) => p !== 'dev-mock').join(', ')}. dev-mock luôn có sẵn để chạy thử.`, default: 'azgames', type: 'list', required: true },

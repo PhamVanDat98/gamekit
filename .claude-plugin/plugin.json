@@ -1,6 +1,6 @@
 {
   "name": "gamekit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Port game từ engine bất kỳ sang web game JS, reskin và đóng gói cho portal. Pipeline 6 pha có cổng, game.yaml giữ trạng thái.",
   "author": { "name": "Dat" },
   "license": "UNLICENSED",

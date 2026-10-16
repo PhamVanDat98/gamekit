@@ -2,12 +2,15 @@
 
 Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml`; luôn chạy `npm run gk -- status` trước khi làm việc để biết đang ở pha nào và skill nào dùng tiếp.
 
+## Game của ai
+`source.ownership` trong `game.yaml`: **`own`** (mặc định) = game của người dùng, giữ nguyên hình, âm thanh, tên, text; **`third-party`** = làm lại game người khác, bắt buộc reskin. Không hỏi lại; luật dưới đây ghi rõ chỗ nào khác nhau.
+
 ## Luật cứng
 1. **Dữ liệu và logic gameplay phải bám sát game gốc.** Mọi số gameplay nằm trong `params/*.json`, mỗi giá trị có `source` (file + hàm/offset, hoặc đo từ video). Không tự đặt số. Sai khác chỉ khi web bắt buộc, phải có mục `D-n` trong `DECISIONS.md` và được người dùng duyệt (`deviation.approved: true`).
-2. **Bám hành vi, không chép code.** Logic viết lại từ ghi chú RE trong `notes/`. Không commit code decompile.
-3. **Asset gốc chỉ là tư liệu.** Để trong `reference/` (gitignored). Mọi file trong `assets/` và `public/` phải có nhãn trong `provenance.json` (`gamekit provenance add … --label …`).
+2. **Code gốc.** `own`: được dịch logic từ code gốc sang TypeScript, viết lại cho hợp `core/`/`view/`. `third-party`: bám hành vi, không chép code; viết lại từ ghi chú RE trong `notes/`. Cả hai: không commit code gốc hay code decompile vào repo này.
+3. **Asset.** `own`: asset gốc xuất sang định dạng web, đưa vào `assets/`/`public/` với nhãn `own`. `third-party`: asset gốc chỉ là tư liệu trong `reference/` (gitignored). Mọi file trong `assets/` và `public/` phải có nhãn trong `provenance.json` (`gamekit provenance add … --label …`).
 4. **Không tự đánh dấu việc "(bạn)"** trong `gates/*.md` — đó là quyết định của người dùng.
-5. **Popup Settings phải giữ footer bản quyền** (`platform.info.copyright`) — portal yêu cầu, không bỏ khi reskin.
+5. **Popup Settings phải giữ footer bản quyền** (`platform.info.copyright`) — portal yêu cầu, không bỏ khi đổi giao diện.
 6. **Mọi text hiển thị đi qua `t()`** và `Language/en.json` (+ các ngôn ngữ khác), không viết cứng trong `src/`.
 
 ## Cấu trúc

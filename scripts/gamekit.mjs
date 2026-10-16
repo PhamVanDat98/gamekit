@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // GameKit CLI. Every agent (Claude Code, Codex) and every IDE task calls this same entry point.
 import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { log } from './lib/log.mjs';
 
@@ -8,7 +10,8 @@ const HELP = `GameKit — port & reskin web game
 
 Dùng: gamekit <lệnh> [tuỳ chọn]
 
-  init <tên> [--title] [--engine] [--dir] [--set k=v…] [--no-input]   Tạo game mới; hỏi thông tin dự án (terminal) hoặc nhận --set
+  init <tên> [--title] [--engine] [--dir] [--set k=v…] [--no-input] [--third-party]   Tạo game mới; hỏi thông tin dự án (terminal) hoặc nhận --set.
+                                            Mặc định là game của bạn; --third-party khi làm lại game người khác (bắt buộc reskin)
   init <tên> --questions --json             In danh sách câu hỏi kèm giải thích (cho agent hỏi người dùng)
   config [--portal p] [--set k=v…] [--questions --json]   Điền thông tin portal còn thiếu, thêm portal
   status | next                             Game đang ở pha nào, việc gì tiếp
@@ -26,7 +29,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -74,8 +77,30 @@ export async function main(argv = process.argv.slice(2)) {
     log.info(HELP);
     return 2;
   }
+  ensureDeps();
   const fn = await load();
   return fn({ ...args, _: rest, cmd });
+}
+
+/**
+ * Claude Code installs plugins by copying the repo, without node_modules. Install the plugin's own
+ * dependencies (yaml, ajv) the first time any command needs them, wherever it is run from.
+ */
+function ensureDeps() {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const need = ['yaml', 'ajv'].filter((d) => !fs.existsSync(path.join(root, 'node_modules', d, 'package.json')));
+  if (!need.length) return;
+  log.info(`GameKit cài thư viện lần đầu (${need.join(', ')})…`);
+  const r = spawnSync('npm', ['install', '--omit=dev', '--prefer-offline', '--no-audit', '--no-fund', '--silent'], {
+    cwd: root,
+    stdio: ['ignore', 'ignore', 'inherit'],
+    shell: process.platform === 'win32',
+  });
+  if (r.status !== 0) {
+    const e = new Error(`Không cài được thư viện của GameKit. Chạy tay: cd "${root}" && npm install`);
+    e.exitCode = 1;
+    throw e;
+  }
 }
 
 // Resolve symlinks so `npm link` / npx bins (…/bin/gamekit) count as running this file.

@@ -297,9 +297,15 @@ test('pack: stops before building when a portal setting is missing, naming the f
   assert.ok(!fs.existsSync(path.join(dir, 'builds')));
 });
 
-test('CLI runs through a symlinked bin (npm link)', () => {
+test('CLI runs through a symlinked bin (npm link)', (t) => {
   const link = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gk-')), 'gamekit');
-  fs.symlinkSync(path.join(import.meta.dirname, '..', 'scripts', 'gamekit.mjs'), link);
+  try {
+    fs.symlinkSync(path.join(import.meta.dirname, '..', 'scripts', 'gamekit.mjs'), link);
+  } catch (e) {
+    // Windows without Developer Mode / admin cannot create symlinks.
+    if (e.code === 'EPERM') return t.skip('không tạo được symlink trên máy này (Windows cần Developer Mode)');
+    throw e;
+  }
   const out = sh(os.tmpdir(), process.execPath, link, 'help');
   assert.match(out, /GameKit/);
 });
@@ -637,4 +643,77 @@ test('pre-commit blocks build output even when force-added', () => {
   write(dir, 'builds/26101601/dev-mock/index.html', 'x');
   sh(dir, 'git', 'add', '-f', 'builds/26101601/dev-mock/index.html');
   assert.throws(() => sh(dir, 'git', 'commit', '-qm', 'x'), /thư mục cấm/);
+});
+
+// ---------- ownership: own (default) vs third-party ----------
+const tickAll = (dir, phase) => write(dir, `gates/${phase}.md`, read(dir, `gates/${phase}.md`).replaceAll('- [ ]', '- [x]'));
+
+test('gate: {only: …} tags parse alongside auto and (bạn)', () => {
+  const items = parseGate('- [ ] a {only: third-party}\n- [ ] b {auto: validate} {only: own}\n- [ ] c (bạn) {only: own}\n- [ ] d');
+  assert.deepEqual(items.map((i) => [i.text, i.auto, i.human, i.only]), [
+    ['a', null, false, 'third-party'],
+    ['b', 'validate', false, 'own'],
+    ['c (bạn)', null, true, 'own'],
+    ['d', null, false, null],
+  ]);
+});
+
+test('gate: CRLF gate files are read, and an empty gate is an error rather than a pass', () => {
+  assert.equal(parseGate('- [ ] a\r\n- [x] b (bạn)\r\n').length, 2);
+  const dir = newGame('crlf');
+  write(dir, 'gates/P0.md', read(dir, 'gates/P0.md').replace(/\r?\n/g, '\r\n'));
+  assert.equal(gk(dir, 'gate').code, 1, 'unticked CRLF gate must not pass');
+  write(dir, 'gates/P0.md', '# Cổng\n\nchỉ có chữ\n');
+  const r = gk(dir, 'gate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /không có mục nào/);
+});
+
+test('ownership: a new game is the user\'s own — P0 passes without forbiddenTerms, clone items hidden', () => {
+  const dir = newGame('own1');
+  assert.match(read(dir, 'game.yaml'), /ownership: own/);
+  assert.match(gk(dir, 'status').out, /game của bạn/);
+  tickAll(dir, 'P0');
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig'));
+  const r = gk(dir, 'gate');
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /forbiddenTerms|clone/);
+});
+
+test('ownership: init --third-party requires forbiddenTerms, keeps reskin phase and its decisions', () => {
+  const dir = newGame('tp1', '--third-party');
+  assert.match(read(dir, 'game.yaml'), /ownership: third-party/);
+  assert.match(gk(dir, 'status').out, /làm lại game người khác/);
+  tickAll(dir, 'P0');
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig'));
+  let r = gk(dir, 'gate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /forbiddenTerms chưa điền/);
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('forbiddenTerms: []', 'forbiddenTerms: [OldName]'));
+  assert.equal(gk(dir, 'gate').code, 0);
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^phase: P0/m, 'phase: P3'));
+  r = gk(dir, 'status');
+  assert.match(r.out, /P3 Reskin/);
+  assert.match(r.out, /Đã chọn style/);
+});
+
+test('ownership: own games turn P3 into moving to the web; no style or asset-manifest to pass', () => {
+  const dir = newGame('own3');
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^phase: P0/m, 'phase: P3'));
+  let r = gk(dir, 'status');
+  assert.match(r.out, /P3 Chuyển sang web/);
+  assert.doesNotMatch(r.out, /style/i);
+  tickAll(dir, 'P3');
+  r = gk(dir, 'gate');
+  assert.doesNotMatch(r.out, /asset-manifest|style/i);
+});
+
+test('ownership: game.yaml without the field counts as own; unknown values are rejected', () => {
+  const dir = newGame('own4');
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^\s*ownership:.*\n/m, ''));
+  assert.match(gk(dir, 'status').out, /game của bạn/);
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^source:\n/m, 'source:\n  ownership: mine\n'));
+  const r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /ownership/);
 });

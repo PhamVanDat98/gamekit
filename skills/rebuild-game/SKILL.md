@@ -1,14 +1,15 @@
 ---
 name: rebuild-game
-description: Dùng ở pha P2 khi dựng lại một game bằng JS/TS từ spec và params đã trích ở P1 — tạo project từ template GameKit, thay logic demo bằng logic game gốc theo TDD, giữ core/ deterministic, chơi được với asset placeholder.
+description: Dùng ở pha P2 khi dựng lại một game bằng JS/TS từ spec và params đã trích ở P1 — tạo project từ template GameKit, thay logic demo bằng logic game gốc theo TDD, giữ core/ deterministic, chơi được trọn vẹn (asset gốc nếu là game của người dùng, placeholder nếu làm lại game người khác).
 ---
 
 # Dựng lại game (P2)
 
-Mục tiêu cổng P2: chơi được trọn vẹn với placeholder, test parity xanh, không còn source TODO.
+Mục tiêu cổng P2: chơi được trọn vẹn (`own`: với asset gốc nhãn `own`; `third-party`: với placeholder), test parity xanh, không còn source TODO.
 
 ## 1. Có project chưa?
-- Chưa có `game.yaml`: `gamekit init <ten-game> --title "<Tên mới>" --engine <engine gốc> --dir <thư mục cha>`. Tên mới, không dùng tên game gốc. Điền `release.forbiddenTerms` bằng tên/thương hiệu game gốc.
+- Chưa có `game.yaml`: `gamekit init <ten-game> --title "<Tên>" --engine <engine gốc> --dir <thư mục cha>`. Mặc định là game của người dùng (`own`): giữ tên gốc được. Làm lại game người khác: thêm `--third-party`, đặt tên mới và điền `release.forbiddenTerms` bằng tên/thương hiệu game gốc.
+- `own` có source gốc (C#…): đọc thẳng code để lấy logic và số; vẫn viết test trước, viết lại cho hợp `core/`/`view/`, không dịch máy từng dòng.
 - Đã có (đi từ P0/P1): kiểm tra `gamekit status` báo P2.
 
 ## 2. Chọn runtime (thay cho skill runtime-select chưa có)

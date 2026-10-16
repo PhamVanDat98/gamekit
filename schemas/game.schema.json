@@ -21,7 +21,7 @@
     "title": {
       "type": "string",
       "minLength": 1,
-      "description": "Tên hiển thị (tên mới, không dùng tên game gốc)"
+      "description": "Tên hiển thị trên web. Game của bạn: giữ tên gốc được. Làm lại game người khác: tên mới"
     },
     "version": {
       "type": "string",
@@ -47,6 +47,13 @@
       ],
       "additionalProperties": false,
       "properties": {
+        "ownership": {
+          "enum": [
+            "own",
+            "third-party"
+          ],
+          "description": "own (mặc định): game của bạn — giữ hình, âm thanh, tên; asset gốc gắn nhãn own. third-party: làm lại game người khác — asset gốc chỉ là tư liệu, bắt buộc reskin"
+        },
         "engine": {
           "enum": [
             "unknown",

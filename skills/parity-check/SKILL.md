@@ -34,7 +34,7 @@ Lấy `out` từ đâu (ghi vào `confidence`):
 - `derived`: tính theo logic đã lần ra trong `notes/`. Cẩn thận: nếu chính bạn suy ra công thức rồi dùng nó sinh oracle, test chỉ chứng minh code khớp với cách bạn hiểu. Phải ghi rõ điều đó.
 - `inferred`: đo từ video hoặc chơi thử. Bắt buộc có `tolerance`.
 
-Chạy code của game gốc để sinh oracle (harness, emulator) là chạy binary của người khác. Chỉ làm khi người dùng đồng ý, và ghi lại thành `D-n`.
+Chạy code của game gốc để sinh oracle (harness, emulator, Unity Editor): với game của người dùng (`own`) cứ làm, đây là cách có oracle `observed` tốt nhất. Với `third-party` đó là chạy binary của người khác: chỉ làm khi người dùng đồng ý, và ghi lại thành `D-n`.
 
 ## 3. Gắn thẻ test
 Tên test chứa `[id:case]`, viết ở `it` hoặc `describe`:

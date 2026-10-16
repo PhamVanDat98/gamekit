@@ -58,6 +58,7 @@ export async function run(args) {
   const gameErrors = check('game', readYaml(path.join(dest, 'game.yaml')));
   if (gameErrors.length) throw new GkError(`game.yaml sinh ra không hợp lệ: ${gameErrors.join('; ')}`);
   updateGame(dest, [
+    [['source', 'ownership'], args['third-party'] ? 'third-party' : 'own'],
     [['source', 'path'], answers.sourcePath ?? null],
     [['portals'], portals],
     [['portalSettings'], portalSettings],

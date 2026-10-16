@@ -3,10 +3,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { exists } from './lib/io.mjs';
 import { log } from './lib/log.mjs';
-import { findGameRoot, loadGame } from './lib/game.mjs';
-import { PHASES, PHASE_INFO, AVAILABLE_SKILLS } from './lib/phases.mjs';
+import { findGameRoot, loadGame, ownershipOf, OWNERSHIP_LABEL } from './lib/game.mjs';
+import { PHASES, AVAILABLE_SKILLS, phaseInfo } from './lib/phases.mjs';
 import { loadPortal, missingSettings } from './lib/portals.mjs';
-import { parseGate } from './gate.mjs';
+import { gateItemsFor } from './gate.mjs';
 
 const days = (a, b = new Date()) => (b - new Date(a)) / 864e5;
 
@@ -14,12 +14,13 @@ export function summarize(root) {
   const game = loadGame(root);
   const phase = game.phase;
   const lines = [];
-  lines.push(`Game: ${game.title} (${game.name}) v${game.version} — engine gốc: ${game.source?.engine ?? '?'}`);
+  const ownership = ownershipOf(game);
+  lines.push(`Game: ${game.title} (${game.name}) v${game.version} — engine gốc: ${game.source?.engine ?? '?'} — ${OWNERSHIP_LABEL[ownership] ?? ownership}`);
   if (phase === 'released') {
     lines.push('Pha: đã phát hành');
     return { game, lines, pending: [], skills: [] };
   }
-  const info = PHASE_INFO[phase];
+  const info = phaseInfo(phase, ownership);
   lines.push(`Pha: ${phase} ${info.name}`);
   const start = game.timings?.[phase]?.start;
   const planned = game.budget?.plannedDays?.[phase];
@@ -29,7 +30,7 @@ export function summarize(root) {
     if (planned && d > planned) lines.push(`⚠ Vượt thời gian dự kiến — cân nhắc quay lại triage (luật cắt lỗ).`);
   }
   const gateFile = path.join(root, 'gates', `${phase}.md`);
-  const pending = exists(gateFile) ? parseGate(fs.readFileSync(gateFile, 'utf8')).filter((i) => !i.auto && !i.checked) : [];
+  const pending = exists(gateFile) ? gateItemsFor(game, fs.readFileSync(gateFile, 'utf8')).filter((i) => !i.auto && !i.checked) : [];
   const skills = info.skills.map((s) => s.replace('<engine>', game.source?.engine ?? 'unknown'));
   const missing = [];
   for (const p of game.portals ?? []) {

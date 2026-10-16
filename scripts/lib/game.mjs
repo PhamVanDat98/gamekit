@@ -32,4 +32,8 @@ export function updateGame(root, edits) {
   writeYamlDoc(file, doc);
 }
 
-export const nowIso = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+/** `own` (default: the user's game — keep its art, sound, name) or `third-party` (remake: reskin required). */
+export const ownershipOf = (game) => game?.source?.ownership ?? 'own';
+export const OWNERSHIP_LABEL = { own: 'game của bạn', 'third-party': 'làm lại game người khác' };
+
+export const nowIso =() => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
