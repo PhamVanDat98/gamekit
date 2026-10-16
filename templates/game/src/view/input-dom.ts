@@ -12,7 +12,7 @@ const KEYMAP: Record<string, Action> = {
 
 /** Keyboard + touch → actions. Touch: left half = left, right half = right. */
 export function bindInput(el: HTMLElement, input: InputState, onAction: () => void): () => void {
-  const inPopup = (e: Event) => e.target instanceof Element && e.target.closest('.gk-settings') !== null;
+  const inPopup = (e: Event) => e.target instanceof Element && e.target.closest('.gk-settings, .gk-gear') !== null;
   const down = (e: KeyboardEvent) => {
     if (inPopup(e)) return;
     const a = KEYMAP[e.code];

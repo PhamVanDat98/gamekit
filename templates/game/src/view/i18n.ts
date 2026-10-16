@@ -8,7 +8,9 @@ export function translate(dict: Readonly<Record<string, unknown>>, code: string,
   let k = key;
   if (typeof params.count === 'number') {
     const form = `${key}.${new Intl.PluralRules(code).select(params.count)}`;
-    k = typeof dict[form] === 'string' ? form : `${key}.other`;
+    const other = `${key}.other`;
+    // "hud.coins": "{count} coins" has no plural forms: keep the key itself.
+    k = typeof dict[form] === 'string' ? form : typeof dict[other] === 'string' ? other : key;
   }
   const s = dict[k];
   if (typeof s !== 'string') return key;

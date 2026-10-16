@@ -58,7 +58,9 @@ export function runLoader(cfg, hooks = {}) {
     if (root) root.classList.remove('gmHasError');
     received = 0;
     const [frameworkCode, dictText] = await Promise.all([fetchText('framework.js', onChunk), fetchText(`Language/${code}.json`, onChunk)]);
-    window.GM_LANG = { code, dict: JSON.parse(dictText), available: cfg.languages };
+    const dict = JSON.parse(dictText);
+    if (dict._meta && dict._meta.dir === 'rtl') document.documentElement.dir = 'rtl'; // ar, fa… (kept by pack)
+    window.GM_LANG = { code, dict, available: cfg.languages };
     setProgress(ALMOST);
     await runScript(frameworkCode);
   };

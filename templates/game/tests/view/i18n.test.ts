@@ -12,6 +12,10 @@ describe('i18n', () => {
     expect(translate(dict, 'en', 'coins', { count: 3 })).toBe('3 coins');
     expect(translate(dict, 'en', 'only', { count: 1 })).toBe('1 x');
   });
+  it('uses a plain key when {count} is passed but the key has no plural forms', () => {
+    expect(translate({ 'hud.coins': '{count} coins' }, 'en', 'hud.coins', { count: 5 })).toBe('5 coins');
+    expect(translate({ 'hud.coins': '{count} coins' }, 'ru', 'hud.coins', { count: 2 })).toBe('2 coins');
+  });
   it('shows the key when missing so gaps are visible', () => {
     expect(translate(dict, 'en', 'nope')).toBe('nope');
   });

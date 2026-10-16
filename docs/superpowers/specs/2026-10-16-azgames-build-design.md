@@ -205,7 +205,7 @@ Mỗi `builds/<v>/<portal>/`:
 - `version.txt` = tên thư mục, 8 byte, không newline. `preview.html` giống `index.html` từng byte. `index.html` ngoài có `<base href="<v>/">`; `<v>/index.html` không có `<base>`.
 - `<v>/` có `index.html, loader.js, framework.js, css/style.css, Icons/{web.png, loading.webp, domain.webp}, Language/en.json`; `assets/` chỉ có `img art audio fonts`; `StreamingAssets/` không có `.js/.mjs/.wasm/.html`.
 - Script trong trang: chỉ `loader.js` (tương đối) + script trên host thuộc `allowedHosts` của portal.
-- `framework.js` khớp `/\.copyright\b/` (truy cập thuộc tính `info.copyright`; minify giữ tên thuộc tính; chữ "Copyright" trong comment license viết hoa và không có dấu chấm đứng trước nên không làm test đạt nhầm).
+- `framework.js` chứa `gk-settings-footer` (class của footer bản quyền trong `src/view/settings.ts`, là chuỗi nên minify giữ nguyên; `.copyright` thì luôn có nhờ `src/platform/index.ts` nên không chứng minh được footer).
 - Kiểm tra cũ áp vào bố cục mới: provenance của file phát hành, tên game gốc (`release.forbiddenTerms`, cả trong `Language/`), link ngoài (host: game.yaml + portal.yaml; bỏ qua `loader.js` vì do plugin sinh), đường dẫn tuyệt đối, `dirty` trong manifest.
 - Ngân sách tải đầu = HTML + `loader.js` + `framework.js` + css + **một** file ngôn ngữ lớn nhất + Icons.
 

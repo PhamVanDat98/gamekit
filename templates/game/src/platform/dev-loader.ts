@@ -13,6 +13,8 @@ export function installDevLoader(): void {
   const available = [...dicts.entries()].map(([code, d]) => ({ code, name: String((d._meta as { name?: string } | undefined)?.name ?? code) }));
   const wanted = new URLSearchParams(location.search).get('lang') ?? read(KEY) ?? 'en';
   const code = dicts.has(wanted) ? wanted : 'en';
+  // Right-to-left languages (ar, fa…) flip the page as the portal loader does.
+  if ((dicts.get(code)?._meta as { dir?: string } | undefined)?.dir === 'rtl') document.documentElement.dir = 'rtl';
   window.GM_LANG = { code, dict: { ...en, ...(dicts.get(code) ?? {}) }, available };
   window.GM_LOADER = {
     copyright: `© ${new Date().getFullYear()} GameKit (dev)`,

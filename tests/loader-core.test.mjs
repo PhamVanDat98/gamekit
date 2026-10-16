@@ -21,6 +21,7 @@ test('sitelock: an iframe needs a known, allowed parent', () => {
   assert.equal(frame('', 'https://evil.com/'), 'block');
   assert.equal(frame('', ''), 'block');
   assert.equal(frame('', 'không phải url'), 'block');
+  assert.equal(frame('evil.com', 'https://azgames.io/game'), 'block', 'biết parent thì không tin referrer');
 });
 
 test('language: saved → ?lang → browser → default → en, region variants match', () => {

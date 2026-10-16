@@ -13,15 +13,15 @@ description: Dùng trước khi phát hành hoặc nộp game lên portal (cổn
 - `version.txt` = tên thư mục, 8 byte, không newline; `preview.html` giống `index.html` từng byte; `index.html` ngoài có `<base href="<v>/">`, `<v>/index.html` không có `<base>`.
 - `<v>/` có `index.html, loader.js, framework.js, css/style.css, Icons/{web.png, loading.webp, domain.webp}, Language/en.json`; `assets/` chỉ có `img art audio fonts`; `StreamingAssets/` không chứa `.js/.mjs/.wasm/.html`.
 - Script trong trang: chỉ `loader.js` (tương đối) và script trên host thuộc `allowedHosts` của portal.
-- `framework.js` phải đọc `info.copyright` (popup Settings giữ footer bản quyền); thiếu là lỗi.
-- Ngân sách tải đầu = HTML + loader + framework + css + một file ngôn ngữ lớn nhất + Icons. `domain.webp` còn là placeholder chỉ bị cảnh báo.
+- `framework.js` phải có footer bản quyền của popup Settings (class `gk-settings-footer` trong `src/view/settings.ts`, hiện `platform.info.copyright`); thiếu là lỗi.
+- Ngân sách tải đầu = HTML + loader + framework + css + một file ngôn ngữ lớn nhất + Icons — cùng con số `initialBytes` pack ghi trong `manifest.json`. `domain.webp` còn là placeholder chỉ bị cảnh báo.
 
 ## Lỗi và cách sửa
 | Lỗi | Sửa |
 | --- | --- |
 | asset `reference` / `placeholder` | Thay bằng asset mới (P3), gắn nhãn `generated`/`own`/`licensed` |
 | lỗi bố cục (file lạ, `version.txt`, `preview.html`, `<base>`, thiếu file bắt buộc) | Không sửa tay trong `builds/`; sửa nguồn rồi `gamekit pack` lại |
-| thiếu copyright trong `framework.js` | Popup Settings phải đọc `platform.info.copyright`; khôi phục footer |
+| thiếu footer bản quyền (`gk-settings-footer`) trong `framework.js` | Khôi phục footer `gk-settings-footer` hiện `platform.info.copyright` trong popup Settings |
 | đóng gói từ bản chưa commit / commit khác HEAD | Commit code và asset, `gamekit pack` lại (sửa gates/notes/spec/game.yaml không tính) |
 | file không có nhãn provenance | `gamekit provenance add <file> --label … --source …` (licensed cần `--license`) |
 | còn tên/thương hiệu game gốc (text, tên file, chuỗi trong file nhị phân) | Đổi text, tên file, metadata; kiểm tra `release.forbiddenTerms` đủ chưa |
