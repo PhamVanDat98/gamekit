@@ -8,7 +8,9 @@ const HELP = `GameKit — port & reskin web game
 
 Dùng: gamekit <lệnh> [tuỳ chọn]
 
-  init <tên> [--title] [--engine] [--dir]   Tạo game mới từ template
+  init <tên> [--title] [--engine] [--dir] [--set k=v…] [--no-input]   Tạo game mới; hỏi thông tin dự án (terminal) hoặc nhận --set
+  init <tên> --questions --json             In danh sách câu hỏi kèm giải thích (cho agent hỏi người dùng)
+  config [--portal p] [--set k=v…] [--questions --json]   Điền thông tin portal còn thiếu, thêm portal
   status | next                             Game đang ở pha nào, việc gì tiếp
   gate [--advance]                          Kiểm tra cổng của pha hiện tại
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
@@ -44,6 +46,7 @@ export function parseArgs(argv) {
 
 const COMMANDS = {
   init: () => import('./init.mjs').then((m) => m.run),
+  config: () => import('./config.mjs').then((m) => m.run),
   status: () => import('./status.mjs').then((m) => m.run),
   next: () => import('./status.mjs').then((m) => m.run),
   gate: () => import('./gate.mjs').then((m) => m.run),

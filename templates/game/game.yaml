@@ -15,6 +15,10 @@ runtime:
   fixedStepHz: 60
 portals:
   - dev-mock
+portalSettings: {}           # thông tin từng portal — gamekit config --portal <id>
+language: en                 # ngôn ngữ mặc định cho người chơi mới
+languages:                   # mỗi mã một file Language/<mã>.json; en bắt buộc
+  - en
 pilot: false
 budget:
   initialLoadMB: 10

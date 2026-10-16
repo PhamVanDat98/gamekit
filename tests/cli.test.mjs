@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { gk, newGame, sh, write, read, editJson } from './helpers.mjs';
+import { gk, newGame, token, sh, write, read, editJson } from './helpers.mjs';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
 import { checkPackage } from '../scripts/release-check.mjs';
@@ -440,4 +440,53 @@ test('params: confidence is observed|derived|inferred; inferred needs a toleranc
     p.player.size.tolerance = 0.05;
   });
   assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0);
+});
+
+test('init: --questions --json lists every question with its explanation', () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'gk-'));
+  const r = gk(parent, 'init', 'qg', '--questions', '--json');
+  assert.equal(r.code, 0, r.out);
+  const qs = JSON.parse(r.out);
+  const gameCode = qs.find((q) => q.key === 'azgames.gameCode');
+  assert.ok(gameCode.description.length > 20);
+  assert.equal(qs.find((q) => q.key === 'azgames.gameId').default, 'qg-az');
+  assert.ok(!fs.existsSync(path.join(parent, 'qg')), 'chỉ in câu hỏi, không tạo game');
+});
+
+test('init: --set answers go to game.yaml; missing portal settings are reported, not fatal', () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'gk-'));
+  const r = gk(parent, 'init', 'sg', '--no-install', '--set', 'title=Sao Băng', '--set', 'portals=azgames', '--set', 'languages=en,es', '--set', 'language=es', '--set', 'azgames.gameCode=g205');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /signed/);
+  assert.match(r.out, /gamekit config --portal azgames/);
+  const dir = path.join(parent, 'sg');
+  const g = YAML.parse(read(dir, 'game.yaml'));
+  assert.equal(g.title, 'Sao Băng');
+  assert.deepEqual(g.portals, ['dev-mock', 'azgames']);
+  assert.deepEqual(g.portalSettings.azgames, { gameCode: 'g205', gameId: 'sg-az', portalGid: 'sg', signed: null });
+  assert.equal(g.language, 'es');
+  assert.deepEqual(g.languages, ['en', 'es']);
+  assert.equal(JSON.parse(read(dir, 'Language/es.json'))._meta.name, 'Español');
+  assert.match(read(dir, 'gates/P4.md'), /\[azgames\] Popup Settings có footer/);
+  assert.equal(gk(dir, 'validate').code, 0, 'thiếu setting chỉ là cảnh báo trước P4');
+  assert.equal(gk(parent, 'init', 'bad', '--no-install', '--set', 'azgames.gameId=sai').code, 1);
+});
+
+test('config: fills missing settings with --set, adds a portal and its checklist, lists what is still open', () => {
+  const dir = newGame('cfg');
+  let r = gk(dir, 'config', '--questions', '--json');
+  assert.equal(r.code, 0);
+  assert.deepEqual(JSON.parse(r.out).map((q) => q.key), ['azgames.gameCode', 'azgames.signed']);
+  r = gk(dir, 'config', '--set', 'azgames.gameCode=g9', '--set', `azgames.signed=${token({ signed: 'x', domain: 'azgame.io' })}`);
+  assert.equal(r.code, 0, r.out);
+  assert.equal(YAML.parse(read(dir, 'game.yaml')).portalSettings.azgames.gameCode, 'g9');
+  assert.doesNotMatch(r.out, /còn thiếu/i);
+  assert.equal(gk(dir, 'validate', '--stage', 'P4').code, 0);
+  assert.equal(gk(dir, 'config', '--set', 'azgames.gameId=sai').code, 1);
+  assert.equal(gk(dir, 'config', '--portal', 'nope').code, 1);
+});
+
+test('status lists portal settings still missing', () => {
+  const dir = newGame('st2');
+  assert.match(gk(dir, 'status').out, /azgames.*gameCode/);
 });

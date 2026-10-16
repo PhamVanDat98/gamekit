@@ -5,6 +5,7 @@ import { exists } from './lib/io.mjs';
 import { log } from './lib/log.mjs';
 import { findGameRoot, loadGame } from './lib/game.mjs';
 import { PHASES, PHASE_INFO, AVAILABLE_SKILLS } from './lib/phases.mjs';
+import { loadPortal, missingSettings } from './lib/portals.mjs';
 import { parseGate } from './gate.mjs';
 
 const days = (a, b = new Date()) => (b - new Date(a)) / 864e5;
@@ -30,7 +31,16 @@ export function summarize(root) {
   const gateFile = path.join(root, 'gates', `${phase}.md`);
   const pending = exists(gateFile) ? parseGate(fs.readFileSync(gateFile, 'utf8')).filter((i) => !i.auto && !i.checked) : [];
   const skills = info.skills.map((s) => s.replace('<engine>', game.source?.engine ?? 'unknown'));
-  return { game, lines, pending, skills, human: info.human };
+  const missing = [];
+  for (const p of game.portals ?? []) {
+    try {
+      const miss = missingSettings(loadPortal(p), game.portalSettings?.[p]);
+      if (miss.length) missing.push(`${p}: ${miss.join(', ')}`);
+    } catch (e) {
+      missing.push(`${p}: ${e.message}`);
+    }
+  }
+  return { game, lines, pending, skills, human: info.human, missing };
 }
 
 function print(root) {
@@ -42,6 +52,10 @@ function print(root) {
   if (s.pending.length) {
     log.info('\nViệc còn mở ở cổng:');
     for (const p of s.pending) log.info(`  - ${p.text}${p.human ? '  ← bạn quyết' : ''}`);
+  }
+  if (s.missing?.length) {
+    log.info('\nThông tin portal còn thiếu (cần trước khi pack) — `gamekit config --portal <id>`:');
+    for (const m of s.missing) log.info(`  - ${m}`);
   }
   {
     log.info('\nSkill cho pha này (theo thứ tự):');
