@@ -172,6 +172,10 @@ function validatePortalSettings(game, st, pr) {
 }
 
 // ---------- Language/: en is the source of every translation ----------
+const PLURAL_FORMS = /^(.+)\.(zero|one|two|few|many|other)$/;
+/** "coins.few" → "coins" (CLDR plural form suffix), otherwise null. */
+const pluralBase = (k) => PLURAL_FORMS.exec(k)?.[1] ?? null;
+
 function validateLanguages(root, game, pr) {
   let langs;
   try {
@@ -189,22 +193,41 @@ function validateLanguages(root, game, pr) {
   if (!codes.includes('en')) pr.error('game.yaml', 'languages phải có en (bản gốc của mọi bản dịch)');
   if (game.language && !codes.includes(game.language)) pr.error('game.yaml', `language ${game.language} không có trong languages`);
   for (const c of codes) if (!langs[c]) pr.error('Language', `languages có ${c} nhưng thiếu Language/${c}.json`);
+  // Plural bases in en: "coins" → union of {param} names over coins.one/coins.other/…, without count.
+  // Languages need different forms (ru: one/few/many/other), so any form of a base en has is valid.
+  const pluralParams = new Map();
+  for (const [k, v] of Object.entries(en)) {
+    const base = pluralBase(k);
+    if (!base) continue;
+    const set = pluralParams.get(base) ?? new Set();
+    for (const p of placeholders(v).split(',')) if (p && p !== 'count') set.add(p);
+    pluralParams.set(base, set);
+  }
+  const withoutCount = (s) => placeholders(s).split(',').filter((p) => p && p !== 'count').join(',');
   for (const [c, dict] of Object.entries(langs)) {
     const where = `Language/${c}.json`;
     for (const [k, v] of Object.entries(dict)) {
       if (k === '_meta') continue;
-      if (typeof v !== 'string') pr.error(where, `${k}: phải là chuỗi`);
-      else if (c !== 'en' && !(k in en)) pr.error(where, `${k}: không có trong en.json`);
-      else if (c !== 'en' && placeholders(v) !== placeholders(en[k])) pr.error(where, `${k}: tham số {…} khác en.json`);
+      if (typeof v !== 'string') {
+        pr.error(where, `${k}: phải là chuỗi`);
+        continue;
+      }
+      if (c === 'en') continue;
+      const base = pluralBase(k);
+      if (base && pluralParams.has(base)) {
+        if (withoutCount(v) !== [...pluralParams.get(base)].sort().join(',')) pr.error(where, `${k}: tham số {…} khác en.json`);
+      } else if (!Object.hasOwn(en, k)) pr.error(where, `${k}: không có trong en.json`);
+      else if (placeholders(v) !== placeholders(en[k])) pr.error(where, `${k}: tham số {…} khác en.json`);
     }
     if (c === 'en') continue;
-    const miss = Object.keys(en).filter((k) => k !== '_meta' && !(k in dict));
+    const hasBase = new Set(Object.keys(dict).map(pluralBase).filter(Boolean));
+    const miss = Object.keys(en).filter((k) => k !== '_meta' && !Object.hasOwn(dict, k) && !(pluralParams.has(pluralBase(k)) && hasBase.has(pluralBase(k))));
     if (miss.length) pr.warn(where, `thiếu ${miss.length} key, pack sẽ lấy từ en: ${miss.slice(0, 20).join(', ')}${miss.length > 20 ? '…' : ''}`);
   }
   for (const rel of walk(path.join(root, 'src')).filter((f) => /\.tsx?$/.test(f))) {
     const text = fs.readFileSync(path.join(root, 'src', rel), 'utf8');
     for (const m of text.matchAll(/\bt\(\s*['"]([\w.-]+)['"]/g))
-      if (!(m[1] in en) && !(`${m[1]}.other` in en)) pr.error(`src/${rel}`, `t('${m[1]}') không có trong Language/en.json`);
+      if (!Object.hasOwn(en, m[1]) && !pluralParams.has(m[1])) pr.error(`src/${rel}`, `t('${m[1]}') không có trong Language/en.json`);
   }
 }
 

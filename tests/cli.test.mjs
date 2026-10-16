@@ -538,6 +538,46 @@ test('validate: Language — en required, extra keys and {param} mismatches fail
   assert.match(gk(dir, 'validate').out, /language fr/);
 });
 
+test('validate: plural forms a language needs (few/many) are valid when en has the base; {count} ignored, unknown suffix fails', () => {
+  const dir = newGame('vplural');
+  editJson(dir, 'Language/en.json', (d) => {
+    d['coins.one'] = 'One coin';
+    d['coins.other'] = '{count} coins';
+    d['lives.one'] = 'One life left in {zone}';
+    d['lives.other'] = '{count} lives left in {zone}';
+  });
+  editYaml(dir, (g) => {
+    g.languages = ['en', 'ru'];
+  });
+  write(dir, 'Language/ru.json', JSON.stringify({
+    'coins.one': '{count} монета',
+    'coins.few': '{count} монеты',
+    'coins.many': '{count} монет',
+    'coins.other': '{count} монеты',
+    'lives.few': '{count} жизни в {zone}',
+    'lives.other': '{count} жизней в {zone}',
+  }));
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /coins\.\w+: không có trong en\.json/);
+  assert.doesNotMatch(r.out, /coins\.\w+: tham số/);
+  assert.doesNotMatch(r.out, /thiếu \d+ key[^\n]*(coins|lives)\./, 'đã có một dạng số nhiều thì không đòi dạng khác');
+  editJson(dir, 'Language/ru.json', (d) => {
+    d['coins.bogus'] = '{count} x';
+    d['lives.many'] = '{count} жизней';
+  });
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /coins\.bogus: không có trong en\.json/);
+  assert.match(r.out, /lives\.many: tham số/);
+  editJson(dir, 'Language/ru.json', (d) => {
+    delete d['coins.bogus'];
+    delete d['lives.many'];
+    d.constructor = 'x';
+  });
+  assert.match(gk(dir, 'validate').out, /constructor: không có trong en\.json/);
+});
+
 test('validate: Icons/web.png must be PNG, loading.webp must be WebP; builds/ must be gitignored', () => {
   const dir = newGame('vicon');
   assert.equal(gk(dir, 'validate').code, 0);
