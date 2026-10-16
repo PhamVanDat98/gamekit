@@ -1,0 +1,38 @@
+# Bộ vỏ AZGAMES — dùng chung cho mọi game. Spec: docs/superpowers/specs/2026-10-16-azgames-build-design.md
+name: AZGAMES
+layout: az-v1
+# Host được phép trong gói (script SDK, canonical, chuyển hướng sitelock)
+allowedHosts: [gm.azgame.io, api.azgame.io, azgames.io]
+# Sitelock: game chỉ chạy trên các domain này và subdomain của chúng
+sitelock: [azgames.io, azgame.io]
+copyright: "© {{YEAR}} Azgames.io"
+# File của bộ vỏ còn là placeholder — release-check cảnh báo. Xoá dòng khi đã có logo thật.
+placeholders: [Icons/domain.webp]
+checklist:
+  - Popup Settings có footer "© <năm> Azgames.io", hiện ở mọi ngôn ngữ (bạn)
+settings:
+  gameCode:
+    label: Mã game
+    description: Mã game do bên vận hành portal cấp. Dùng làm key localStorage `azgames.<gameCode>` (tiến trình, ngôn ngữ đã chọn).
+    example: g205
+    required: true
+    pattern: "^[a-z0-9]+$"
+  gameId:
+    label: Id game trên SDK
+    description: Id game trên SDK, kết thúc bằng -az. GMGameSDK.init dùng cho analytics, leaderboard.
+    example: ten-game-az
+    default: "{{NAME}}-az"
+    required: true
+    pattern: "^[a-z0-9-]+-az$"
+  portalGid:
+    label: Slug trang game trên portal
+    description: Slug trang game trên portal, không có -az. gmsdkv2 dùng cho More Games, quảng cáo; sitelock chuyển hướng về azgames.io/<portalGid>.
+    example: ten-game
+    default: "{{NAME}}"
+    required: true
+    pattern: "^[a-z0-9-]+(?<!-az)$"
+  signed:
+    label: Token ký của portal (GMSOFT_SIGNED)
+    description: Token do bên vận hành portal cấp riêng cho từng game, chứa domain được phép; gmsdkv2 kiểm tra trước khi bật quảng cáo, More Games. Dán nguyên chuỗi base64.
+    required: true
+    check: gmsoft-signed

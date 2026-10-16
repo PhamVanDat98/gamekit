@@ -1,0 +1,8 @@
+# Bộ vỏ dev-mock: cùng bố cục az-v1, không sitelock, SDK giả — để chạy thử gói ở máy (localhost, file://).
+name: GameKit dev-mock
+layout: az-v1
+allowedHosts: []
+sitelock: null
+copyright: "© {{YEAR}} GameKit (dev)"
+checklist: []
+settings: {}
