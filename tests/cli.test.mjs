@@ -299,6 +299,18 @@ test('validate rejects unknown --stage; portal names are restricted', () => {
   assert.equal(gk(dir, 'pack', '--portal', '..').code, 1);
 });
 
+test('pack: stops before building when a portal setting is missing, naming the fix; bad --version rejected', () => {
+  const dir = newGame('pk');
+  let r = gk(dir, 'pack', '--portal', 'azgames');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /gameCode/);
+  assert.match(r.out, /gamekit config --portal azgames/);
+  assert.ok(!fs.existsSync(path.join(dir, 'builds')));
+  r = gk(dir, 'pack', '--portal', 'dev-mock', '--version', '123');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /8 chữ số/);
+});
+
 test('CLI runs through a symlinked bin (npm link)', () => {
   const link = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gk-')), 'gamekit');
   fs.symlinkSync(path.join(import.meta.dirname, '..', 'scripts', 'gamekit.mjs'), link);
