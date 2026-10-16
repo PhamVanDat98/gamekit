@@ -277,6 +277,15 @@ test('release-check: every layout fault is caught', async () => {
   }
 });
 
+test('release-check: corrupt manifest and compressed code are reported, not thrown', async () => {
+  const { dir, out, game } = await packedGame('rc-corrupt');
+  fs.writeFileSync(path.join(dir, 'builds/26101601/manifest.json'), 'not json');
+  write(out, '26101601/StreamingAssets/data/x.js.gz', '1');
+  const errors = checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir)).errors.join('\n');
+  assert.match(errors, /manifest\.json hỏng/);
+  assert.match(errors, /x\.js\.gz.*StreamingAssets|StreamingAssets.*x\.js\.gz/);
+});
+
 test('release-check: unbuilt, dirty or stale packages are refused', async () => {
   const { dir, game } = await packedGame('rc-fresh');
   fs.writeFileSync(path.join(dir, 'builds/26101601/manifest.json'), JSON.stringify({ commit: 'abc1234', dirty: true }));

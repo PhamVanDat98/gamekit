@@ -547,6 +547,13 @@ test('validate: Icons/web.png must be PNG, loading.webp must be WebP; builds/ mu
   assert.match(gk(dir, 'validate').out, /web\.png/);
 });
 
+test('release-check command: bad --version is an error', () => {
+  const dir = newGame('rcv');
+  const r = gk(dir, 'release-check', '--version', '123');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /8 chữ số/);
+});
+
 test('release-check command: no build yet is an error', () => {
   const dir = newGame('rcn');
   const r = gk(dir, 'release-check');
