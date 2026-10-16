@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { readJson } from './io.mjs';
+import { GkError } from './log.mjs';
 
 export function loadLanguages(root) {
   const dir = path.join(root, 'Language');
@@ -9,6 +10,27 @@ export function loadLanguages(root) {
   const out = {};
   for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json')).sort()) out[f.slice(0, -5)] = readJson(path.join(dir, f));
   return out;
+}
+
+/**
+ * Package files: every key present (missing ones from en, so players download exactly one file),
+ * minified; `_meta.name` goes to the loader's list, `_meta.dir` stays only for right-to-left.
+ */
+export function buildLanguages(sources, codes) {
+  if (!sources.en) throw new GkError('Thiếu Language/en.json');
+  const { _meta: _enMeta, ...enKeys } = sources.en;
+  const files = {};
+  const list = [];
+  for (const code of codes) {
+    const src = sources[code];
+    if (!src) throw new GkError(`Thiếu Language/${code}.json`);
+    const { _meta: meta = {}, ...keys } = src;
+    const out = { ...enKeys, ...keys };
+    if (meta.dir === 'rtl') out._meta = { dir: 'rtl' };
+    files[code] = JSON.stringify(out);
+    list.push({ code, name: meta.name ?? code });
+  }
+  return { files, list };
 }
 
 /** Sorted placeholder names, to compare a translation with en. */

@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { nextVersion, checkVersion, latestVersion, copyrightYear } from '../scripts/lib/version.mjs';
 import { escapeHtml, jsString, fillTemplate, withBase } from '../scripts/lib/html.mjs';
 import { listPortals, loadPortal, checkSetting, missingSettings, copyrightFor } from '../scripts/lib/portals.mjs';
-import { token } from './helpers.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { assemblePortal } from '../scripts/lib/assemble.mjs';
+import { tmpDir, write, read, solidPng, tinyWebp, token } from './helpers.mjs';
 import { PassThrough } from 'node:stream';
 import { allQuestions, parseAnswer, checkAnswer, parseSets, withDefaults, settingsFor, ask } from '../scripts/lib/questions.mjs';
 
@@ -111,4 +114,88 @@ test('questions: portal questions are skipped for portals not chosen', async () 
   const a = await ask(qs, { input, output: new PassThrough() });
   assert.deepEqual(a.portals, ['dev-mock']);
   assert.ok(!('azgames.gameCode' in a));
+});
+
+function fakeVite(dir) {
+  const vite = path.join(dir, 'vite');
+  write(vite, 'framework.js', 'console.log("game");const c=platform.info.copyright;');
+  write(vite, 'css/style.css', 'body{}');
+  write(vite, 'assets/img/hero-abc.png', 'x');
+  write(vite, 'assets/audio/hit-abc.mp3', 'x');
+  write(vite, 'StreamingAssets/data/level1.json', '{}');
+  write(vite, 'StreamingAssets/data/.gitkeep', '');
+  fs.mkdirSync(path.join(vite, 'Icons'), { recursive: true });
+  fs.writeFileSync(path.join(vite, 'Icons/web.png'), solidPng(8, 8));
+  fs.writeFileSync(path.join(vite, 'Icons/loading.webp'), tinyWebp());
+  return vite;
+}
+const GAME = { name: 'demo', title: 'Zombie <Run> & "Co"', language: 'es', languages: ['en', 'es'] };
+const SETTINGS = { gameCode: 'g205', gameId: 'demo-az', portalGid: 'demo', signed: token({ signed: 'x', domain: 'azgame.io' }) };
+const LANGS = { en: { _meta: { name: 'English' }, a: 'A', b: 'B {x}' }, es: { _meta: { name: 'Español' }, a: 'A-es' } };
+const TOOLS = { buildLoader: async ({ define }) => `var cfg=${define.__GK_LOADER__};`, obfuscate: async (code) => code };
+const assembleTo = (dir, portal = 'azgames', vite = fakeVite(dir)) =>
+  assemblePortal({ game: GAME, kit: loadPortal(portal), settings: portal === 'azgames' ? SETTINGS : {}, version: '26101601', viteOut: vite, languages: LANGS, outDir: path.join(dir, 'out'), ...TOOLS });
+
+test('assemble: az-v1 layout, <base>, byte-identical preview, 8-byte version.txt', async () => {
+  const dir = tmpDir();
+  const { cfg } = await assembleTo(dir);
+  const out = path.join(dir, 'out');
+  assert.deepEqual(fs.readdirSync(out).sort(), ['26101601', 'index.html', 'preview.html', 'version.txt']);
+  assert.equal(fs.readFileSync(path.join(out, 'version.txt'), 'latin1'), '26101601');
+  assert.ok(fs.readFileSync(path.join(out, 'index.html')).equals(fs.readFileSync(path.join(out, 'preview.html'))));
+  const outer = read(out, 'index.html');
+  const inner = read(out, '26101601/index.html');
+  assert.match(outer, /<base href="26101601\/">/);
+  assert.doesNotMatch(inner, /<base/);
+  assert.equal(outer.replace(/\n\s*<base href="26101601\/">/, ''), inner);
+  for (const f of ['loader.js', 'framework.js', 'css/style.css', 'Icons/web.png', 'Icons/loading.webp', 'Icons/domain.webp', 'Language/en.json', 'Language/es.json', 'assets/img/hero-abc.png', 'assets/audio/hit-abc.mp3', 'StreamingAssets/data/level1.json'])
+    assert.ok(fs.existsSync(path.join(out, '26101601', f)), f);
+  assert.ok(!fs.existsSync(path.join(out, '26101601/StreamingAssets/data/.gitkeep')));
+  assert.equal(cfg.version, '26101601');
+});
+
+test('assemble: settings escaped, AZ_SETTINGS has exactly the portal keys, loader config baked in', async () => {
+  const dir = tmpDir();
+  const { cfg } = await assembleTo(dir);
+  const inner = read(path.join(dir, 'out'), '26101601/index.html');
+  assert.match(inner, /<title>Zombie &lt;Run&gt; &amp; &quot;Co&quot;<\/title>/);
+  const az = inner.match(/window\.AZ_SETTINGS = \{([\s\S]*?)\};/)[1];
+  assert.deepEqual([...az.matchAll(/^\s*(\w+):/gm)].map((m) => m[1]), ['gameCode', 'language', 'gameId', 'portalGid']);
+  assert.match(inner, /window\["GMSOFT_SIGNED"\] = "/);
+  assert.match(inner, /<!--PRODUCT_VERSION:26101601END-->/);
+  assert.match(inner, /canonical" href="https:\/\/azgames\.io\/demo"/);
+  assert.deepEqual(cfg.languages, [{ code: 'en', name: 'English' }, { code: 'es', name: 'Español' }]);
+  assert.equal(cfg.defaultLanguage, 'es');
+  assert.equal(cfg.sizes.framework, fs.statSync(path.join(dir, 'out/26101601/framework.js')).size);
+  assert.equal(cfg.sizes.lang.es, fs.statSync(path.join(dir, 'out/26101601/Language/es.json')).size);
+  assert.equal(cfg.copyright, '© 2026 Azgames.io');
+  assert.equal(cfg.storageKey, 'azgames.g205.lang');
+  assert.deepEqual(cfg.sitelock, ['azgames.io', 'azgame.io']);
+  assert.match(read(path.join(dir, 'out'), '26101601/loader.js'), /"storageKey":"azgames\.g205\.lang"/);
+});
+
+test('assemble: translations get every key from en, minified, _meta.name moved to the loader', async () => {
+  const dir = tmpDir();
+  await assembleTo(dir);
+  const out = path.join(dir, 'out/26101601/Language');
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(out, 'es.json'), 'utf8')), { a: 'A-es', b: 'B {x}' });
+  assert.equal(fs.readFileSync(path.join(out, 'en.json'), 'utf8'), '{"a":"A","b":"B {x}"}');
+});
+
+test('assemble: dev-mock has no sitelock and no SDK; stray files outside the layout are rejected', async () => {
+  const dir = tmpDir();
+  const { cfg } = await assembleTo(dir, 'dev-mock');
+  const inner = read(path.join(dir, 'out'), '26101601/index.html');
+  assert.doesNotMatch(inner, /azgame\.io/);
+  assert.equal(cfg.sitelock, null);
+  assert.equal(cfg.storageKey, 'gamekit.demo.lang');
+  assert.equal(cfg.copyright, '© 2026 GameKit (dev)');
+  const dir2 = tmpDir();
+  const vite = fakeVite(dir2);
+  write(vite, 'TemplateData/old.css', 'x');
+  await assert.rejects(() => assembleTo(dir2, 'azgames', vite), /TemplateData/);
+  const dir3 = tmpDir();
+  const vite3 = fakeVite(dir3);
+  write(vite3, 'assets/misc/a.bin', 'x');
+  await assert.rejects(() => assembleTo(dir3, 'azgames', vite3), /assets\/misc/);
 });
