@@ -12,7 +12,7 @@
 | Portal và iframe | Đường dẫn tương đối, không link ngoài, chặn cuộn trang bởi phím, focus, pause khi ẩn tab, bàn phím + cảm ứng | `src/platform/web-guard.ts` + `release-check` |
 | Chơi được khi tắt tiếng | Mọi thông tin gameplay có tín hiệu hình ảnh, không chỉ dựa vào màu | Checklist cổng P3 |
 | Git | Conventional Commits; `reference/`, `decompiled/` gitignored | Pre-commit hook (`gamekit precommit`) |
-| Version và build | Semver; build id = version + commit; build hash trong `StreamingAssets/build-manifest.json` | `pack` |
+| Version và build | Semver; build id = version + commit, số build `YYMMDDNN`; build hash trong `builds/<v>/manifest.json` | `pack` |
 | Event analytics | Một bộ tên chung (`src/platform/events.ts`) | Type + `createPlatform` bỏ tên lạ |
 | Theo dõi lỗi | `window.onerror`, promise lỗi → `track('error')` kèm build id | `web-guard.ts` |
 | Ghi quyết định | `game.yaml` trạng thái; `DECISIONS.md` lý do và sai khác | Cổng các pha |

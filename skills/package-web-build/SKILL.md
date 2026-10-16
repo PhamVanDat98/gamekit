@@ -16,7 +16,7 @@ description: Dùng ở pha P5 (hoặc bất cứ khi nào cần bản build) đ�
 
 ```
 builds/<v>/
-  manifest.json                     commit, dirty, hash, kích thước — KHÔNG upload
+  manifest.json                     name, title, semver, version, commit, dirty, builtAt, portals.<id>.hash — KHÔNG upload
   <name>-<portal>-<v>.zip           (--zip) nội dung = thư mục portal
   azgames/                          đơn vị upload
     index.html                      = <v>/index.html + <base href="<v>/">
