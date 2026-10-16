@@ -8,10 +8,10 @@ import { log, GkError } from './lib/log.mjs';
 import { git } from './lib/git.mjs';
 import { nowIso } from './lib/game.mjs';
 import { SCHEMA_DIR, check } from './lib/schema.mjs';
+import { ENGINES } from './lib/questions.mjs';
 
 export const GAMEKIT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TEMPLATE = path.join(GAMEKIT_ROOT, 'templates', 'game');
-const ENGINES = ['unknown', 'unity', 'cocos', 'godot', 'unreal', 'flash', 'construct', 'laya', 'html5', 'other'];
 
 export async function run(args) {
   const name = args._[0];

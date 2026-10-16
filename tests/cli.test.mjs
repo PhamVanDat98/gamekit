@@ -215,6 +215,8 @@ test('release-check: provenance, original names, foreign links, absolute paths, 
 test('cli args: boolean flags never swallow positionals', () => {
   assert.deepEqual(parseArgs(['provenance', 'add', '--all', 'assets', '--label', 'own']), { _: ['provenance', 'add', 'assets'], all: true, label: 'own' });
   assert.deepEqual(parseArgs(['--wave=2']), { _: [], wave: '2' });
+  assert.deepEqual(parseArgs(['init', 'g', '--set', 'a=1', '--set=b=2']), { _: ['init', 'g'], set: ['a=1', 'b=2'] });
+  assert.deepEqual(parseArgs(['init', '--questions', '--json', 'g']), { _: ['init', 'g'], questions: true, json: true });
 });
 
 test('session-start hook emits context JSON', () => {

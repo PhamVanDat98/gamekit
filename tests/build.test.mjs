@@ -4,6 +4,8 @@ import { nextVersion, checkVersion, latestVersion, copyrightYear } from '../scri
 import { escapeHtml, jsString, fillTemplate, withBase } from '../scripts/lib/html.mjs';
 import { listPortals, loadPortal, checkSetting, missingSettings, copyrightFor } from '../scripts/lib/portals.mjs';
 import { token } from './helpers.mjs';
+import { PassThrough } from 'node:stream';
+import { allQuestions, parseAnswer, checkAnswer, parseSets, withDefaults, settingsFor, ask } from '../scripts/lib/questions.mjs';
 
 test('version: YYMMDDNN from the build date, next number of the day, capped at 99', () => {
   const d = new Date(2026, 9, 16); // 16/10/2026, giờ máy
@@ -50,4 +52,63 @@ test('portal kits: azgames settings, patterns and the GMSOFT_SIGNED token', () =
   assert.deepEqual(missingSettings(dev, {}), []);
   assert.equal(copyrightFor(dev, '27010101'), '© 2027 GameKit (dev)');
   assert.throws(() => loadPortal('../x'), /Không có bộ vỏ/);
+});
+
+test('questions: core + portal questions with defaults filled from the game name', () => {
+  const qs = allQuestions({ name: 'ten-game', title: 'Ten Game' });
+  const by = Object.fromEntries(qs.map((q) => [q.key, q]));
+  assert.equal(by.title.default, 'Ten Game');
+  assert.equal(by['azgames.gameId'].default, 'ten-game-az');
+  assert.equal(by['azgames.portalGid'].default, 'ten-game');
+  assert.equal(by['azgames.gameCode'].portal, 'azgames');
+  assert.ok(by['azgames.signed'].description.includes('GMSOFT_SIGNED') || by['azgames.signed'].label.includes('GMSOFT_SIGNED'));
+  assert.ok(!qs.some((q) => q.portal === 'dev-mock'), 'dev-mock không có câu hỏi');
+});
+
+test('questions: answers are parsed and checked; --set rejects unknown keys and bad values', () => {
+  const qs = allQuestions({ name: 'g', title: 'G' });
+  const q = (k) => qs.find((x) => x.key === k);
+  assert.deepEqual(parseAnswer(q('languages'), ' EN, es ,es'), ['en', 'es']);
+  assert.match(checkAnswer(q('languages'), ['en', 'Tiếng Việt']), /sai định dạng/);
+  assert.match(checkAnswer(q('engine'), 'gamemaker'), /một trong/);
+  assert.match(checkAnswer(q('portals'), ['azgames', 'nope']), /nope/);
+  assert.equal(checkAnswer(q('azgames.gameCode'), ''), null, 'câu portal được để trống');
+  assert.match(checkAnswer(q('title'), ''), /bắt buộc/);
+  assert.deepEqual(parseSets(['azgames.gameCode=g205', 'languages=en,es'], qs), { 'azgames.gameCode': 'g205', languages: ['en', 'es'] });
+  assert.throws(() => parseSets(['azgames.nope=1'], qs), /không có câu hỏi/);
+  assert.throws(() => parseSets(['azgames.gameId=sai'], qs), /azgames\.gameId/);
+  assert.throws(() => parseSets(['khongcodau'], qs), /khoá=giá-trị/);
+  assert.deepEqual(withDefaults(qs.filter((x) => !x.portal), { title: 'X' }), { title: 'X', engine: 'unknown', sourcePath: null, portals: ['azgames'], language: 'en', languages: ['en'] });
+  assert.deepEqual(settingsFor(['dev-mock', 'azgames'], { 'azgames.gameCode': 'g205' }, qs), { azgames: { gameCode: 'g205', gameId: 'g-az', portalGid: 'g', signed: null } });
+  assert.deepEqual(settingsFor(['azgames'], {}, qs, { azgames: { gameCode: 'old', signed: 's' } }).azgames.gameCode, 'old');
+});
+
+test('questions: terminal asks one by one, explains, re-asks a wrong answer, Enter takes the default', async () => {
+  const qs = allQuestions({ name: 'g', title: 'G' });
+  const input = new PassThrough();
+  const output = new PassThrough();
+  let shown = '';
+  output.on('data', (d) => (shown += d));
+  // title=Enter, engine=sai→unity, sourcePath=Enter, portals=azgames, language=Enter, languages=en,es,
+  // azgames: gameCode=g205, gameId=Enter, portalGid=Enter, signed=Enter (để trống)
+  input.end(['', 'gamemaker', 'unity', '', 'azgames', '', 'en,es', 'g205', '', '', ''].join('\n') + '\n');
+  const a = await ask(qs, { input, output });
+  assert.equal(a.title, 'G');
+  assert.equal(a.engine, 'unity');
+  assert.deepEqual(a.languages, ['en', 'es']);
+  assert.equal(a['azgames.gameCode'], 'g205');
+  assert.equal(a['azgames.gameId'], 'g-az');
+  assert.equal(a['azgames.signed'], null);
+  assert.match(shown, /một trong/, 'giải thích vì sao sai rồi hỏi lại');
+  assert.match(shown, /GMGameSDK\.init/, 'có mô tả từng câu');
+  assert.match(shown, /\[g-az\]/, 'hiện giá trị mặc định');
+});
+
+test('questions: portal questions are skipped for portals not chosen', async () => {
+  const qs = allQuestions({ name: 'g', title: 'G' });
+  const input = new PassThrough();
+  input.end(['', '', '', 'dev-mock', '', ''].join('\n') + '\n');
+  const a = await ask(qs, { input, output: new PassThrough() });
+  assert.deepEqual(a.portals, ['dev-mock']);
+  assert.ok(!('azgames.gameCode' in a));
 });

@@ -116,6 +116,24 @@
       "minItems": 1,
       "description": "Adapter cần đóng gói, vd dev-mock"
     },
+    "portalSettings": {
+      "type": "object",
+      "description": "Thông tin từng portal cần khi đóng gói (gamekit config). Khoá hợp lệ khai báo trong portals/<id>/portal.yaml của plugin",
+      "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
+      "additionalProperties": { "type": "object", "additionalProperties": { "type": ["string", "null"] } }
+    },
+    "language": {
+      "type": "string",
+      "pattern": "^[a-z]{2,3}(-[a-z0-9]{2,8})*$",
+      "description": "Ngôn ngữ mặc định cho người chơi mới; phải nằm trong languages"
+    },
+    "languages": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z]{2,3}(-[a-z0-9]{2,8})*$" },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Ngôn ngữ phát hành, mỗi mã một file Language/<mã>.json; en bắt buộc"
+    },
     "pilot": {
       "type": "boolean"
     },

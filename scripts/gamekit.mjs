@@ -24,17 +24,19 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
+  // A repeated flag (--set a=1 --set b=2) collects into an array.
+  const put = (k, v) => (out[k] = k in out ? [].concat(out[k], v) : v);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--')) {
       const [k, v] = a.slice(2).split(/=(.*)/s);
-      if (v !== undefined) out[k] = v;
-      else if (!BOOL.has(k) && argv[i + 1] !== undefined && !argv[i + 1].startsWith('--')) out[k] = argv[++i];
-      else out[k] = true;
+      if (v !== undefined) put(k, v);
+      else if (!BOOL.has(k) && argv[i + 1] !== undefined && !argv[i + 1].startsWith('--')) put(k, argv[++i]);
+      else put(k, true);
     } else out._.push(a);
   }
   return out;
