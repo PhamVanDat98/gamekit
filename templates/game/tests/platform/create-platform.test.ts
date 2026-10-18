@@ -108,6 +108,40 @@ describe('gameplay around ads', () => {
   });
 });
 
+describe('gameplay while paused', () => {
+  const gameplayCalls = (calls: string[]) => calls.filter((c) => c.startsWith('gameplay'));
+
+  it('menu or hidden tab stops gameplay, resuming restarts it', () => {
+    const mock = createDevMock({ log: quiet });
+    const { bus, platform } = setup(mock);
+    platform.gameplayStart();
+    bus.pause('menu');
+    bus.pause('hidden');
+    bus.resume('menu');
+    expect(gameplayCalls(mock.calls)).toEqual(['gameplayStart', 'gameplayStop']);
+    bus.resume('hidden');
+    expect(gameplayCalls(mock.calls)).toEqual(['gameplayStart', 'gameplayStop', 'gameplayStart']);
+  });
+
+  it('gameplayStart while paused waits for the resume', () => {
+    const mock = createDevMock({ log: quiet });
+    const { bus, platform } = setup(mock);
+    bus.pause('menu');
+    platform.gameplayStart();
+    expect(gameplayCalls(mock.calls)).toEqual([]);
+    bus.resume('menu');
+    expect(gameplayCalls(mock.calls)).toEqual(['gameplayStart']);
+  });
+
+  it('pausing when no round is running sends nothing', () => {
+    const mock = createDevMock({ log: quiet });
+    const { bus } = setup(mock);
+    bus.pause('hidden');
+    bus.resume('hidden');
+    expect(gameplayCalls(mock.calls)).toEqual([]);
+  });
+});
+
 describe('gameplay events', () => {
   it('start/stop are balanced and idempotent', () => {
     const mock = createDevMock({ log: quiet });

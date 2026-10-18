@@ -16,4 +16,11 @@ describe('Rng', () => {
       expect(v).toBeLessThanOrEqual(7);
     }
   });
+
+  it('int rejects a bad range instead of returning garbage', () => {
+    const r = new Rng(1);
+    expect(() => r.int(5, 4)).toThrow(/bad range/);
+    expect(() => r.int(0, 2.5)).toThrow(/bad range/);
+    expect(r.int(3, 3)).toBe(3);
+  });
 });

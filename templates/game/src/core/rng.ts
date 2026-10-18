@@ -23,8 +23,9 @@ export class Rng {
     return min + (max - min) * this.next();
   }
 
-  /** Integer in [min, max]. */
+  /** Integer in [min, max] (both integers, min ≤ max). */
   int(min: number, max: number): number {
+    if (!Number.isInteger(min) || !Number.isInteger(max) || min > max) throw new Error(`Rng.int: bad range [${min}, ${max}]`);
     return Math.floor(this.range(min, max + 1));
   }
 

@@ -38,12 +38,15 @@ export class InputRecorder {
   }
 }
 
-/** Plays a recording back: returns the actions held at a given tick. */
+/** Plays a recording back: returns the actions held at a given tick. Binary search, O(log n) per tick. */
 export function inputAt(recording: readonly InputFrame[], tick: number): readonly Action[] {
-  let current: readonly Action[] = [];
-  for (const f of recording) {
-    if (f.tick > tick) break;
-    current = f.actions;
+  // Last frame with frame.tick <= tick (the recorder keeps frames in tick order).
+  let lo = 0;
+  let hi = recording.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if ((recording[mid] as InputFrame).tick <= tick) lo = mid + 1;
+    else hi = mid;
   }
-  return current;
+  return lo === 0 ? [] : (recording[lo - 1] as InputFrame).actions;
 }

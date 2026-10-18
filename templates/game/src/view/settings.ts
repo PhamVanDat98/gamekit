@@ -29,7 +29,10 @@ export function mountSettings(parent: HTMLElement, opts: SettingsOptions): { ope
   let sound = opts.sound;
   const soundBtn = el('button', 'gk-settings-toggle');
   soundBtn.type = 'button';
-  const paintSound = () => (soundBtn.textContent = `${t('settings.sound')}: ${t(sound ? 'settings.on' : 'settings.off')}`);
+  const paintSound = () => {
+    soundBtn.textContent = `${t('settings.sound')}: ${t(sound ? 'settings.on' : 'settings.off')}`;
+    soundBtn.setAttribute('aria-pressed', String(sound));
+  };
   paintSound();
   soundBtn.onclick = () => {
     sound = !sound;
@@ -60,14 +63,36 @@ export function mountSettings(parent: HTMLElement, opts: SettingsOptions): { ope
   overlay.append(panel);
   parent.append(gear, overlay);
 
+  // Modal while open: Escape closes from anywhere, Tab cycles inside the panel.
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      api.close();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const items = [soundBtn, select, closeBtn].filter((x) => !x.closest('[hidden]'));
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (!first || !last) return;
+    const active = document.activeElement;
+    if (!panel.contains(active) || active === (e.shiftKey ? first : last)) {
+      e.preventDefault();
+      (e.shiftKey ? last : first).focus();
+    }
+  };
   const api = {
     open() {
+      if (!overlay.hidden) return;
       overlay.hidden = false;
+      document.addEventListener('keydown', onKey);
       soundBtn.focus();
       opts.onOpen?.();
     },
     close() {
+      if (overlay.hidden) return;
       overlay.hidden = true;
+      document.removeEventListener('keydown', onKey);
       opts.returnFocus?.focus();
       opts.onClose?.();
     },
@@ -77,9 +102,6 @@ export function mountSettings(parent: HTMLElement, opts: SettingsOptions): { ope
     api.open();
   };
   closeBtn.onclick = () => api.close();
-  overlay.onkeydown = (e) => {
-    if (e.key === 'Escape' && !overlay.hidden) api.close();
-  };
   overlay.onclick = (e) => {
     if (e.target === overlay) api.close();
   };

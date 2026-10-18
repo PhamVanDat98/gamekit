@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { InputRecorder, InputState, inputAt } from '../../src/core/input';
+import { FIXED_HZ } from '../../src/core/loop';
 import { PARAMS } from '../../src/core/params';
 import { Rng } from '../../src/core/rng';
 import { createWorld, stepWorld, worldHash } from '../../src/core/world';
 
-const DT = 1 / 60;
+const DT = 1 / FIXED_HZ;
 
 /** Play a scripted session, recording input; return the recording and final hash. */
 function playScripted(seed: number) {
@@ -32,6 +33,16 @@ describe('replay', () => {
     const w = createWorld(PARAMS, 1234);
     for (let t = 0; t < live.ticks; t++) stepWorld(w, PARAMS, { tick: w.tick, actions: inputAt(live.frames, w.tick) }, DT);
     expect(worldHash(w)).toBe(live.hash);
+  });
+
+  it('inputAt returns what was held at each tick', () => {
+    const rec = [
+      { tick: 3, actions: ['left'] as const },
+      { tick: 7, actions: [] as const },
+      { tick: 9, actions: ['action', 'right'] as const },
+    ];
+    expect([0, 2, 3, 6, 7, 8, 9, 100].map((t) => inputAt(rec, t).join('+'))).toEqual(['', '', 'left', 'left', '', '', 'action+right', 'action+right']);
+    expect(inputAt([], 5)).toEqual([]);
   });
 
   it('[run.replay:replay] different seed → different run', () => {
