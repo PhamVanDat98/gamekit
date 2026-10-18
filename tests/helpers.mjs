@@ -13,9 +13,16 @@ export function tmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'gamekit-test-'));
 }
 
+/** process.env without what the hook and the game's gk shim read, so a Claude Code session running the tests doesn't leak in. */
+export function cleanEnv(extra = {}) {
+  const env = { ...process.env, ...extra };
+  for (const k of ['CLAUDE_PROJECT_DIR', 'CLAUDE_PLUGIN_ROOT', 'GAMEKIT_ROOT']) delete env[k];
+  return env;
+}
+
 /** Run the CLI; returns { code, out }. */
 export function gk(cwd, ...args) {
-  const r = spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: 'utf8', env: cleanEnv({ NO_COLOR: '1' }) });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }
 
@@ -29,7 +36,7 @@ export function newGame(name = 'demo', ...extra) {
   return dir;
 }
 
-export const sh = (cwd, cmd, ...args) => execFileSync(cmd, args, { cwd, encoding: 'utf8' });
+export const sh = (cwd, cmd, ...args) => execFileSync(cmd, args, { cwd, encoding: 'utf8', env: cleanEnv() });
 export const write = (dir, rel, text) => {
   fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
   fs.writeFileSync(path.join(dir, rel), text);

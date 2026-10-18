@@ -717,3 +717,41 @@ test('ownership: game.yaml without the field counts as own; unknown values are r
   assert.equal(r.code, 1);
   assert.match(r.out, /ownership/);
 });
+
+// Session-start hook (imports are hoisted; kept here so the hook tests stay in one block).
+import { spawnSync } from 'node:child_process';
+import { cleanEnv, tmpDir } from './helpers.mjs';
+
+const HOOK = path.join(import.meta.dirname, '..', 'hooks', 'session-start.mjs');
+const hookContext = (hook, cwd, env = cleanEnv()) =>
+  JSON.parse(spawnSync(process.execPath, [hook], { cwd, encoding: 'utf8', env }).stdout).hookSpecificOutput.additionalContext;
+
+test('session-start hook: a game needs .gamekit/ beside game.yaml; references are absolute; AGENTS.md parts are not repeated', () => {
+  const stray = tmpDir();
+  write(stray, 'game.yaml', 'name: x\n');
+  fs.mkdirSync(path.join(stray, 'sub'));
+  assert.doesNotMatch(hookContext(HOOK, path.join(stray, 'sub')), /Luật cứng/);
+  const ctx = hookContext(HOOK, newGame('hook2'));
+  assert.match(ctx, /Luật cứng/);
+  assert.doesNotMatch(ctx, /## Cấu trúc một game|## Tạo game mới/);
+  const ref = ctx.match(/`([^`]*standards\.md)`/)[1];
+  assert.ok(path.isAbsolute(ref) && fs.existsSync(ref), ref);
+});
+
+test('session-start hook: a failed npm install is retried after a day, not every session, and is reported', { skip: process.platform === 'win32' && 'npm giả là shell script' }, () => {
+  const plugin = tmpDir();
+  write(plugin, 'hooks/session-start.mjs', fs.readFileSync(HOOK, 'utf8'));
+  write(plugin, 'package.json', '{"version":"0.0.0-hooktest"}');
+  const bin = tmpDir();
+  write(bin, 'npm', `#!/bin/sh\necho x >> "${path.join(bin, 'calls')}"\nexit 1\n`);
+  fs.chmodSync(path.join(bin, 'npm'), 0o755);
+  const env = cleanEnv({ PATH: `${bin}${path.delimiter}${process.env.PATH}` });
+  const hook = path.join(plugin, 'hooks', 'session-start.mjs');
+  try {
+    assert.match(hookContext(hook, bin, env), /không cài được thư viện yaml, ajv/);
+    assert.match(hookContext(hook, bin, env), /lần cài trước lỗi, hook thử lại sau 1 ngày/);
+    assert.equal(read(bin, 'calls').trim().split('\n').length, 1, 'npm chỉ chạy một lần');
+  } finally {
+    for (const f of fs.readdirSync(os.tmpdir())) if (f.startsWith('gamekit-npm-failed-0.0.0-hooktest-')) fs.rmSync(path.join(os.tmpdir(), f), { force: true });
+  }
+});
