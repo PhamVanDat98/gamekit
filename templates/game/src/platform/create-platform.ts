@@ -31,8 +31,8 @@ export function createPlatform(adapter: PortalAdapter, opts: PlatformOptions): P
   const log = opts.log ?? ((m: string, e?: unknown) => console.warn(`[platform:${adapter.name}] ${m}`, e ?? ''));
   const storage = opts.storage === undefined ? safeLocalStorage() : opts.storage;
   const adTimeoutMs = opts.adTimeoutMs ?? DEFAULT_AD_TIMEOUT_MS;
-  // What the game asked for vs. what the SDK was told. An ad forces "stopped";
-  // when it closes, the SDK follows whatever the game wants at that moment.
+  // What the game asked for vs. what the SDK was told. An ad or any pause (menu, hidden tab) forces
+  // "stopped"; when it ends, the SDK follows whatever the game wants at that moment.
   let wantGameplay = false;
   let sdkGameplay = false;
   let adRunning = false;
@@ -47,11 +47,13 @@ export function createPlatform(adapter: PortalAdapter, opts: PlatformOptions): P
   };
 
   const syncGameplay = () => {
-    const target = wantGameplay && !adRunning;
+    const target = wantGameplay && !adRunning && !bus.paused;
     if (target === sdkGameplay) return;
     sdkGameplay = target;
     safe(target ? 'gameplayStart' : 'gameplayStop', () => (target ? adapter.gameplayStart?.() : adapter.gameplayStop?.()));
   };
+
+  bus.subscribe(syncGameplay);
 
   const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
     new Promise<T>((resolve, reject) => {
