@@ -9,7 +9,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 import { log, GkError } from './lib/log.mjs';
 import { requireGameRoot, loadGame, updateGame, nowIso, ownershipOf } from './lib/game.mjs';
 import { PHASES, nextPhase, phaseInfo } from './lib/phases.mjs';
-import { validateGame } from './validate.mjs';
+import { sourcePathProblem, validateGame } from './validate.mjs';
 import { parityDetail, parityForGame } from './parity.mjs';
 
 /**
@@ -59,6 +59,11 @@ function runAuto(root, name, phase) {
     } catch (e) {
       return { ok: false, detail: e.message };
     }
+  }
+  if (name === 'source-path') {
+    // The original build is set, on this machine, and outside what git commits.
+    const why = sourcePathProblem(root, loadGame(root), { mustExist: true });
+    return { ok: !why, detail: why ?? '' };
   }
   if (name.startsWith('field:')) {
     // field:release.forbiddenTerms → the game.yaml value must be non-empty

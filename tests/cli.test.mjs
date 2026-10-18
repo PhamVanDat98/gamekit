@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
+import { ROOT, gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
 import { ownershipProblems, topo } from '../scripts/parallel.mjs';
 import { parseArgs } from '../scripts/gamekit.mjs';
 import { evaluateParity, testsFromVitestReport } from '../scripts/parity.mjs';
+import { zipDir } from '../scripts/lib/zip.mjs';
+import { recon } from '../scripts/lib/formats.mjs';
+import { ENGINES } from '../scripts/lib/questions.mjs';
 import YAML from 'yaml';
 
 test('init creates a valid game with git, hook and schemas', () => {
@@ -108,7 +111,12 @@ test('gate: parses items, runs auto checks, advances and records timings', () =>
   const fieldFail = gk(dir, 'gate');
   assert.equal(fieldFail.code, 1, 'source.path and forbiddenTerms still empty');
   assert.match(fieldFail.out, /source\.path chưa điền/);
+  assert.match(fieldFail.out, /thiếu notes\/recon\.md/);
   write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig').replace('forbiddenTerms: []', 'forbiddenTerms: [OldName]'));
+  write(dir, 'notes/recon.md', '# Recon');
+  write(dir, 'notes/triage.md', '# Triage');
+  assert.match(gk(dir, 'gate').out, /không tồn tại trên máy này/);
+  fs.mkdirSync(path.join(dir, '..', 'orig'));
   assert.equal(gk(dir, 'gate').code, 0);
   assert.equal(gk(dir, 'gate', '--advance').code, 0);
   const y = read(dir, 'game.yaml');
@@ -646,6 +654,14 @@ test('pre-commit blocks build output even when force-added', () => {
 });
 
 // ---------- ownership: own (default) vs third-party ----------
+/** What the P0 gate checks automatically: an original build next to the game, recon and triage notes. */
+function readyForP0(dir) {
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig'));
+  fs.mkdirSync(path.join(dir, '..', 'orig'), { recursive: true });
+  write(dir, 'notes/recon.md', '# Recon');
+  write(dir, 'notes/triage.md', '# Triage');
+}
+
 const tickAll = (dir, phase) => write(dir, `gates/${phase}.md`, read(dir, `gates/${phase}.md`).replaceAll('- [ ]', '- [x]'));
 
 test('gate: {only: …} tags parse alongside auto and (bạn)', () => {
@@ -674,7 +690,7 @@ test('ownership: a new game is the user\'s own — P0 passes without forbiddenTe
   assert.match(read(dir, 'game.yaml'), /ownership: own/);
   assert.match(gk(dir, 'status').out, /game của bạn/);
   tickAll(dir, 'P0');
-  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig'));
+  readyForP0(dir);
   const r = gk(dir, 'gate');
   assert.equal(r.code, 0, r.out);
   assert.doesNotMatch(r.out, /forbiddenTerms|clone/);
@@ -685,7 +701,7 @@ test('ownership: init --third-party requires forbiddenTerms, keeps reskin phase 
   assert.match(read(dir, 'game.yaml'), /ownership: third-party/);
   assert.match(gk(dir, 'status').out, /làm lại game người khác/);
   tickAll(dir, 'P0');
-  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig'));
+  readyForP0(dir);
   let r = gk(dir, 'gate');
   assert.equal(r.code, 1);
   assert.match(r.out, /forbiddenTerms chưa điền/);
@@ -716,4 +732,206 @@ test('ownership: game.yaml without the field counts as own; unknown values are r
   const r = gk(dir, 'validate');
   assert.equal(r.code, 1);
   assert.match(r.out, /ownership/);
+});
+
+// ---------- recon: tell the container, store and engine of an original build ----------
+
+/** Write `files` ({ path: content }) under a new folder; returns its path. */
+function tree(files, dir = tmpDirFor()) {
+  for (const [rel, content] of Object.entries(files)) write(dir, rel, content);
+  return dir;
+}
+const tmpDirFor = () => fs.mkdtempSync(path.join(os.tmpdir(), 'gamekit-recon-'));
+/** A zip of `files`, as a Buffer. */
+function zipOf(files) {
+  const out = path.join(tmpDirFor(), 'a.zip');
+  zipDir(tree(files), out);
+  return fs.readFileSync(out);
+}
+/** An Electron .asar holding `names`. */
+function asarOf(names) {
+  const files = {};
+  for (const n of names) {
+    let node = files;
+    const parts = n.split('/');
+    for (const p of parts.slice(0, -1)) node = (node[p] ??= { files: {} }).files;
+    node[parts.at(-1)] = { size: 1, offset: '0' };
+  }
+  const json = Buffer.from(JSON.stringify({ files }));
+  const head = Buffer.alloc(16);
+  head.writeUInt32LE(4, 0);
+  head.writeUInt32LE(json.length + 8, 4);
+  head.writeUInt32LE(json.length + 4, 8);
+  head.writeUInt32LE(json.length, 12);
+  return Buffer.concat([head, json, Buffer.from('x')]);
+}
+const ids = (list) => list.map((x) => x.id);
+
+test('recon: Unity IL2CPP APK — container, engine variant and version from globalgamemanagers', () => {
+  const dir = tree({});
+  fs.writeFileSync(path.join(dir, 'game.apk'), zipOf({
+    'AndroidManifest.xml': 'x',
+    'classes.dex': 'x',
+    'lib/arm64-v8a/libil2cpp.so': 'x',
+    'lib/arm64-v8a/libunity.so': 'x',
+    'assets/bin/Data/Managed/Metadata/global-metadata.dat': 'x',
+    'assets/bin/Data/globalgamemanagers': `\0\0\0\x162021.3.5f1\0${'x'.repeat(5000)}`,
+  }));
+  const r = recon(path.join(dir, 'game.apk'));
+  assert.deepEqual(ids(r.containers), ['apk']);
+  assert.equal(r.engine, 'unity');
+  assert.equal(r.engines[0].label, 'Unity (IL2CPP)');
+  assert.ok(!ids(r.engines).includes('android-native'), 'engine found, so no "plain Android" fallback');
+  assert.equal(r.engineVersion, '2021.3.5f1');
+  assert.ok(!r.notes.some((n) => /global-metadata/.test(n)));
+});
+
+test('recon: XAPK opens nested APKs — Cocos Creator, encrypted .jsc, split APK and OBB notes', () => {
+  const base = zipOf({ 'AndroidManifest.xml': 'x', 'classes.dex': 'x', 'assets/assets/main/index.jsc': 'x', 'assets/assets/main/config.json': '{}' });
+  const split = zipOf({ 'AndroidManifest.xml': 'x', 'lib/arm64-v8a/libcocos2djs.so': 'x' });
+  const dir = tree({});
+  const xapkSrc = tree({ 'manifest.json': '{}' });
+  fs.writeFileSync(path.join(xapkSrc, 'com.demo.apk'), base);
+  fs.writeFileSync(path.join(xapkSrc, 'config.arm64_v8a.apk'), split);
+  write(xapkSrc, 'Android/obb/com.demo/main.1.com.demo.obb', 'x');
+  zipDir(xapkSrc, path.join(dir, 'demo.xapk'));
+  const r = recon(path.join(dir, 'demo.xapk'));
+  assert.ok(ids(r.containers).includes('split-apk'));
+  assert.ok(ids(r.containers).includes('obb'));
+  assert.equal(r.engine, 'cocos');
+  assert.ok(r.engines[0].evidence.some((e) => e.includes('demo.xapk!/config.arm64_v8a.apk!/lib/arm64-v8a/libcocos2djs.so')));
+  assert.ok(r.notes.some((n) => /\.jsc/.test(n)));
+  assert.ok(r.notes.some((n) => /Split APK/.test(n)));
+  assert.ok(r.notes.some((n) => /OBB/.test(n)));
+});
+
+test('recon: Steam folder (Unity Mono) — store from the path and steam_api, Steamworks note', () => {
+  const root = tree({
+    'steamapps/common/Foo/Foo.exe': 'MZ',
+    'steamapps/common/Foo/UnityPlayer.dll': 'x',
+    'steamapps/common/Foo/Foo_Data/Managed/Assembly-CSharp.dll': 'x',
+    'steamapps/common/Foo/Foo_Data/Plugins/x86_64/steam_api64.dll': 'x',
+    'steamapps/common/Foo/Foo_Data/globalgamemanagers': 'xx 2019.4.40f1 xx',
+  });
+  const r = recon(path.join(root, 'steamapps/common/Foo'));
+  assert.deepEqual(ids(r.stores), ['steam']);
+  assert.ok(ids(r.containers).includes('windows'));
+  assert.equal(r.engines[0].label, 'Unity (Mono)');
+  assert.equal(r.engineVersion, '2019.4.40f1');
+  assert.ok(r.notes.some((n) => /Steamworks/.test(n)));
+});
+
+test('recon: Electron app — web inside app.asar decides the engine, not "native exe"', () => {
+  const dir = tree({ 'Game.exe': 'MZ', 'chrome_100_percent.pak': 'x', 'resources.pak': 'x' });
+  fs.mkdirSync(path.join(dir, 'resources'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'resources', 'app.asar'), asarOf(['package.json', 'index.html', 'js/phaser.min.js']));
+  const r = recon(dir);
+  assert.ok(ids(r.containers).includes('electron'));
+  assert.equal(r.engines[0].label, 'HTML5 (Phaser)');
+  assert.ok(!ids(r.engines).includes('unreal'), "Chromium's .pak files are not Unreal paks");
+});
+
+test('recon: RPG Maker MV on NW.js, Unity WebGL, GameMaker .app, Unreal, Godot exe, Ren\'Py', () => {
+  let r = recon(tree({ 'Game.exe': 'MZ', 'nw.dll': 'x', 'www/index.html': 'x', 'www/js/rpg_core.js': 'x', 'www/img/a.rpgmvp': 'x' }));
+  assert.ok(ids(r.containers).includes('nwjs'));
+  assert.equal(r.engine, 'rpgmaker');
+  assert.ok(r.notes.some((n) => /encryptionKey/.test(n)));
+
+  r = recon(tree({ 'index.html': 'x', 'Build/web.loader.js': 'x', 'Build/web.framework.js.br': 'x', 'Build/web.wasm.br': 'x', 'Build/web.data.br': 'x' }));
+  assert.equal(r.engines[0].label, 'Unity WebGL');
+  assert.ok(!ids(r.engines).includes('emscripten'));
+
+  r = recon(tree({ 'Foo.app/Contents/Info.plist': 'x', 'Foo.app/Contents/MacOS/Foo': 'x', 'Foo.app/Contents/Resources/game.ios': 'x' }));
+  assert.ok(ids(r.containers).includes('macos'));
+  assert.equal(r.engine, 'gamemaker');
+
+  r = recon(tree({ 'Foo.exe': 'MZ', 'Foo/Binaries/Win64/Foo-Win64-Shipping.exe': 'MZ', 'Foo/Content/Paks/Foo-Windows.pak': 'x' }));
+  assert.equal(r.engine, 'unreal');
+  assert.ok(r.notes.some((n) => /AES/.test(n)));
+
+  const exe = path.join(tree({}), 'game.exe');
+  fs.writeFileSync(exe, Buffer.concat([Buffer.from('MZ'), Buffer.alloc(64), Buffer.from('GDPC')]));
+  assert.equal(recon(exe).engine, 'godot');
+
+  const pck = Buffer.alloc(32);
+  pck.write('GDPC', 0, 'latin1');
+  pck.writeUInt32LE(2, 4);
+  pck.writeUInt32LE(4, 8);
+  pck.writeUInt32LE(2, 12);
+  pck.writeUInt32LE(1, 16);
+  const gdir = tree({ 'game.x86_64': 'x' });
+  fs.writeFileSync(path.join(gdir, 'game.pck'), pck);
+  r = recon(gdir);
+  assert.equal(r.engine, 'godot');
+  assert.equal(r.engineVersion, '4.2.1');
+
+  r = recon(tree({ 'Foo.exe': 'MZ', 'renpy/__init__.py': 'x', 'game/script.rpyc': 'x', 'game/archive.rpa': 'x' }));
+  assert.equal(r.engine, 'renpy');
+  assert.ok(r.notes.some((n) => /unrpyc/.test(n)));
+});
+
+test('recon: unknown build says so; every engine it can name is a valid game.yaml engine', () => {
+  const r = recon(tree({ 'data.bin': 'x', 'readme.txt': 'x' }));
+  assert.equal(r.engine, 'unknown');
+  assert.ok(r.notes.some((n) => /Không nhận ra engine/.test(n)));
+  const schema = JSON.parse(fs.readFileSync(path.join(ROOT, 'schemas/game.schema.json'), 'utf8'));
+  assert.deepEqual(schema.properties.source.properties.engine.enum, ENGINES, 'schema and init question list the same engines');
+});
+
+test('recon CLI: defaults to source.path; --write saves notes/recon.md and fills an unknown engine only', () => {
+  const src = tree({ 'index.html': 'x', 'js/c3runtime.js': 'x' });
+  const dir = newGame('recon-demo', '--set', `sourcePath=${src}`);
+  editYaml(dir, (g) => {
+    g.source.engine = 'unknown';
+  });
+  let r = gk(dir, 'recon', '--write');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Construct/);
+  assert.match(read(dir, 'notes/recon.md'), /Construct/);
+  assert.match(read(dir, 'game.yaml'), /engine: construct/);
+  editYaml(dir, (g) => {
+    g.source.engine = 'unity';
+  });
+  r = gk(dir, 'recon', '--write');
+  assert.match(r.out, /không tự sửa/);
+  assert.match(read(dir, 'game.yaml'), /engine: unity/);
+  write(dir, 'notes/recon.md', `${read(dir, 'notes/recon.md').split('## Kiểm tra tay')[0]}## Kiểm tra tay\n\nĐã mở data.json: đúng C3.\n`);
+  gk(dir, 'recon', '--write');
+  assert.match(read(dir, 'notes/recon.md'), /Đã mở data\.json: đúng C3\./, 're-run keeps the manual checks');
+  r = gk(dir, 'recon', src, '--json');
+  assert.equal(JSON.parse(r.out).engine, 'construct');
+  assert.equal(gk(dir, 'recon', path.join(src, 'nope')).code, 1);
+});
+
+test('pre-commit blocks files of the original build and original/decompiled code anywhere', () => {
+  const dir = newGame();
+  for (const f of ['game.apk', 'orig/lib/arm64-v8a/libil2cpp.so', 'orig/Foo_Data/Managed/Assembly-CSharp.dll', 'orig/global-metadata.dat', 'Content/Paks/Foo.pak', 'dump/Player.java', 'scripts/player.gd', 'www/img/a.rpgmvp.swf']) {
+    write(dir, f, 'x');
+    sh(dir, 'git', 'add', '-A');
+    assert.throws(() => sh(dir, 'git', 'commit', '-qm', 'x'), undefined, f);
+    sh(dir, 'git', 'reset', '-q');
+    fs.rmSync(path.join(dir, f));
+  }
+  write(dir, 'notes/engine.md', '# Logic nằm ở Player.Update');
+  write(dir, 'reference/game.apk', 'x');
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'notes only');
+});
+
+test('source.path inside the game folder is an error (it would be committed), unless under reference/', () => {
+  const dir = newGame();
+  editYaml(dir, (g) => {
+    g.source.path = 'orig';
+  });
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /nằm trong thư mục game/);
+  editYaml(dir, (g) => {
+    g.source.path = 'reference/orig';
+  });
+  assert.equal(gk(dir, 'validate').code, 0);
+  editYaml(dir, (g) => {
+    g.source.path = path.join(os.tmpdir(), 'somewhere-else');
+  });
+  assert.equal(gk(dir, 'validate').code, 0, 'outside the folder: fine (existence is checked by the P0 gate only)');
 });

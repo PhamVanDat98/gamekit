@@ -25,6 +25,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Việc | Lệnh |
 | --- | --- |
 | Trạng thái, việc tiếp theo | `npm run gk -- status` |
+| Nhận diện game gốc (P0) | `npm run gk -- recon --write` (mặc định `source.path`) → `notes/recon.md` |
 | Kiểm tra dữ liệu | `npm run gk -- validate` |
 | Test / typecheck / lint | `npm test` · `npm run typecheck` · `npm run lint` |
 | Parity với game gốc | `npm run gk -- parity` (nghĩa vụ trong `spec/obligations.yaml`, test gắn thẻ `[id:case]`) |

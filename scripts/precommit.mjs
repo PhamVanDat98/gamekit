@@ -5,7 +5,7 @@ import { requireGameRoot } from './lib/game.mjs';
 import { git } from './lib/git.mjs';
 import { readYaml } from './lib/io.mjs';
 import { check } from './lib/schema.mjs';
-import { loadProvenance, SHIPPED_DIRS, FORBIDDEN_DIRS, pathUnder } from './validate.mjs';
+import { loadProvenance, SHIPPED_DIRS, FORBIDDEN_DIRS, ORIGINAL_BUILD_FILE, pathUnder } from './validate.mjs';
 
 export async function run(args) {
   const root = requireGameRoot(args.cwd);
@@ -23,7 +23,7 @@ export async function run(args) {
   const labels = new Map((prov.entries ?? []).map((e) => [e.path, e.label]));
   for (const f of staged) {
     if (FORBIDDEN_DIRS.some((d) => pathUnder(f, d + '/'))) pr.error(f, 'thư mục cấm commit (asset gốc / code decompile / dữ liệu local)');
-    if (/\.(il|cs\.decompiled|decompiled)$|(^|\/)(Assembly-CSharp|dump)\.cs$/i.test(f)) pr.error(f, 'trông như code decompile — chỉ commit ghi chú RE viết bằng lời của mình');
+    else if (ORIGINAL_BUILD_FILE.test(f)) pr.error(f, 'file của bản build gốc hoặc code gốc/decompile — để trong reference/ hoặc decompiled/ (gitignored) hoặc ngoài thư mục game; chỉ commit ghi chú trong notes/');
     if (SHIPPED_DIRS.some((d) => pathUnder(f, d + '/')) && path.basename(f) !== '.gitkeep') {
       const label = labels.get(f);
       if (!label) pr.error(f, 'asset chưa có nhãn provenance');

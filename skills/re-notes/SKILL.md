@@ -15,6 +15,8 @@ Mở `notes/QUESTIONS.md`. Biến yêu cầu thành danh sách câu hỏi, mỗi
 Trước khi mở công cụ, xem lại `notes/` và `params/` đã có gì. Không phân tích lại thứ đã có kết luận.
 
 ## 2. Xác định target: logic và data nằm ở đâu
+`notes/recon.md` (skill **game-recon**, `gamekit recon`) đã ghi engine, nơi chứa logic/data và công cụ cho bản build này — bắt đầu từ đó. Bảng dưới là tóm tắt các engine hay gặp; đủ dạng (GameMaker, RPG Maker, Ren'Py, Defold, Flutter, React Native, Electron…) do `gamekit recon` in ra.
+
 | Engine / dạng build | Logic | Data / asset | Công cụ thường dùng |
 | --- | --- | --- | --- |
 | Unity Mono | `*_Data/Managed/Assembly-CSharp.dll` (IL, đọc gần như source) | `*.assets`, ScriptableObject | ILSpy / dnSpy; AssetRipper, UABEA |
@@ -26,7 +28,7 @@ Trước khi mở công cụ, xem lại `notes/` và `params/` đã có gì. Kh�
 | Unreal | Blueprint / native trong `.pak` | `.uasset` | FModel / UModel; native: Ghidra |
 | Native cũ (C/C++) | exe/dll | file data riêng | Ghidra / IDA |
 
-APK: nhìn `lib/*/` để nhận engine (`libunity.so`, `libil2cpp.so`, `libcocos2djs.so`, `libgodot_android.so`).
+APK: nhìn `lib/*/` để nhận engine (`libunity.so`, `libil2cpp.so`, `libcocos2djs.so`, `libgodot_android.so`). Cách lấy và mở từng dạng (split APK, AAB, Steam, bộ cài, Electron…): [../game-recon/references/formats.md](../game-recon/references/formats.md).
 
 Nếu phiên có công cụ MCP reverse engineering (ví dụ rea: `open_binary`, `analyze_function`, `analyze_javascript_application`, `inspect_managed_artifact`), dùng chúng cho bước phân tích tĩnh. Bắt đầu từ bản tóm tắt; chỉ đào sâu khi còn một câu hỏi cụ thể; không chạy lại một phân tích y hệt.
 
