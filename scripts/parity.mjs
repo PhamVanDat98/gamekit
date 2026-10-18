@@ -11,6 +11,7 @@ import { decisionIds, loadObligations, OBLIGATIONS_FILE } from './validate.mjs';
 
 export const CASE_KINDS = ['normal', 'edge', 'invalid', 'oracle', 'replay'];
 const TAG = /\[([a-z0-9][a-z0-9._-]*):([a-z-]+)\]/g;
+const LOOSE_TAG = /\[[^\]\s]+\s*:\s*[^\]\s]+\]/g; // looks like a tag: if TAG misses it, say why instead of silently ignoring it
 
 /** Vitest `--reporter=json` → [{ name, file, status }]; status is passed | failed | skipped | pending | todo. */
 export function testsFromVitestReport(report) {
@@ -23,6 +24,13 @@ export function testsFromVitestReport(report) {
   );
 }
 
+/** Test files vitest marked failed without any failing test: they did not load (bad import, syntax) or a hook threw, so their tags are invisible. */
+export function brokenFilesFromVitestReport(report) {
+  return (report.testResults ?? [])
+    .filter((f) => f.status === 'failed' && !(f.assertionResults ?? []).some((a) => a.status === 'failed'))
+    .map((f) => ({ file: f.name, message: String(f.message ?? '').split('\n')[0] }));
+}
+
 /**
  * Each obligation ends in one state:
  *   closed  — every required case has a passing tagged test, and no tagged test is red or unrun
@@ -32,8 +40,13 @@ export function testsFromVitestReport(report) {
  */
 export function evaluateParity({ obligations, tests, decisions = new Set() }) {
   const errors = [];
+  const warnings = [];
   const byId = new Map(obligations.map((o) => [o.id, { o, tagged: [] }]));
   for (const t of tests) {
+    const strict = new Set([...t.name.matchAll(TAG)].map((m) => m[0]));
+    for (const [loose] of t.name.matchAll(LOOSE_TAG)) {
+      if (!strict.has(loose)) warnings.push(`test "${t.name}": ${loose} không phải thẻ hợp lệ — viết thường, không khoảng trắng: [id:case]`);
+    }
     for (const [, id, kind] of t.name.matchAll(TAG)) {
       if (!CASE_KINDS.includes(kind)) {
         errors.push(`test "${t.name}": loại case lạ "${kind}" (dùng: ${CASE_KINDS.join(', ')})`);
@@ -67,7 +80,7 @@ export function evaluateParity({ obligations, tests, decisions = new Set() }) {
   const mustClose = items.filter((i) => i.required && i.state !== 'waived');
   if (!mustClose.length) errors.push('chưa có nghĩa vụ bắt buộc nào cần kiểm chứng — parity không chứng minh được gì');
   const ok = errors.length === 0 && mustClose.length > 0 && mustClose.every((i) => i.state === 'closed');
-  return { ok, items, errors };
+  return { ok, items, errors, warnings };
 }
 
 const REPORT = '.gamekit/local/parity-report.json';
@@ -92,7 +105,12 @@ export function parityForGame(root, { report, cwd = root } = {}) {
   const errs = check('obligations', data);
   if (errs.length) throw new GkError(`${OBLIGATIONS_FILE}: ${errs.join('; ')}`);
   const json = report ? readJson(path.resolve(cwd, report)) : runVitest(root);
-  return evaluateParity({ obligations: data.obligations, tests: testsFromVitestReport(json), decisions: decisionIds(root) });
+  const result = evaluateParity({ obligations: data.obligations, tests: testsFromVitestReport(json), decisions: decisionIds(root) });
+  for (const b of brokenFilesFromVitestReport(json)) {
+    result.errors.push(`${path.relative(root, b.file) || b.file}: file test lỗi khi chạy (không nạp được hoặc hook lỗi), thẻ trong đó không được tính${b.message ? ` — ${b.message}` : ''}`);
+    result.ok = false;
+  }
+  return result;
 }
 
 /** One line for gate output: what still blocks parity. */
@@ -112,11 +130,12 @@ export async function run(args) {
       const why = {
         open: `thiếu test xanh cho case: ${i.missing.join(', ')} (gắn thẻ [${i.id}:<case>] vào tên test)`,
         failed: `test đỏ: ${i.failing.join(' | ')}`,
-        unknown: `test chưa chạy (skip/todo): ${i.unverified.join(' | ')}`,
+        unknown: `test chưa chạy (skip/todo, hoặc hook beforeAll lỗi): ${i.unverified.join(' | ')}`,
       }[i.state];
       (i.required ? log.fail : log.warn)(`${head}: ${why}`);
     }
   }
+  for (const w of result.warnings) log.warn(w);
   for (const e of result.errors) log.fail(e);
   const must = result.items.filter((i) => i.required && i.state !== 'waived');
   const closed = must.filter((i) => i.state === 'closed').length;

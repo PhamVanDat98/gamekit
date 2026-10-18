@@ -318,6 +318,12 @@ export function checkModulePlan(plan) {
   const where = 'module-plan.yaml';
   for (const e of check('module-plan', plan)) pr.error(where, e);
   if (!pr.ok) return pr;
+  // shared/owns are plain path prefixes: a glob, absolute or ../ entry would match nothing and silently open the shared zone.
+  const badPath = (p) => !norm(p).trim() || /[*?[\]{}\\]/.test(p) || /^(\/|[a-z]:)/i.test(p) || norm(p).split('/').includes('..');
+  for (const p of [...plan.shared, ...plan.modules.flatMap((m) => m.owns)]) {
+    if (badPath(p)) pr.error(where, `đường dẫn "${p}" không hợp lệ: dùng đường dẫn tương đối từ gốc game, không glob, không bắt đầu bằng /, không .. hay \\ (thư mục kết thúc bằng /)`);
+  }
+  if (!pr.ok) return pr;
   const ids = new Map();
   for (const m of plan.modules) {
     if (ids.has(m.id)) pr.error(where, `module trùng id ${m.id}`);

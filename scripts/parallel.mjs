@@ -38,22 +38,6 @@ const waveOf = (plan, wave) => {
   return mods;
 };
 
-/** Order modules so dependencies inside the same list come first. */
-export function topo(mods) {
-  const ids = new Set(mods.map((m) => m.id));
-  const done = new Set();
-  const out = [];
-  const visit = (m, stack = []) => {
-    if (done.has(m.id)) return;
-    if (stack.includes(m.id)) throw new GkError(`Phụ thuộc vòng: ${[...stack, m.id].join(' → ')}`);
-    for (const d of m.dependsOn ?? []) if (ids.has(d)) visit(mods.find((x) => x.id === d), [...stack, m.id]);
-    done.add(m.id);
-    out.push(m);
-  };
-  mods.forEach((m) => visit(m));
-  return out;
-}
-
 export function briefFor(plan, m, game) {
   const shared = plan.shared.map((s) => `- \`${s}\``).join('\n');
   return `# Brief: ${m.id} (đợt ${m.wave}) — ${game.title}
@@ -106,6 +90,7 @@ export async function fanout(args) {
     if (exists(wt)) log.warn(`${wt} đã có — giữ nguyên`);
     else {
       fs.mkdirSync(path.dirname(wt), { recursive: true });
+      git(root, ['worktree', 'prune']); // a worktree folder deleted by hand would otherwise block `worktree add`
       git(root, ['worktree', 'add', ...(branchExists(root, br) ? [wt, br] : ['-b', br, wt, plan.base])]);
     }
     const local = path.join(wt, '.gamekit', 'local');
@@ -180,18 +165,28 @@ export async function integrate(args) {
   const testCmd = args.test ?? 'npm test --silent';
   if (currentBranch(root) !== plan.base) throw new GkError(`Phải đứng ở nhánh ${plan.base} để integrate`);
   if (!isClean(root)) throw new GkError('Working tree chưa sạch');
-  const mods = topo(waveOf(plan, wave));
+  // Dependencies are always in an earlier wave (checkModulePlan), so plan order is merge order.
+  const mods = waveOf(plan, wave);
   let merged = 0;
   for (const m of mods) {
     const br = branchOf(m.id);
-    if (!branchExists(root, br)) throw new GkError(`Chưa có nhánh ${br}`);
-    if (isMerged(root, plan.base, m.id)) {
+    const wasMerged = isMerged(root, plan.base, m.id);
+    if (!branchExists(root, br)) {
+      if (wasMerged) {
+        log.dim(`${m.id}: đã merge trước đó`);
+        continue;
+      }
+      throw new GkError(`Chưa có nhánh ${br}`);
+    }
+    const wt = worktreeOf(root, game, m.id);
+    const ahead = commitsAhead(root, plan.base, br);
+    if (wasMerged && ahead === 0 && !worktreeDirty(wt)) {
       log.dim(`${m.id}: đã merge trước đó`);
       continue;
     }
-    const wt = worktreeOf(root, game, m.id);
     if (worktreeDirty(wt)) throw new GkError(`${m.id}: worktree còn thay đổi chưa commit (${wt}) — subagent commit trước khi integrate`);
-    if (commitsAhead(root, plan.base, br) === 0) throw new GkError(`${m.id}: nhánh ${br} chưa có commit nào — module chưa làm xong`);
+    if (ahead === 0) throw new GkError(`${m.id}: nhánh ${br} chưa có commit nào — module chưa làm xong`);
+    if (wasMerged) log.info(`${m.id}: đã merge trước đó nhưng nhánh có thêm ${ahead} commit — merge tiếp`);
     const own = ownershipProblems(plan, m, changedFiles(root, plan.base, br, false));
     if (!own.ok) {
       own.report(`check-ownership ${m.id}`);
@@ -210,6 +205,7 @@ export async function integrate(args) {
     const t = runTests(root, testCmd);
     if (!t.ok) {
       git(root, ['reset', '--hard', before]);
+      git(root, ['clean', '-fdq']); // files the tests left behind; the tree was clean before the merge
       log.info(t.out);
       throw new GkError(`${m.id}: test đỏ sau khi merge — đã hoàn tác merge này. ${merged} module trước đó vẫn giữ.`);
     }
@@ -220,7 +216,9 @@ export async function integrate(args) {
     for (const m of mods) {
       const wt = worktreeOf(root, game, m.id);
       if (!exists(wt)) continue;
+      const br = branchOf(m.id);
       if (!isMerged(root, plan.base, m.id)) log.warn(`${m.id}: chưa merge — giữ worktree ${wt}`);
+      else if (branchExists(root, br) && commitsAhead(root, plan.base, br) > 0) log.warn(`${m.id}: nhánh ${br} còn commit chưa merge — giữ ${wt}`);
       else if (worktreeDirty(wt)) log.warn(`${m.id}: worktree còn thay đổi chưa commit — giữ ${wt}`);
       else {
         // node_modules is a symlink we created; remove it so git sees a clean tree.

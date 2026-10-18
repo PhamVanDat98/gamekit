@@ -6,9 +6,9 @@ import os from 'node:os';
 import { gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
-import { ownershipProblems, topo } from '../scripts/parallel.mjs';
+import { ownershipProblems } from '../scripts/parallel.mjs';
 import { parseArgs } from '../scripts/gamekit.mjs';
-import { evaluateParity, testsFromVitestReport } from '../scripts/parity.mjs';
+import { evaluateParity, testsFromVitestReport, brokenFilesFromVitestReport } from '../scripts/parity.mjs';
 import YAML from 'yaml';
 
 test('init creates a valid game with git, hook and schemas', () => {
@@ -135,17 +135,20 @@ test('module plan: overlap, shared and wave order are rejected', () => {
   assert.match(text, /vùng dùng chung/);
 });
 
-test('ownership and topo order', () => {
+test('ownership: prefixes match whole path segments', () => {
   const plan = { base: 'main', shared: ['params/'], modules: [] };
   const mod = { id: 'a', owns: ['src/core/a/'] };
   assert.ok(ownershipProblems(plan, mod, ['src/core/a/x.ts']).ok);
   assert.equal(ownershipProblems(plan, mod, ['src/core/ab.ts', 'params/g.json']).errors.length, 2);
-  const order = topo([
-    { id: 'c', dependsOn: ['b'] },
-    { id: 'b', dependsOn: ['a'] },
-    { id: 'a' },
-  ]).map((m) => m.id);
-  assert.deepEqual(order, ['a', 'b', 'c']);
+});
+
+test('module plan: glob, absolute, .. and backslash paths are rejected (they would match nothing)', () => {
+  const plan = (shared, owns) => ({ base: 'main', shared, modules: [{ id: 'a', wave: 1, owns, brief: 'x' }] });
+  for (const bad of ['/params/', 'src/**/contracts.ts', '../x/', 'src\\core', 'C:/x/', '']) {
+    assert.equal(checkModulePlan(plan([bad], ['src/core/a/'])).ok, false, bad);
+    assert.equal(checkModulePlan(plan(['params/'], [bad])).ok, false, bad);
+  }
+  assert.ok(checkModulePlan(plan(['./params/', 'package.json'], ['src/core/a/'])).ok);
 });
 
 test('fanout → work → check-ownership → integrate (merge + rollback on red tests)', () => {
@@ -179,11 +182,27 @@ modules:
   assert.equal(red.code, 1);
   assert.equal(sh(dir, 'git', 'rev-parse', 'HEAD').trim(), head, 'merge rolled back');
 
-  const green = gk(dir, 'integrate', '--wave', '1', '--test', 'exit 0', '--cleanup');
+  const junk = gk(dir, 'integrate', '--wave', '1', '--test', 'echo x > junk.txt; exit 1');
+  assert.equal(junk.code, 1);
+  assert.equal(sh(dir, 'git', 'status', '--porcelain').trim(), '', 'files left by red tests are removed');
+
+  const green = gk(dir, 'integrate', '--wave', '1', '--test', 'exit 0');
   assert.equal(green.code, 0, green.out);
   assert.ok(fs.existsSync(path.join(dir, 'src/core/a/x.ts')));
   assert.ok(fs.existsSync(path.join(dir, 'src/core/b/x.ts')));
+
+  // a follow-up commit on an already merged module is merged too, not skipped
+  write(wt('a'), 'src/core/a/fix.ts', 'export const f = 1;\n');
+  sh(wt('a'), 'git', 'add', '-A');
+  sh(wt('a'), 'git', 'commit', '-qm', 'fix');
+  const again = gk(dir, 'integrate', '--wave', '1', '--test', 'exit 0', '--cleanup');
+  assert.equal(again.code, 0, again.out);
+  assert.ok(fs.existsSync(path.join(dir, 'src/core/a/fix.ts')), again.out);
   assert.ok(!fs.existsSync(wt('a')), 'worktree removed');
+
+  // a worktree folder deleted by hand does not block fanout
+  fs.rmSync(wt('b'), { recursive: true, force: true });
+  assert.equal(gk(dir, 'fanout', '--wave', '1').code, 0);
 });
 
 
@@ -373,6 +392,18 @@ test('parity: reads vitest JSON reports', () => {
   ]);
 });
 
+test('parity: test files that fail to load or whose hook throws block parity; malformed tags are named', () => {
+  const report = { testResults: [
+    { name: '/g/tests/ok.test.ts', status: 'passed', assertionResults: [{ title: '[a:normal] x', status: 'passed' }] },
+    { name: '/g/tests/red.test.ts', status: 'failed', assertionResults: [{ title: 'y', status: 'failed' }] },
+    { name: '/g/tests/broken.test.ts', status: 'failed', message: 'Cannot find module ./nope\nstack', assertionResults: [] },
+  ] };
+  assert.deepEqual(brokenFilesFromVitestReport(report), [{ file: '/g/tests/broken.test.ts', message: 'Cannot find module ./nope' }]);
+  const r = evaluateParity({ obligations: [ob('a')], tests: [t('[a:normal] x'), t('[A:normal] y'), t('[a : edge] z')] });
+  assert.equal(r.ok, true);
+  assert.equal(r.warnings.length, 2);
+});
+
 test('parity command: template ledger, --report, exit 1 until every obligation is closed', () => {
   const dir = newGame('par');
   const { obligations } = YAML.parse(read(dir, 'spec/obligations.yaml'));
@@ -385,6 +416,10 @@ test('parity command: template ledger, --report, exit 1 until every obligation i
   write(dir, '.gamekit/local/r.json', JSON.stringify({ testResults: [{ name: 'x', assertionResults }] }));
   r = gk(dir, 'parity', '--report', '.gamekit/local/r.json');
   assert.equal(r.code, 0, r.out);
+  write(dir, '.gamekit/local/r.json', JSON.stringify({ testResults: [{ name: 'x', assertionResults }, { name: path.join(dir, 'tests/b.test.ts'), status: 'failed', assertionResults: [] }] }));
+  r = gk(dir, 'parity', '--report', '.gamekit/local/r.json');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /tests\/b\.test\.ts: file test lỗi/);
   fs.rmSync(path.join(dir, 'spec/obligations.yaml'));
   r = gk(dir, 'parity', '--report', '.gamekit/local/r.json');
   assert.equal(r.code, 1);

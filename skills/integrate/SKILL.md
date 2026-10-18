@@ -1,6 +1,6 @@
 ---
 name: integrate
-description: Dùng sau khi các subagent làm xong một đợt module trên worktree — merge các nhánh mod/* vào main theo thứ tự phụ thuộc, chạy test sau mỗi lần merge, xử lý vi phạm sở hữu, xung đột và test đỏ.
+description: Dùng sau khi các subagent làm xong một đợt module trên worktree — merge các nhánh mod/* của đợt vào main, chạy test sau mỗi lần merge, xử lý vi phạm sở hữu, xung đột và test đỏ.
 ---
 
 # Tích hợp một đợt
@@ -11,9 +11,10 @@ description: Dùng sau khi các subagent làm xong một đợt module trên wor
 
 ## Chạy
 `gamekit integrate --wave N [--test "npm test --silent"] [--cleanup]`
-- Merge `--no-ff` theo thứ tự phụ thuộc trong đợt.
+- Merge `--no-ff` lần lượt theo thứ tự trong `module-plan.yaml` (phụ thuộc luôn ở đợt trước nên đã có trên main).
 - Trước mỗi merge: kiểm tra sở hữu trên toàn nhánh. Sau mỗi merge: chạy test; đỏ thì **tự hoàn tác merge đó** và dừng (module trước vẫn giữ).
-- `--cleanup` gỡ worktree của module đã merge và sạch; worktree còn thay đổi được giữ lại.
+- Test đỏ: hoàn tác bằng `reset --hard` + `git clean` (file test sinh ra bị xoá; file trong `.gitignore` giữ nguyên).
+- `--cleanup` gỡ worktree của module đã merge và sạch; worktree còn thay đổi hoặc nhánh còn commit chưa merge được giữ lại.
 - Module được coi là đã merge khi có commit `merge: <id> (đợt N)` trên main — xoá nhánh `mod/*` sau đó không ảnh hưởng đợt sau.
 
 ## Khi dừng giữa chừng
@@ -24,7 +25,7 @@ description: Dùng sau khi các subagent làm xong một đợt module trên wor
 | Xung đột merge | Thường do contract chưa đủ. Sửa contract trên main, subagent rebase nhánh lên main rồi làm lại phần lệch |
 | Test đỏ sau merge | Đọc output, xác định module gây lỗi (thường là giả định khác nhau về contract). Giao lại kèm test đỏ làm bằng chứng |
 
-Chạy lại `integrate` — module đã merge được bỏ qua.
+Chạy lại `integrate` — module đã merge được bỏ qua; module đã merge nhưng nhánh có thêm commit (sửa sau review) được merge tiếp.
 
 ## Sau đợt
 - `gamekit fanout --wave N+1` nếu còn đợt.
