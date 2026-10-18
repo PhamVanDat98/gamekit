@@ -1,5 +1,7 @@
 # Gói build AZGAMES + `builds/{version}/` + hỏi thông tin khi `init` — Kế hoạch triển khai
 
+> **Trạng thái: đã triển khai** (các commit d5e74c0..7db05f3, bản 0.2.0). Giữ lại làm lịch sử; các ô `- [ ]` bên dưới chưa được tick nhưng không phải việc còn mở. Hành vi hiện tại xem README, CHANGELOG và các skill.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `gamekit pack` ra gói đúng bố cục B.1 của AZGAMES trong `builds/<YYMMDDNN>/<portal>/`, vỏ portal dùng chung trong plugin, `init`/`config` hỏi thông tin portal kèm giải thích, game có đa ngôn ngữ tối ưu dung lượng và popup Settings có footer bản quyền.

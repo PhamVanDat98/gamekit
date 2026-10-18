@@ -1,5 +1,12 @@
 # Changelog
 
+## Chưa phát hành
+- `pack` khi có portal chưa điền đủ thông tin: vẫn đóng gói các portal đã đủ, liệt kê mục còn thiếu, thoát mã 1 (trước đây dừng hết). Chưa có token azgames thì thử bằng `pack --portal dev-mock`.
+- `gate`: mục `{auto: pack}` dùng lại bản build mới nhất nếu nó được build từ HEAD, không build lại.
+- `init`/`config --questions` in JSON luôn, bỏ cờ `--json`.
+- Hook SessionStart: npm install lỗi thì chờ 1 ngày mới thử lại (trước đây thử 90 giây mỗi phiên, không báo) và báo lỗi kèm lệnh cài tay; kiểm cả `yaml` và `ajv`; chỉ nhận thư mục có `game.yaml` và `.gamekit/`; đường dẫn `references/` tuyệt đối; bỏ phần trùng với AGENTS.md của game (context nhỏ hơn ~20%).
+- Tài liệu: platform-sdk hướng dẫn tạo bộ vỏ `portals/<id>/`, thêm ghi chú portal azgames; sửa chỗ lệch với code (re-notes, rebuild-game, release-check, standards); README liệt kê skill `status` gợi ý nhưng chưa có.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.
