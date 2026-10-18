@@ -387,6 +387,114 @@ fs.writeFileSync(out, ${JSON.stringify(report)});
   assert.equal(read(dir, 'runs.txt'), 'x');
 });
 
+/**
+ * A stand-in vitest for a game: tests come from .gamekit/local/fake-tests.json ({ name, param?: { file, path, expect, raw? } }); a test
+ * passes while its param (raw: the value at path, else its .value) still holds `expect`. Honours -t like vitest, logs every run's arguments to .gamekit/local/runs.txt (both gitignored).
+ */
+function fakeVitest(dir, tests) {
+  write(dir, '.gamekit/local/fake-tests.json', JSON.stringify(tests));
+  write(dir, 'node_modules/vitest/vitest.mjs', `import fs from 'node:fs';
+const args = process.argv.slice(2);
+fs.appendFileSync('.gamekit/local/runs.txt', JSON.stringify(args) + '\\n');
+const t = args.indexOf('-t');
+const only = t >= 0 ? new RegExp(args[t + 1]) : null;
+const value = (s) => { const v = s.path.split('.').reduce((o, k) => o[k], JSON.parse(fs.readFileSync(s.file, 'utf8'))); return s.raw ? v : v.value; };
+const results = JSON.parse(fs.readFileSync('.gamekit/local/fake-tests.json', 'utf8')).map((s) => ({
+  fullName: s.name, title: s.name,
+  status: only && !only.test(s.name) ? 'skipped' : !s.param || value(s.param) === s.param.expect ? 'passed' : 'failed',
+}));
+const out = args.find((a) => a.startsWith('--outputFile='));
+if (out) {
+  const f = out.slice(13);
+  fs.mkdirSync(f.replace(/[^/]+$/, ''), { recursive: true });
+  fs.writeFileSync(f, JSON.stringify({ testResults: [{ name: 'x', assertionResults: results }] }));
+}
+process.exit(results.some((r) => r.status === 'failed') ? 1 : 0);
+`);
+}
+const runs = (dir) => read(dir, '.gamekit/local/runs.txt').trim().split('\n').map((l) => JSON.parse(l));
+
+test('parity scopes: --obligation, --area, --module run and judge only those obligations; --json', () => {
+  const dir = newGame('pscope');
+  write(dir, 'spec/obligations/hero.yaml', 'obligations:\n  - { id: hero.jump, title: Nhảy, cases: [normal] }\n');
+  write(dir, 're-plan.yaml', 'kind: re\nbase: main\nshared: [re-plan.yaml]\nareas:\n  - { id: hero, owns: [notes/hero/, spec/obligations/hero.yaml], buildModule: core-hero, brief: H }\n');
+  write(dir, 'module-plan.yaml', 'base: main\nshared: [module-plan.yaml]\nmodules:\n  - { id: core-hero, wave: 1, owns: [src/core/hero/], brief: H }\n  - { id: core-move, wave: 1, owns: [src/core/move/], obligations: [player.move], brief: M }\n');
+  fakeVitest(dir, [{ name: '[player.move:normal] a' }, { name: '[player.move:edge] b' }, { name: '[hero.jump:normal] c' }]);
+  let r = gk(dir, 'parity');
+  assert.equal(r.code, 1, 'the whole ledger still has open obligations');
+  r = gk(dir, 'parity', '--obligation', 'player.move');
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /obstacle\.speed/);
+  assert.deepEqual(runs(dir).at(-1).slice(-2), ['-t', '\\[(?:player\\.move):'], 'only the tagged tests of the scope run');
+  assert.equal(gk(dir, 'parity', '--area', 'hero').code, 0);
+  r = gk(dir, 'parity', '--module', 'core-hero');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Parity: module core-hero \(mảng hero\)/);
+  assert.equal(gk(dir, 'parity', '--module', 'core-move').code, 0, 'obligations listed on the module');
+  assert.match(gk(dir, 'parity', '--obligation', 'nope').out, /không có nghĩa vụ nope/);
+  r = gk(dir, 'parity', '--obligation', 'player.move,hero.jump', '--json');
+  const json = JSON.parse(r.out);
+  assert.equal(json.ok, true);
+  assert.deepEqual(json.items.map((i) => i.id).sort(), ['hero.jump', 'player.move']);
+  // module obligations must exist in the ledger
+  write(dir, 'module-plan.yaml', read(dir, 'module-plan.yaml').replace('obligations: [player.move]', 'obligations: [player.fly]'));
+  assert.match(gk(dir, 'validate').out, /core-move: không có nghĩa vụ player\.fly/);
+});
+
+test('parity --mutate: oracle tests must go red when the table changes; params-only checks are a warning; files restored', () => {
+  const dir = newGame('mut');
+  const speed = { file: 'params/game.json', path: 'player.speed', expect: 320 };
+  const row0 = { file: 'spec/oracles/obstacle-speed.json', path: 'cases.0.out', expect: 180, raw: true };
+  const tests = [
+    { name: '[player.move:normal] pinned speed', param: speed },
+    { name: '[player.move:edge] edge', param: speed },
+    { name: '[score.rate:normal] expectation read from params' },
+    { name: '[obstacle.speed:normal] n' },
+    { name: '[obstacle.speed:oracle] compares the table', param: row0 },
+  ];
+  fakeVitest(dir, tests);
+  const before = [read(dir, 'params/game.json'), read(dir, 'spec/oracles/obstacle-speed.json')];
+  let r = gk(dir, 'parity', '--mutate', '--obligation', 'player.move,score.rate,obstacle.speed');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /✔ player\.move × player\.speed: đổi số thì test đỏ/);
+  assert.match(r.out, /⚠ score\.rate × score\.perSecond: vẫn closed khi đổi số — test lấy kỳ vọng từ chính params/);
+  assert.match(r.out, /✔ obstacle\.speed × spec\/oracles\/obstacle-speed\.json: đổi bảng thì test đỏ/);
+  // an oracle test that never reads the table is an error
+  fakeVitest(dir, tests.map((t) => (t.param === row0 ? { name: t.name } : t)));
+  r = gk(dir, 'parity', '--mutate', '--obligation', 'obstacle.speed');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /✘ obstacle\.speed × spec\/oracles\/obstacle-speed\.json: vẫn closed khi đổi bảng oracle — test oracle không thật sự so với bảng/);
+  assert.deepEqual([read(dir, 'params/game.json'), read(dir, 'spec/oracles/obstacle-speed.json')], before, 'files restored');
+});
+
+test('integrate --scoped: each merge runs only its module tests, the full suite once; red at the end undoes the round', () => {
+  const dir = newGame('scoped');
+  write(dir, 'module-plan.yaml', `base: main
+shared: [src/contracts/, params/, package.json, game.yaml, module-plan.yaml]
+modules:
+  - { id: a, wave: 1, owns: [src/core/a/], tests: [tests/core/a], obligations: [player.move], brief: A }
+  - { id: b, wave: 1, owns: [src/core/b/], brief: B }
+`);
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  fakeVitest(dir, [{ name: '[player.move:normal] a' }, { name: '[player.move:edge] b' }]);
+  assert.equal(gk(dir, 'fanout', '--wave', '1').code, 0);
+  const wt = (id) => path.join(path.dirname(dir), 'scoped.worktrees', id);
+  for (const id of ['a', 'b']) commitIn(wt(id), { [`src/core/${id}/x.ts`]: 'export const x = 1;\n' });
+  const head = sh(dir, 'git', 'rev-parse', 'HEAD').trim();
+  let r = gk(dir, 'integrate', '--wave', '1', '--scoped', '--test', 'exit 1');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /a: merge xong, test của module xanh/);
+  assert.match(r.out, /đã hoàn tác cả 2 merge/);
+  assert.equal(sh(dir, 'git', 'rev-parse', 'HEAD').trim(), head);
+  const calls = runs(dir);
+  assert.ok(calls.some((c) => c[0] === 'run' && c[1] === 'tests/core/a'), 'module a: its own test path');
+  assert.ok(calls.some((c) => c.includes('-t')), 'module a: parity of its obligations');
+  r = gk(dir, 'integrate', '--wave', '1', '--scoped', '--test', 'exit 0');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Toàn bộ test xanh sau 2 merge/);
+});
+
 test('provenance: unlabeled assets fail; reference blocked from P3; placeholder blocked at P5', () => {
   const dir = newGame();
   write(dir, 'assets/hero.png', 'x');

@@ -18,7 +18,7 @@ Chạy song song chỉ an toàn khi **contract được chốt trước**. Agent
 4. **Stub**: mỗi module một file export hàm rỗng/throw `not implemented` đúng chữ ký contract, để project build và typecheck được ngay.
 5. **module-plan.yaml** (xem `module-plan.example.yaml` trong game, schema `.gamekit/schemas/module-plan.schema.json`):
    - `shared`: `src/contracts/`, `params/`, `package.json`, `package-lock.json`, `game.yaml`, `module-plan.yaml` và mọi file dùng chung khác — chỉ agent chính sửa.
-   - Mỗi module: `id`, `wave`, `owns` (thư mục, mỗi file một chủ), `dependsOn` (chỉ module ở đợt trước), `contracts`, `tests`, `brief` (trích spec liên quan + tiêu chí parity cụ thể).
+   - Mỗi module: `id`, `wave`, `owns` (thư mục, mỗi file một chủ), `dependsOn` (chỉ module ở đợt trước), `contracts`, `tests`, `obligations` (nghĩa vụ parity module đóng — bỏ trống nếu một mảng của `re-plan.yaml` có `buildModule` trỏ tới module này), `brief` (trích spec liên quan + tiêu chí parity cụ thể).
    - Đợt điển hình: 1 = các `core/*` + `view/ui` trên state giả + asset; 2 = `view/scene`, `view/fx`, input; 3 = tích hợp.
    - `maxParallel`: 3–5.
 6. `gamekit validate` sạch (kiểm tra trùng sở hữu, phụ thuộc sai đợt, đụng vùng shared) → commit lên `main`.

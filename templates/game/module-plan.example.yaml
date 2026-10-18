@@ -13,6 +13,7 @@ modules:
     wave: 1
     owns: [src/core/player/, tests/core/player/]
     contracts: [src/contracts/world.ts, src/contracts/input.ts]
+    obligations: [player.move]   # nghĩa vụ parity module này đóng (parity --module, integrate --scoped)
     tests: [tests/core/player]
     brief: >
       Di chuyển nhân vật theo spec mục 2.1: tốc độ player.speed, giới hạn trong world.width.

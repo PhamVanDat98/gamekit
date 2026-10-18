@@ -33,7 +33,8 @@
           "dependsOn": { "type": "array", "items": { "type": "string" } },
           "brief": { "type": "string", "minLength": 1, "description": "Việc cần làm, trích spec liên quan" },
           "contracts": { "type": "array", "items": { "type": "string" }, "description": "File contract module này dùng" },
-          "tests": { "type": "array", "items": { "type": "string" }, "description": "Đường dẫn test phải xanh" }
+          "tests": { "type": "array", "items": { "type": "string" }, "description": "Đường dẫn test phải xanh" },
+          "obligations": { "type": "array", "items": { "type": "string" }, "description": "Nghĩa vụ parity module này đóng (mặc định: nghĩa vụ của mảng có buildModule trỏ tới module)" }
         }
       }
     }

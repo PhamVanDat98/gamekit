@@ -18,6 +18,9 @@
 - Cổng mảng `gamekit gate --area <id>`: luật P2 (params có nguồn, không TODO, ghi chú đủ năm phần…) chỉ trên file mảng sở hữu, câu hỏi bắt buộc xong, nghĩa vụ của mảng có `source`. Mảng khác chưa xong không chặn; nạp params vào `src/core/params.ts` không tính (việc của agent chính).
 - Mục cổng tự động mới: `{auto: areas}` (mọi mảng của `re-plan.yaml` đã merge và qua cổng mảng), `{auto: merged}` (mọi module đã merge, worktree đã gỡ), `{auto: questions}`. Thẻ `{only: split}` / `{only: single}` theo việc có `re-plan.yaml`. Template: P1 có `{auto: areas}` và `{auto: file:spec/gameplay-spec.md}`, mục `QUESTIONS.md` chỉ cho game không chia mảng; P2 `Mọi module đã merge` là `{auto: merged}`.
 - `gate` chạy các mục auto song song (`pack`, `release-check` vẫn lần lượt, sau cùng); `{auto: test}` và `{auto: parity}` dùng chung một lần vitest khi `npm test` là `vitest run`. Cổng P2 của game demo: 7,4 s → 3,6 s.
+- `parity --area <id> | --module <id> | --obligation a,b`: chỉ chấm và chỉ chạy (vitest `-t`) test của nghĩa vụ trong phạm vi; thẻ của nghĩa vụ ngoài phạm vi không tính là lạ. `--json`. Module nhận nghĩa vụ từ trường mới `obligations` trong `module-plan.yaml` (validate kiểm có thật), hoặc từ mảng có `buildModule` trỏ tới nó.
+- `parity --mutate`: đổi bảng oracle của nghĩa vụ (test oracle phải đỏ, không thì lỗi) và từng số params (vẫn xanh = cảnh báo: kỳ vọng lấy từ chính params). Luôn khôi phục file. Skill parity-check mục 5 viết lại theo đó — hướng dẫn cũ "đổi params thì phải đỏ" sai với test lấy kỳ vọng từ params.
+- `integrate --scoped`: sau mỗi merge chỉ test của module + `parity --module`, cuối lượt chạy toàn bộ một lần; đỏ thì hoàn tác cả lượt.
 - `docs/re-process-review.md`: rà soát quy trình RE và kế hoạch chạy song song.
 
 ## 0.2.0 — 2026-10-16

@@ -406,7 +406,15 @@ function validateModulePlan(root, pr) {
   if (!plan) return;
   const r = checkModulePlan(plan);
   pr.merge(r);
-  if (r.ok) checkLinks(root, plan, 'module-plan.yaml', pr);
+  if (!r.ok) return;
+  checkLinks(root, plan, 'module-plan.yaml', pr);
+  let ids = null;
+  try {
+    ids = new Set((loadObligations(root)?.obligations ?? []).map((o) => o?.id));
+  } catch {
+    // reported by validateObligations
+  }
+  if (ids) for (const m of plan.modules) for (const o of m.obligations ?? []) if (!ids.has(o)) pr.error('module-plan.yaml', `${m.id}: không có nghĩa vụ ${o} trong spec/obligations`);
 }
 
 function validateRePlan(root, pr) {

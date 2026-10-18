@@ -55,6 +55,8 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | `validate [--stage Px]` | Schema `game.yaml`, `params/*.json` (mọi giá trị có `source`; `confidence` = observed/derived/inferred, inferred cần `tolerance` từ P2), `spec/obligations.yaml`, `spec/oracles/*.json`, provenance, `module-plan.yaml`, `asset-manifest.json` |
 | `questions [--area id] [--json]` | Câu hỏi phân tích theo mảng (`notes/<mảng>/questions.yaml`): tiến độ, câu bắt buộc chưa xong (chưa trả lời mà chưa ghi `openReason` + `impact`) |
 | `parity [--report file.json]` | Chạy vitest, đóng từng nghĩa vụ trong `spec/obligations.yaml` bằng test gắn thẻ `[id:case]`. Test đỏ, skip/todo, thiếu case hay thẻ lạ đều tính là chưa đạt |
+| `parity --area id \| --module id \| --obligation a,b [--json]` | Chỉ chấm và chỉ chạy test của nghĩa vụ trong phạm vi |
+| `parity --mutate` | Đổi bảng oracle / số params của từng nghĩa vụ, chạy lại test của nó: oracle phải làm test đỏ (lỗi nếu không); params chỉ cảnh báo |
 | `provenance add <file…> --label …` | Nhãn `reference / generated / own / licensed / placeholder` |
 | `pack [--portal] [--all] [--version V] [--compress] [--zip]` | `builds/<YYMMDDNN>/<portal>/{index.html, preview.html, version.txt, <v>/…}` + `builds/<v>/manifest.json` (+ zip) |
 | `release-check [--version V] [--portal p]` | Mặc định bản mới nhất. Kiểm bố cục az-v1, footer bản quyền, chặn asset reference/placeholder, tên game gốc, link ngoài, đường dẫn tuyệt đối, vượt ngân sách tải |

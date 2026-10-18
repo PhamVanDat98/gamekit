@@ -9,6 +9,7 @@ import { log, GkError, Problems } from './lib/log.mjs';
 import { requireGameRoot, loadGame, ownershipOf } from './lib/game.mjs';
 import { git, isClean, currentBranch, branchExists } from './lib/git.mjs';
 import { checkModulePlan, pathUnder } from './validate.mjs';
+import { parityScope } from './parity.mjs';
 import { branchOf as planBranch, checkRePlan, loadPlan, mergeGrep, mergeMessage, PLAN_FILES, readySet, topo, unitsOf } from './lib/plan.mjs';
 
 export { topo };
@@ -297,6 +298,28 @@ function runTests(root, cmd) {
   return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim().split('\n').slice(-15).join('\n') };
 }
 
+/**
+ * --scoped: right after a module merges, run only its own tests (`tests` paths) and parity of its obligations;
+ * the full suite runs once at the end of the round. Nothing of its own to run → the final run covers it.
+ */
+function scopedTests(root, m) {
+  const steps = [];
+  const vitest = path.join(root, 'node_modules', 'vitest', 'vitest.mjs');
+  if (m.tests?.length && exists(vitest)) steps.push([vitest, 'run', ...m.tests]);
+  try {
+    if (parityScope(root, { module: m.id }).only?.size) steps.push([CLI, 'parity', '--module', m.id]);
+  } catch {
+    // no obligations tied to this module
+  }
+  const outs = [];
+  for (const s of steps) {
+    const r = spawnSync(process.execPath, s, { cwd: root, encoding: 'utf8' });
+    outs.push(`${r.stdout ?? ''}${r.stderr ?? ''}`);
+    if (r.status !== 0) return { ok: false, out: outs.join('\n').trim().split('\n').slice(-15).join('\n') };
+  }
+  return { ok: true, out: '', none: steps.length === 0 };
+}
+
 /** Analysis areas change data, not code: validate is their test. Modules run the game's tests. */
 const defaultTest = (kind) => (kind === 'build' ? 'npm test --silent' : `"${process.execPath}" "${CLI}" validate`);
 
@@ -304,7 +327,7 @@ const defaultTest = (kind) => (kind === 'build' ? 'npm test --silent' : `"${proc
  * Merge one unit; returns null when merged, otherwise { why, pending }. pending = the subagent is not done
  * (uncommitted work, no commit yet). The merge is undone when tests go red.
  */
-function mergeUnit(root, game, plan, kind, m, { testCmd, dryRun }) {
+function mergeUnit(root, game, plan, kind, m, { test, dryRun }) {
   const br = branchOf(m.id, kind);
   const wt = worktreeOf(root, game, m.id, kind);
   if (worktreeDirty(wt)) return { pending: true, why: `worktree còn thay đổi chưa commit (${wt}) — subagent commit trước khi integrate` };
@@ -324,7 +347,7 @@ function mergeUnit(root, game, plan, kind, m, { testCmd, dryRun }) {
     git(root, ['merge', '--abort'], { allowFail: true });
     return { why: `xung đột khi merge — sửa ${kind === 'build' ? 'contract' : 'kế hoạch mảng'} hoặc giao lại, rồi chạy lại integrate` };
   }
-  const t = runTests(root, testCmd);
+  const t = test(m);
   if (!t.ok) {
     git(root, ['reset', '--hard', before]);
     log.info(t.out);
@@ -351,6 +374,8 @@ export async function integrate(args) {
   const kind = kindOf(args);
   const plan = loadPlanOrDie(root, kind);
   const testCmd = args.test ?? defaultTest(kind);
+  const scoped = Boolean(args.scoped) && kind === 'build';
+  const test = scoped ? (m) => scopedTests(root, m) : () => runTests(root, testCmd);
   if (currentBranch(root) !== plan.base) throw new GkError(`Phải đứng ở nhánh ${plan.base} để integrate`);
   if (!isClean(root)) throw new GkError('Working tree chưa sạch');
   const byWave = kind === 'build' && (args.wave !== undefined || !args.ready);
@@ -361,6 +386,7 @@ export async function integrate(args) {
   const failed = new Map(); // id → why; dependents of a failed unit are skipped, not merged
   const blocked = new Map();
   let count = 0;
+  const start = git(root, ['rev-parse', 'HEAD']);
   for (const m of units) {
     if (merged.has(m.id)) {
       log.dim(`${m.id}: đã merge trước đó`);
@@ -375,7 +401,7 @@ export async function integrate(args) {
       blocked.set(m.id, waitOn);
       continue;
     }
-    const res = mergeUnit(root, game, plan, kind, m, { testCmd, dryRun: args['dry-run'] });
+    const res = mergeUnit(root, game, plan, kind, m, { test, dryRun: args['dry-run'] });
     if (res?.pending && !byWave) {
       log.dim(`${m.id}: chưa xong — ${res.why}`); // --ready merges what is done and leaves the rest running
       continue;
@@ -390,7 +416,17 @@ export async function integrate(args) {
     if (args['dry-run']) continue;
     merged.add(m.id);
     count++;
-    log.ok(`${m.id}: merge xong, test xanh`);
+    log.ok(`${m.id}: merge xong, ${scoped ? 'test của module xanh' : 'test xanh'}`);
+  }
+  if (scoped && count) {
+    // Modules passed alone; one full run proves they pass together. Red → undo the whole round, rerun without --scoped to find the culprit.
+    const t = runTests(root, testCmd);
+    if (!t.ok) {
+      git(root, ['reset', '--hard', start]);
+      log.info(t.out);
+      throw new GkError(`Toàn bộ test đỏ sau lượt --scoped — đã hoàn tác cả ${count} merge của lượt này. Chạy lại integrate không có --scoped để tìm module gây lỗi.`);
+    }
+    log.ok(`Toàn bộ test xanh sau ${count} merge`);
   }
   if (args.cleanup && !args['dry-run']) for (const m of units) removeWorktree(root, game, plan, kind, m);
   for (const [id, deps] of blocked) log.warn(`${id}: chờ ${deps.join(', ')} merge${deps.some((d) => failed.has(d)) ? ' (đang lỗi)' : ''}`);

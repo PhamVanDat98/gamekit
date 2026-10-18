@@ -314,7 +314,7 @@ Thứ tự phụ thuộc: **W0** phải xong trước; các gói trong cùng m�
 | **W3 Lập lịch song song** (đã xong, xem 5.0d) | 1 | `scripts/parallel.mjs` | `fanout/integrate --plan re|build --ready`, `--keep-going`, `links:` symlink, chia lượt `maxParallel`, tiền tố nhánh theo kind, brief giàu thông tin | worktree có symlink `decompiled/`; nhánh đỏ không chặn nhánh độc lập; con của nhánh đỏ bị bỏ qua |
 | **W4 Recon** | 1 | `scripts/recon.mjs` (mới), `schemas/inventory.schema.json` | Nhận diện engine, kiểm kê, ghi `notes/inventory.json`, điền `game.yaml` | thư mục giả cho từng engine (Unity Mono, IL2CPP, WebGL, Godot, APK) |
 | **W5 Cổng** (đã xong, xem 5.0f) | 2 (sau W2, W3) | `scripts/gate.mjs`, `templates/game/gates/P1.md`, `P2.md` | `gate --area`; auto `areas`, `questions`, `file:spec/gameplay-spec.md`, `merged` (mọi module đã merge + worktree gỡ); chạy auto song song; dùng chung một lần vitest | cổng mảng qua/không qua; P2 chạy vitest đúng 1 lần |
-| **W6 Parity một phần** | 2 (sau W1) | `scripts/parity.mjs` | `--area`, `--module`, `--json`, `--mutate` | lọc đúng; mutate làm nghĩa vụ đỏ |
+| **W6 Parity một phần** (đã xong, xem 5.0g) | 2 (sau W1) | `scripts/parity.mjs` | `--area`, `--module`, `--json`, `--mutate` | lọc đúng; mutate làm nghĩa vụ đỏ |
 | **W7 Status/next** | 2 (sau W3) | `scripts/status.mjs`, `commands/next.md` | Đơn vị sẵn sàng / đang chạy / chờ integrate / bị chặn; `next` gợi ý giao **nhiều** việc một lượt | output có các nhóm |
 | **W8 Skill** | 3 | `skills/re-plan/` (mới), `skills/re-notes/`, `skills/game-recon/` (mới), `skills/module-plan/`, `skills/integrate/`, `skills/using-gamekit/`, `scripts/lib/phases.mjs` (`AVAILABLE_SKILLS`), `README.md`, `CHANGELOG.md` | Viết theo luồng mới; nêu cách giao song song (Claude Code: nhiều Agent trong một lượt; Codex: mỗi worktree một session) | `tests/skills.test.mjs` (frontmatter) |
 
@@ -368,6 +368,14 @@ Theo `AGENTS.md`: mỗi lệnh mới thêm vào `COMMANDS` + `HELP` trong `scrip
 - `evaluateGate` thành async: mục auto chạy song song qua `lib/proc.mjs` (`runAsync`), trừ `pack` và `release-check` chạy lần lượt sau cùng. `vitestRun` trong `parity.mjs` chạy vitest một lần cho cả `parity` và `test` khi `scripts.test` đúng là `vitest run`; script test khác thì chạy riêng như cũ.
 - Đo trên game demo (máy phiên này): cổng P2 7,4 s → 3,6 s.
 - Lưu ý dùng: một mục cổng chỉ nhận một thẻ `{only: …}`; tên mảng không được trùng nhóm của `params/game.json` (game demo có `world`, `player`, `obstacle`, `score`).
+
+### 5.0g Đã làm: W6 — parity một phần
+
+- `parityScope(root, {area, module, obligation})` → tập id; `evaluateParity({…, only})` chỉ chấm tập đó (thẻ ngoài tập vẫn hợp lệ vì có trong sổ); `runVitest` thêm `-t '\[(?:id1|id2):'` (vitest khớp tên đầy đủ, kể cả `describe` — đã thử với vitest thật trên game demo).
+- `module-plan.yaml`: trường `obligations` (tuỳ chọn); thiếu thì lấy nghĩa vụ trong file của mảng có `buildModule` trỏ tới module.
+- `--mutate` (`mutateParity`): thiết kế ban đầu chỉ đổi params và coi "vẫn xanh" là lỗi. Chạy thật trên game demo cho thấy sai: test lấy kỳ vọng từ chính params đổi theo code nên không bao giờ đỏ (2/6 số "lọt" dù test đúng như skill hướng dẫn). Sửa: đổi **oracle** là kiểm thật (lọt = lỗi); đổi params là thông tin (`self` = cảnh báo). Kết quả trên game demo: 5 bắt được, 0 lọt, 2 chỉ dựa vào params (`player.size`, `score.perSecond`), 2 bỏ qua (không có params/oracle).
+- `integrate --scoped` (`scopedTests`): `vitest run <tests>` + `gamekit parity --module <id>`; cuối lượt `--test` một lần, đỏ thì `reset --hard` về đầu lượt.
+- Chưa làm: tự sinh case oracle; `--mutate` theo từng dòng oracle (hiện đổi cả bảng một lần).
 
 ### 5.1 Tương thích ngược
 

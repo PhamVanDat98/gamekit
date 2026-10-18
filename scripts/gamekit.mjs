@@ -20,6 +20,9 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, re-plan, câu hỏi, asset-manifest
   questions [--area id] [--json]            Câu hỏi phân tích theo mảng (notes/<mảng>/questions.yaml): tiến độ, câu bắt buộc chưa xong
   parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)
+  parity [--area id | --module id | --obligation a,b] [--json] [--mutate]
+                                            Chỉ chấm (và chỉ chạy test của) nghĩa vụ trong phạm vi; --mutate: đổi từng số params
+                                            mà nghĩa vụ dùng, test phải đỏ — chứng minh test chạm tới số đó
   provenance add <file…> --label <nhãn>     Gắn nguồn gốc asset (reference|generated|own|licensed|placeholder)
   provenance list [--label]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
@@ -27,13 +30,14 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   fanout [--plan build|re] [--wave N | --ready] [--dry-run]   Tạo worktree + brief cho module (module-plan.yaml) hoặc mảng phân tích (re-plan.yaml).
                                             --ready: mọi đơn vị có phụ thuộc đã merge, tối đa maxParallel
   check-ownership [--plan] [--module id]    Module/mảng chỉ sửa trong phần được giao (nhận theo nhánh mod/… hoặc re/…)
-  integrate [--plan build|re] [--wave N | --ready] [--keep-going] [--test "cmd"] [--cleanup]
-                                            Merge theo phụ thuộc, test sau mỗi lần (mảng: validate); --keep-going bỏ qua đơn vị lỗi và phụ thuộc của nó
+  integrate [--plan build|re] [--wave N | --ready] [--keep-going] [--scoped] [--test "cmd"] [--cleanup]
+                                            Merge theo phụ thuộc, test sau mỗi lần (mảng: validate); --keep-going bỏ qua đơn vị lỗi và phụ thuộc của nó;
+                                            --scoped: sau mỗi merge chỉ test + parity của module, cuối lượt chạy toàn bộ một lần
   precommit                                 (git hook) chặn asset gốc, code decompile, asset chưa nhãn
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'ready', 'keep-going']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'ready', 'keep-going', 'mutate', 'scoped']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
