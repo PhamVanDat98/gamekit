@@ -1,5 +1,9 @@
 # Changelog
 
+## Chưa phát hành
+- Mã quyết định theo mảng `D-<mảng>-n` (vd `D-player-1`), ghi trong `notes/<mảng>/decisions.md`: các mảng/module chạy song song không còn cùng sửa `DECISIONS.md`, không trùng số. `validate` chặn mã trùng và mã sai mảng; `D-n` trong `DECISIONS.md` giữ như cũ.
+- `docs/re-process-review.md`: rà soát quy trình RE và kế hoạch chạy song song.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.

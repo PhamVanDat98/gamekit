@@ -35,6 +35,7 @@ export function validateGame(root, { stage } = {}) {
   }
   const st = stage ?? Math.max(0, phaseIndex(game.phase));
 
+  validateDecisions(root, pr);
   const paramKeys = validateParams(root, st, pr);
   validateObligations(root, st, pr, paramKeys);
   validateOracles(root, pr);
@@ -58,12 +59,36 @@ export function collectParams(obj, prefix = '', out = []) {
   return out;
 }
 
-export function decisionIds(root) {
-  const f = path.join(root, 'DECISIONS.md');
-  if (!exists(f)) return new Set();
-  const text = fs.readFileSync(f, 'utf8').replace(/```[\s\S]*?```/g, ''); // ignore the template example
-  const ids = text.match(/^#{2,3}\s+(D-\d+)\b/gm) ?? [];
-  return new Set(ids.map((h) => h.replace(/^#+\s+/, '')));
+/** Decision ids: D-n (main agent, DECISIONS.md) or D-<area>-n (one area's own file, so parallel areas never collide). */
+export const DECISION_ID = /^D-(?:([a-z0-9][a-z0-9-]*)-)?\d+$/;
+/** Each area records its decisions in its own file; the main agent keeps DECISIONS.md. */
+const AREA_DECISIONS = /^notes\/([a-z0-9][a-z0-9-]*)\/decisions\.md$/;
+
+/** Every decision heading (## D-… / ### D-…) with the file it is in. Code fences (the template example) are skipped. */
+export function decisionEntries(root) {
+  const files = ['DECISIONS.md', ...walk(path.join(root, 'notes')).map((f) => `notes/${f}`).filter((f) => AREA_DECISIONS.test(f))];
+  const out = [];
+  for (const rel of files) {
+    const f = path.join(root, rel);
+    if (!exists(f)) continue;
+    const text = fs.readFileSync(f, 'utf8').replace(/```[\s\S]*?```/g, '');
+    for (const m of text.matchAll(/^#{2,3}\s+(D-[a-z0-9-]*\d)\b/gm)) out.push({ id: m[1], file: rel });
+  }
+  return out;
+}
+
+export const decisionIds = (root) => new Set(decisionEntries(root).map((e) => e.id));
+
+function validateDecisions(root, pr) {
+  const seen = new Map();
+  for (const { id, file } of decisionEntries(root)) {
+    const area = AREA_DECISIONS.exec(file)?.[1];
+    const prefix = DECISION_ID.exec(id);
+    if (!prefix) pr.error(file, `${id}: mã quyết định phải là D-n hoặc D-<mảng>-n`);
+    else if (area && prefix[1] !== area) pr.error(file, `${id}: quyết định của mảng ${area} phải đặt mã D-${area}-n`);
+    if (seen.has(id)) pr.error(file, `trùng mã quyết định ${id} (đã có trong ${seen.get(id)})`);
+    else seen.set(id, file);
+  }
 }
 
 function validateParams(root, st, pr) {
@@ -92,7 +117,7 @@ function validateParams(root, st, pr) {
         (strict ? pr.error : pr.warn).call(pr, where, `${key}: giá trị ước lượng (inferred) cần tolerance để parity test so được`);
       if (p.deviation) {
         const d = p.deviation;
-        if (!decisions.has(d.decision)) pr.error(where, `${key}: deviation trỏ tới ${d.decision} nhưng DECISIONS.md không có mục này`);
+        if (!decisions.has(d.decision)) pr.error(where, `${key}: deviation trỏ tới ${d.decision} nhưng không có mục này trong DECISIONS.md hay notes/<mảng>/decisions.md`);
         if (!d.approved) (strict ? pr.error : pr.warn).call(pr, where, `${key}: sai khác game gốc chưa được duyệt (${d.decision})`);
       }
     }
@@ -130,8 +155,8 @@ function validateObligations(root, st, pr, paramKeys) {
     for (const k of o.params ?? []) if (!paramKeys.has(k)) pr.error(where, `${o.id}: params ${k} không có trong params/`);
     if (o.oracle && !exists(path.join(root, o.oracle))) pr.error(where, `${o.id}: không có file oracle ${o.oracle}`);
     if ((o.status ?? 'active') !== 'active') {
-      if (!o.decision) pr.error(where, `${o.id}: ${o.status} cần decision D-n trong DECISIONS.md`);
-      else if (!decisions.has(o.decision)) pr.error(where, `${o.id}: trỏ tới ${o.decision} nhưng DECISIONS.md không có mục này`);
+      if (!o.decision) pr.error(where, `${o.id}: ${o.status} cần decision D-n (hoặc D-<mảng>-n) trong DECISIONS.md / notes/<mảng>/decisions.md`);
+      else if (!decisions.has(o.decision)) pr.error(where, `${o.id}: trỏ tới ${o.decision} nhưng không có mục này trong DECISIONS.md hay notes/<mảng>/decisions.md`);
       if (!o.approved) (strict ? pr.error : pr.warn).call(pr, where, `${o.id}: ${o.status} chưa được người dùng duyệt (${o.decision ?? 'thiếu D-n'})`);
     }
   }

@@ -55,7 +55,7 @@ export function evaluateParity({ obligations, tests, decisions = new Set() }) {
     let state;
     if (status !== 'active') {
       state = 'waived';
-      if (!o.decision || !decisions.has(o.decision)) errors.push(`${o.id}: ${status} cần mục ${o.decision ?? 'D-n'} trong DECISIONS.md`);
+      if (!o.decision || !decisions.has(o.decision)) errors.push(`${o.id}: ${status} cần mục ${o.decision ?? 'D-n'} trong DECISIONS.md hoặc notes/<mảng>/decisions.md`);
       else if (!o.approved) errors.push(`${o.id}: ${status} (${o.decision}) chưa được người dùng duyệt`);
     } else if (failing.length) state = 'failed';
     else if (unverified.length) state = 'unknown';

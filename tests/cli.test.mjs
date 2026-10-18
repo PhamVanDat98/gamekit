@@ -65,6 +65,38 @@ test('params: deviation needs a DECISIONS entry and approval from P2', () => {
   assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0);
 });
 
+test('decisions: D-<area>-n lives in notes/<area>/decisions.md; duplicates and wrong-area ids fail', () => {
+  const dir = newGame('dec');
+  editJson(dir, 'params/game.json', (p) => {
+    p.player.speed.deviation = { original: 300, reason: 'cảm ứng', decision: 'D-player-1', approved: true };
+  });
+  write(dir, 'spec/obligations.yaml', 'obligations:\n  - { id: a, title: A, cases: [normal] }\n  - { id: b, title: B, cases: [normal], status: out-of-scope, decision: D-level-gen-2, approved: true }\n');
+  let r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /D-player-1/);
+  assert.match(r.out, /D-level-gen-2/);
+  write(dir, 'notes/player/decisions.md', '# Quyết định mảng player\n\n## D-player-1 Tăng tốc cho cảm ứng\n');
+  write(dir, 'notes/level-gen/decisions.md', '## D-level-gen-2 Bỏ chế độ online\n');
+  r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 0, r.out);
+  // An area only uses its own prefix, so two areas never pick the same number.
+  write(dir, 'notes/level-gen/decisions.md', '## D-level-gen-2 Bỏ chế độ online\n\n## D-3 Số chung\n\n## D-player-4 Mảng khác\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /D-3: quyết định của mảng level-gen phải đặt mã D-level-gen-n/);
+  assert.match(r.out, /D-player-4: quyết định của mảng level-gen/);
+  write(dir, 'notes/level-gen/decisions.md', '## D-level-gen-2 Bỏ chế độ online\n');
+  fs.appendFileSync(path.join(dir, 'DECISIONS.md'), '\n## D-player-1 Chuyển lên file chung nhưng vẫn còn trong mảng\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /trùng mã quyết định D-player-1/);
+  // Schemas still reject malformed ids.
+  editJson(dir, 'params/game.json', (p) => {
+    p.player.speed.deviation.decision = 'D-Player-1';
+  });
+  assert.equal(gk(dir, 'validate').code, 1);
+});
+
 test('provenance: unlabeled assets fail; reference blocked from P3; placeholder blocked at P5', () => {
   const dir = newGame();
   write(dir, 'assets/hero.png', 'x');

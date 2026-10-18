@@ -28,7 +28,7 @@
           "oracle": { "type": "string", "description": "File bảng oracle, vd spec/oracles/pan.json" },
           "source": { "type": "string", "description": "Ghi chú RE mô tả hành vi, vd notes/player.md" },
           "status": { "enum": ["active", "blocked", "out-of-scope"], "default": "active" },
-          "decision": { "type": "string", "pattern": "^D-\\d+$", "description": "Bắt buộc khi blocked/out-of-scope: mục trong DECISIONS.md" },
+          "decision": { "type": "string", "pattern": "^D-([a-z0-9][a-z0-9-]*-)?\\d+$", "description": "Bắt buộc khi blocked/out-of-scope: mục trong DECISIONS.md (D-n) hoặc notes/<mảng>/decisions.md (D-<mảng>-n)" },
           "approved": { "type": "boolean", "description": "Người dùng đã duyệt việc không kiểm chứng nghĩa vụ này" }
         }
       }

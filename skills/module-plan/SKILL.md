@@ -27,6 +27,7 @@ Chạy song song chỉ an toàn khi **contract được chốt trước**. Agent
 ## Giao việc
 - **Claude Code**: trong cùng một lượt, gọi Agent tool cho từng module (song song), prompt: "Làm việc trong thư mục <worktree>. Đọc .gamekit/local/BRIEF.md và làm theo. Dùng TDD cho core/. Trả lời bằng tóm tắt việc đã làm và đề xuất đổi contract nếu có."
 - **Codex**: mỗi worktree một session.
+- Quyết định riêng của module (sai khác game gốc, bỏ một nghĩa vụ) ghi vào `notes/<id>/decisions.md` với mã `D-<id>-n`; subagent không sửa `DECISIONS.md`. Thêm `notes/<id>/` vào `owns` của module.
 - Subagent đề xuất đổi contract → agent chính quyết, sửa trên `main`, rebase/giao lại module bị ảnh hưởng. Subagent không tự sửa vùng shared (`check-ownership` chặn).
 
 Xong đợt → skill **integrate**.

@@ -6,7 +6,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 `source.ownership` trong `game.yaml`: **`own`** (mặc định) = game của người dùng, giữ nguyên hình, âm thanh, tên, text; **`third-party`** = làm lại game người khác, bắt buộc reskin. Không hỏi lại; luật dưới đây ghi rõ chỗ nào khác nhau.
 
 ## Luật cứng
-1. **Dữ liệu và logic gameplay phải bám sát game gốc.** Mọi số gameplay nằm trong `params/*.json`, mỗi giá trị có `source` (file + hàm/offset, hoặc đo từ video). Không tự đặt số. Sai khác chỉ khi web bắt buộc, phải có mục `D-n` trong `DECISIONS.md` và được người dùng duyệt (`deviation.approved: true`).
+1. **Dữ liệu và logic gameplay phải bám sát game gốc.** Mọi số gameplay nằm trong `params/*.json`, mỗi giá trị có `source` (file + hàm/offset, hoặc đo từ video). Không tự đặt số. Sai khác chỉ khi web bắt buộc, phải có mục `D-n` trong `DECISIONS.md` (hoặc `D-<mảng>-n` trong `notes/<mảng>/decisions.md` khi làm theo mảng) và được người dùng duyệt (`deviation.approved: true`).
 2. **Code gốc.** `own`: được dịch logic từ code gốc sang TypeScript, viết lại cho hợp `core/`/`view/`. `third-party`: bám hành vi, không chép code; viết lại từ ghi chú RE trong `notes/`. Cả hai: không commit code gốc hay code decompile vào repo này.
 3. **Asset.** `own`: asset gốc xuất sang định dạng web, đưa vào `assets/`/`public/` với nhãn `own`. `third-party`: asset gốc chỉ là tư liệu trong `reference/` (gitignored). Mọi file trong `assets/` và `public/` phải có nhãn trong `provenance.json` (`gamekit provenance add … --label …`).
 4. **Không tự đánh dấu việc "(bạn)"** trong `gates/*.md` — đó là quyết định của người dùng.
@@ -35,4 +35,4 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Chơi thử bản build | `npm run preview` → `http://localhost:4173/<v>/dev-mock/<v>/index.html` |
 
 ## Nếu bạn là subagent trong một worktree
-Đọc `.gamekit/local/BRIEF.md`. Chỉ sửa trong thư mục được giao; cần đổi contract/params/package.json thì dừng và báo lại. Trước khi xong: test xanh, `npm run gk -- check-ownership` đạt, commit trên nhánh của module.
+Đọc `.gamekit/local/BRIEF.md`. Chỉ sửa trong thư mục được giao; cần đổi contract/params/package.json thì dừng và báo lại. Quyết định của mảng ghi vào `notes/<mảng>/decisions.md` với mã `D-<mảng>-n`, không sửa `DECISIONS.md`. Trước khi xong: test xanh, `npm run gk -- check-ownership` đạt, commit trên nhánh của module.

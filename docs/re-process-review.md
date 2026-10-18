@@ -191,7 +191,7 @@ flowchart TB
   end
   subgraph C[Bước 2 — tích hợp từng mảng khi xong]
     X1 & X2 & X3 & X4 --> IG[gamekit integrate --plan re --ready: check-ownership, validate --area, gate mảng]
-    IG --> SP[agent chính: gộp spec/gameplay-spec.md mục lục, đánh số D-n, chốt contracts]
+    IG --> SP[agent chính: gộp spec/gameplay-spec.md mục lục, chốt contracts]
   end
   subgraph D[Bước 3 — dựng lại theo dây chuyền]
     IG -->|mảng player qua cổng| M1[module core-player]
@@ -212,7 +212,7 @@ Trong khi mảng `economy` còn RE, module `core-player` đã có thể dựng �
 | Oracle | `spec/oracles/*.json` | `spec/oracles/<area>/*.json` (+ trường `area`, `question`) | mảng |
 | Nghĩa vụ | `spec/obligations.yaml` | `spec/obligations/<area>.yaml` — `loadObligations` gộp; giữ đọc file cũ | mảng |
 | Spec | `spec/gameplay-spec.md` | `spec/<area>.md` + `spec/gameplay-spec.md` chỉ là mục lục/core loop | mảng / chính |
-| Quyết định | `DECISIONS.md`, `D-n` tăng dần | Đề xuất trong `notes/<area>/decisions.md` dùng id tạm `D-<area>-n`; agent chính đánh số lại khi gộp — **hoặc** cho phép id `D-<area>-n` hợp lệ luôn (sửa regex `decisionIds` và schema `decision`) | mảng → chính |
+| Quyết định | `DECISIONS.md`, `D-n` tăng dần | **Đã chốt và đã làm (cách 2)**: mảng ghi vào `notes/<area>/decisions.md` với mã cố định `D-<area>-n`; `DECISIONS.md` (`D-n`) chỉ agent chính sửa. `validate` chặn mã trùng và mã sai mảng | mảng |
 | Provenance | `provenance.json` | `provenance/<area>.json` gộp khi đọc (hoặc chỉ agent chính `provenance add` sau integrate) | mảng |
 | Kiểm kê | — | `notes/inventory.json` (do `recon` sinh) | chính |
 | Contracts | `src/contracts/` | giữ: shared, chỉ agent chính | chính |
@@ -310,7 +310,7 @@ Thứ tự phụ thuộc: **W0** phải xong trước; các gói trong cùng m�
 | --- | --- | --- | --- | --- |
 | **W0 Lược đồ chung** | 0 | `schemas/questions.schema.json` (mới), `schemas/module-plan.schema.json` (thêm `kind`, `links`, `areas`/`modules`, `wave` tuỳ chọn), `scripts/lib/plan.mjs` (mới: `loadPlan(root, kind)`, `units()`, `readySet()`, `branchOf(kind,id)`) | Chốt định dạng; giữ tương thích `module-plan.yaml` cũ | plan cũ vẫn hợp lệ; DAG vòng bị chặn; `readySet` đúng |
 | **W1 Params/obligations nhiều file** | 1 | `scripts/validate.mjs` (params, obligations), `templates/game/src/core/params.ts`, `templates/game/spec/` | `loadObligations` gộp `spec/obligations.yaml` + `spec/obligations/*.yaml`; báo trùng khoá params giữa file; `params.ts` gộp `import.meta.glob('../../params/*.json', {eager:true})` theo tên file (giữ `game.json` gộp ở gốc để tương thích) | trùng khoá lỗi; game thử: test/typecheck/lint/pack xanh |
-| **W2 Câu hỏi & ghi chú** | 1 | `scripts/questions.mjs` (mới), `scripts/validate.mjs` (phần notes — tách thành `scripts/lib/validate-notes.mjs` để không đụng W1), `templates/game/notes/` | Đọc `notes/**/questions.yaml` (và cảnh báo nếu còn `QUESTIONS.md` kiểu cũ); kiểm liên kết; kiểm frontmatter ghi chú; lệnh `questions` | câu `answered` không có ghi chú → lỗi; `openReason` bắt buộc khi đóng |
+| **W2 Câu hỏi & ghi chú** (mã quyết định theo mảng đã xong, xem 5.0) | 1 | `scripts/questions.mjs` (mới), `scripts/validate.mjs` (phần notes — tách thành `scripts/lib/validate-notes.mjs` để không đụng W1), `templates/game/notes/` | Đọc `notes/**/questions.yaml` (và cảnh báo nếu còn `QUESTIONS.md` kiểu cũ); kiểm liên kết; kiểm frontmatter ghi chú; lệnh `questions` | câu `answered` không có ghi chú → lỗi; `openReason` bắt buộc khi đóng |
 | **W3 Lập lịch song song** | 1 | `scripts/parallel.mjs` | `fanout/integrate --plan re|build --ready`, `--keep-going`, `links:` symlink, chia lượt `maxParallel`, tiền tố nhánh theo kind, brief giàu thông tin | worktree có symlink `decompiled/`; nhánh đỏ không chặn nhánh độc lập; con của nhánh đỏ bị bỏ qua |
 | **W4 Recon** | 1 | `scripts/recon.mjs` (mới), `schemas/inventory.schema.json` | Nhận diện engine, kiểm kê, ghi `notes/inventory.json`, điền `game.yaml` | thư mục giả cho từng engine (Unity Mono, IL2CPP, WebGL, Godot, APK) |
 | **W5 Cổng** | 2 (sau W2, W3) | `scripts/gate.mjs`, `templates/game/gates/P1.md`, `P2.md` | `gate --area`; auto `areas`, `questions`, `file:spec/gameplay-spec.md`, `merged` (mọi module đã merge + worktree gỡ); chạy auto song song; dùng chung một lần vitest | cổng mảng qua/không qua; P2 chạy vitest đúng 1 lần |
@@ -319,6 +319,13 @@ Thứ tự phụ thuộc: **W0** phải xong trước; các gói trong cùng m�
 | **W8 Skill** | 3 | `skills/re-plan/` (mới), `skills/re-notes/`, `skills/game-recon/` (mới), `skills/module-plan/`, `skills/integrate/`, `skills/using-gamekit/`, `scripts/lib/phases.mjs` (`AVAILABLE_SKILLS`), `README.md`, `CHANGELOG.md` | Viết theo luồng mới; nêu cách giao song song (Claude Code: nhiều Agent trong một lượt; Codex: mỗi worktree một session) | `tests/skills.test.mjs` (frontmatter) |
 
 Theo `AGENTS.md`: mỗi lệnh mới thêm vào `COMMANDS` + `HELP` trong `scripts/gamekit.mjs` và có test trong `tests/cli.test.mjs`; sửa template thì tạo game thử và chạy test / typecheck / lint / pack / release-check của nó; `npm test` trước khi commit.
+
+### 5.0 Đã làm: mã quyết định theo mảng
+
+- Mã hợp lệ: `D-n` hoặc `D-<mảng>-n` (`<mảng>` theo dạng id module: `[a-z0-9][a-z0-9-]*`) — `schemas/params.schema.json`, `schemas/obligations.schema.json`, `DECISION_ID` trong `scripts/validate.mjs`.
+- Nguồn: `DECISIONS.md` + mọi `notes/<mảng>/decisions.md` (`decisionEntries`); `params.deviation.decision` và `obligations[].decision` tra trong cả hai.
+- `validate`: mã trùng (cùng file hay khác file) là lỗi; trong `notes/<mảng>/decisions.md` chỉ được dùng `D-<mảng>-n` của chính mảng đó.
+- Agent chính vẫn có thể chuyển một quyết định sang `DECISIONS.md` mà giữ nguyên mã.
 
 ### 5.1 Tương thích ngược
 
@@ -331,7 +338,7 @@ Theo `AGENTS.md`: mỗi lệnh mới thêm vào `COMMANDS` + `HELP` trong `scrip
 - **Contract trôi**: mảng RE song song có thể dùng đơn vị khác nhau (px/frame vs px/s). Giảm bằng: `re-plan.yaml` chốt đơn vị chuẩn và `fixedStepHz` từ bước 0; `validate` bắt `unit` khác nhau cho cùng tên tham số ở các mảng.
 - **Oracle tự sinh**: oracle `derived` do chính agent của mảng suy ra rồi dùng để test chính code của mình — giữ cảnh báo của skill parity-check; nên để agent **khác** (mảng khác hoặc agent chính) review oracle `derived` trước khi cổng mảng qua.
 - **Luật third-party**: symlink `reference/`, `decompiled/` vào worktree không làm chúng bị commit (vẫn gitignored, `precommit` vẫn chặn), nhưng `check-ownership` cần bỏ qua đường dẫn symlink; luật "chỉ phân tích tĩnh" áp cho mọi subagent — đưa vào brief.
-- **`DECISIONS.md` đánh số**: chọn một trong hai phương án ở 4.3 trước khi code W2/W5.
+- **`DECISIONS.md` đánh số**: đã chốt mã `D-<mảng>-n` (xem 4.3, mục 5.0).
 
 ---
 

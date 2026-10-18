@@ -22,7 +22,7 @@ Parity không phải cảm giác "chơi thấy giống". Nó là danh sách ngh�
 - Chia theo hành vi, không theo file code. Một nghĩa vụ nên kiểm chứng được bằng vài test.
 - `cases`: `normal` (giá trị điển hình) · `edge` (biên: tường, máu 0, max level, dt lớn) · `invalid` (input sai, save hỏng) · `oracle` (bảng từ game gốc) · `replay` (luồng chơi ghi lại).
 - `required: false` cho thứ có thì tốt (hiệu ứng phụ). Mặc định là bắt buộc.
-- Không làm được hoặc không làm: `status: blocked | out-of-scope`, kèm `decision: D-n` trong `DECISIONS.md`. Chỉ người dùng đặt `approved: true`. Nghĩa vụ bỏ qua được ghi lại, **không bao giờ tính là đã đóng**.
+- Không làm được hoặc không làm: `status: blocked | out-of-scope`, kèm `decision: D-n` trong `DECISIONS.md` (hoặc `D-<mảng>-n` trong `notes/<mảng>/decisions.md`). Chỉ người dùng đặt `approved: true`. Nghĩa vụ bỏ qua được ghi lại, **không bao giờ tính là đã đóng**.
 
 `gamekit validate` kiểm tra schema, id trùng, `params` có tồn tại, file oracle có thật.
 
