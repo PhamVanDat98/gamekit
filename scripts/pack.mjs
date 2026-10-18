@@ -5,12 +5,12 @@ import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
-import { exists, walk, writeJson } from './lib/io.mjs';
+import { exists, readJson, walk, writeJson } from './lib/io.mjs';
 import { log, GkError } from './lib/log.mjs';
 import { requireGameRoot, loadGame, nowIso } from './lib/game.mjs';
 import { git } from './lib/git.mjs';
-import { checkVersion, nextVersion } from './lib/version.mjs';
-import { checkSetting, loadPortal, missingSettings } from './lib/portals.mjs';
+import { checkVersion, latestVersion, nextVersion } from './lib/version.mjs';
+import { PORTALS_DIR, checkSetting, loadPortal, missingSettings } from './lib/portals.mjs';
 import { loadLanguages } from './lib/languages.mjs';
 import { assemblePortal } from './lib/assemble.mjs';
 import { initialLoadBytes } from './lib/budget.mjs';
@@ -45,6 +45,42 @@ function buildError(text = '') {
 
 /** Paths whose edits don't change the build (checklists, notes) — not counted as "dirty". */
 const DOC_PATHS = [':!gates', ':!notes', ':!spec', ':!DECISIONS.md', ':!game.yaml', ':!provenance.json'];
+
+/** Commit a build would come from, and whether code/assets have uncommitted edits. */
+export function buildState(root) {
+  const commit = git(root, ['rev-parse', '--short', 'HEAD'], { allowFail: true }) ?? 'nogit';
+  const dirty = (git(root, ['status', '--porcelain', '--', '.', ...DOC_PATHS], { allowFail: true }) ?? '') !== '';
+  return { commit, dirty };
+}
+
+/**
+ * Fingerprint of what a build reads besides the committed code: game.yaml (minus progress fields that
+ * gate --advance writes), the portal kits and the plugin version. game.yaml is outside DOC_PATHS' dirty check,
+ * so an uncommitted title or portal setting still changes this.
+ */
+export function buildInputs(game, kits) {
+  const { phase, gates, timings, ...rest } = game;
+  const h = crypto.createHash('sha256').update(JSON.stringify(rest));
+  h.update(readJson(path.join(PORTALS_DIR, '..', 'package.json')).version);
+  for (const dir of [path.join(PORTALS_DIR, 'shared'), ...kits.map((k) => k.dir)]) h.update(`${path.basename(dir)}\0${hashDir(dir)}`);
+  return h.digest('hex').slice(0, 16);
+}
+
+/** The latest build when it already matches HEAD, a clean tree and the current inputs — gate need not pack again. */
+export function reusableBuild(root, game) {
+  const buildsDir = path.join(root, 'builds');
+  const version = latestVersion(exists(buildsDir) ? fs.readdirSync(buildsDir) : []);
+  if (!version) return null;
+  try {
+    const man = readJson(path.join(buildsDir, version, 'manifest.json'));
+    const { commit, dirty } = buildState(root);
+    if (dirty || man.dirty || commit === 'nogit' || man.commit !== commit) return null;
+    if (!game.portals.every((p) => man.portals?.[p] && exists(path.join(buildsDir, version, p)))) return null;
+    return man.inputs === buildInputs(game, game.portals.map((p) => loadPortal(p))) ? version : null;
+  } catch {
+    return null;
+  }
+}
 
 /** esbuild + javascript-obfuscator from the game's node_modules — the plugin itself depends only on yaml and ajv. */
 export function gameTools(root) {
@@ -102,10 +138,10 @@ export async function run(args) {
   const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
   if (!exists(viteBin)) throw new GkError('Game chưa cài vite — chạy npm install');
   const languages = loadLanguages(root);
-  const commit = git(root, ['rev-parse', '--short', 'HEAD'], { allowFail: true }) ?? 'nogit';
-  const dirty = (git(root, ['status', '--porcelain', '--', '.', ...DOC_PATHS], { allowFail: true }) ?? '') !== '';
+  const { commit, dirty } = buildState(root);
   const base = path.join(buildsDir, version);
-  const manifest = { name: game.name, title: game.title, semver: game.version, version, commit, dirty, builtAt: nowIso(), portals: {} };
+  const inputs = buildInputs(game, kits);
+  const manifest = { name: game.name, title: game.title, semver: game.version, version, commit, dirty, inputs, builtAt: nowIso(), portals: {} };
 
   try {
     for (const kit of kits) {

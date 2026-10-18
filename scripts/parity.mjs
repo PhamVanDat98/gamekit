@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { exists, readJson } from './lib/io.mjs';
+import { runAsync } from './lib/run.mjs';
 import { log, GkError } from './lib/log.mjs';
 import { requireGameRoot } from './lib/game.mjs';
 import { check } from './lib/schema.mjs';
@@ -72,12 +73,15 @@ export function evaluateParity({ obligations, tests, decisions = new Set() }) {
 
 const REPORT = '.gamekit/local/parity-report.json';
 
-function runVitest(root) {
+function vitestArgs(root) {
   fs.rmSync(path.join(root, REPORT), { force: true });
   // vitest's own bin with this node — no npx, no shell, so paths with spaces stay one argument.
   const bin = path.join(root, 'node_modules', 'vitest', 'vitest.mjs');
   if (!exists(bin)) throw new GkError('Game chưa cài vitest — chạy npm install');
-  const r = spawnSync(process.execPath, [bin, 'run', '--reporter=json', `--outputFile=${REPORT}`], { cwd: root, encoding: 'utf8' });
+  return [bin, 'run', '--reporter=json', `--outputFile=${REPORT}`];
+}
+
+function readReport(root, r) {
   if (!exists(path.join(root, REPORT))) {
     const tail = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim().split('\n').slice(-3).join(' | ');
     throw new GkError(`vitest không tạo được báo cáo (exit ${r.status}): ${tail}`);
@@ -85,13 +89,18 @@ function runVitest(root) {
   return readJson(path.join(root, REPORT));
 }
 
-/** Evaluate a game: its ledger against a vitest JSON report (given, or produced by running vitest). */
-export function parityForGame(root, { report, cwd = root } = {}) {
+const runVitest = (root) => readReport(root, spawnSync(process.execPath, vitestArgs(root), { cwd: root, encoding: 'utf8' }));
+
+/** One vitest run as a JSON report — gate shares it between parity and test. */
+export const runVitestAsync = async (root) => readReport(root, await runAsync(process.execPath, vitestArgs(root), { cwd: root }));
+
+/** Evaluate a game: its ledger against a vitest JSON report (`json` already loaded, a `report` file, or a fresh vitest run). */
+export function parityForGame(root, { report, json, cwd = root } = {}) {
   const data = loadObligations(root);
   if (!data) throw new GkError(`Chưa có ${OBLIGATIONS_FILE}: liệt kê cơ chế của game gốc thành nghĩa vụ (skill parity-check)`);
   const errs = check('obligations', data);
   if (errs.length) throw new GkError(`${OBLIGATIONS_FILE}: ${errs.join('; ')}`);
-  const json = report ? readJson(path.resolve(cwd, report)) : runVitest(root);
+  json ??= report ? readJson(path.resolve(cwd, report)) : runVitest(root);
   return evaluateParity({ obligations: data.obligations, tests: testsFromVitestReport(json), decisions: decisionIds(root) });
 }
 

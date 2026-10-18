@@ -1,5 +1,12 @@
 # Changelog
 
+## Chưa phát hành
+Tốc độ:
+- `gate` chạy các kiểm tra tự động song song (test, typecheck, lint, pack); `release-check` chờ `pack` của cùng cổng. Cổng P2 của game mẫu: ~6s → ~3s.
+- Cổng có cả `parity` và `test` chỉ chạy vitest một lần khi `npm test` là `vitest run` của template; `npm test` tự sửa thì vẫn chạy riêng.
+- `gate` ở P4/P5 dùng lại bản build mới nhất khi nó đúng commit HEAD, cây sạch và cùng đầu vào (`game.yaml` trừ phase/gates/timings, bộ vỏ portal, version plugin — ghi ở `manifest.json` `inputs`); trước đây mỗi lần chạy `gate` đóng gói và tốn một số build. `gamekit pack` vẫn luôn đóng gói mới.
+- Test của plugin tách thành nhiều file (`cli`, `validate`, `provenance`, `gate`, `parallel`) để chạy song song.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.
