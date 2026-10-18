@@ -14,8 +14,8 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 6. **Mọi text hiển thị đi qua `t()`** và `Language/en.json` (+ các ngôn ngữ khác), không viết cứng trong `src/`.
 
 ## Cấu trúc
-- `src/core/` logic thuần, deterministic: không DOM, không thư viện render, thời gian từ fixed step, ngẫu nhiên từ `Rng` có seed. **Viết test trước** (TDD).
-- `src/view/` render và input thiết bị; chỉ đọc state. Kiểm tra bằng screenshot/checklist, không unit test.
+- `src/core/` logic thuần, deterministic: không DOM, không thư viện render, thời gian từ fixed step, ngẫu nhiên từ `Rng` có seed. **Viết test trước** (TDD). `npm run lint` và `npm run typecheck` (lượt thứ hai với `tsconfig.core.json`, không có DOM) chặn phần lớn vi phạm.
+- `src/view/` render và input thiết bị; chỉ đọc state. Phần vẽ/input kiểm tra bằng screenshot/checklist; hàm thuần (vd `translate` trong `i18n.ts`) có unit test trong `tests/view/`.
 - `src/platform/` interface chung cho mọi portal. Gameplay chỉ gọi `Platform`; adapter nằm trong `src/platform/adapters/`. Event analytics chỉ dùng tên trong `src/platform/events.ts`.
 - `src/contracts/` type dùng chung giữa các module — chỉ agent chính sửa.
 - `Language/` mỗi ngôn ngữ một file (`en.json` bắt buộc) · `public/Icons/` (`web.png`, `loading.webp`) · `builds/` đầu ra của pack (gitignored, không commit).

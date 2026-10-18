@@ -4,7 +4,7 @@ import tseslint from 'typescript-eslint';
 const RENDER_LIBS = ['pixi.js', 'pixi.js/*', 'phaser', 'three', 'three/*', '@babylonjs/*', 'howler'];
 
 export default tseslint.config(
-  { ignores: ['builds/', 'node_modules/', 'scripts/', '.gamekit/', 'reference/', 'decompiled/'] },
+  { ignores: ['builds/', 'dist/', 'node_modules/', 'scripts/', '.gamekit/', 'reference/', 'decompiled/'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

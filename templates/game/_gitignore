@@ -1,5 +1,6 @@
 node_modules
 builds/
+dist/
 # Tư liệu từ game gốc: chỉ để tham khảo, không bao giờ commit hay đóng gói
 reference/
 decompiled/
