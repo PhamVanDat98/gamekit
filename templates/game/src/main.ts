@@ -1,6 +1,6 @@
 import './view/style.css';
 import { InputState } from './core/input';
-import { advance, createFixedStep } from './core/loop';
+import { FIXED_HZ, advance, createFixedStep } from './core/loop';
 import { PARAMS } from './core/params';
 import { createWorld, stepWorld } from './core/world';
 import { t } from './view/i18n';
@@ -10,7 +10,6 @@ import { mountSettings } from './view/settings';
 import { BUILD_ID, PauseBus, bootPlatform } from './platform';
 import { installWebGuard } from './platform/web-guard';
 
-const FIXED_HZ = 60;
 const MS = 1000;
 /** After game over, taps are ignored this long so a tap meant for the dying round never restarts it and opens an ad. */
 const RESTART_DELAY_MS = 600;
@@ -35,10 +34,17 @@ async function main(): Promise<void> {
   if (import.meta.env.DEV) (await import('./platform/dev-loader')).installDevLoader();
   const { stage, canvas } = ensureStage();
   const devLoader = document.getElementById('loader'); // only in index.html for npm run dev
+  const devBar = document.getElementById('loader-bar');
 
   const bus = new PauseBus();
   const platform = await bootPlatform(bus);
-  platform.loadingProgress(0.5);
+  const progress = (p: number) => {
+    platform.loadingProgress(p);
+    const pct = String(Math.round(p * 100));
+    if (devBar) devBar.style.width = `${pct}%`;
+    devLoader?.setAttribute('aria-valuenow', pct);
+  };
+  progress(0.5);
   installWebGuard({ bus, platform, focusEl: canvas, buildId: BUILD_ID });
   mountSettings(stage, {
     copyright: platform.info.copyright,
@@ -52,7 +58,13 @@ async function main(): Promise<void> {
   const renderer = new Renderer(canvas, PARAMS);
   const input = new InputState();
   const step = createFixedStep(FIXED_HZ);
-  let world = createWorld(PARAMS, Date.now() >>> 0);
+  const newSeed = () => {
+    const seed = Date.now() >>> 0;
+    // Dev only: a bug seen while playing can be replayed with createWorld(PARAMS, seed) in a test.
+    if (import.meta.env.DEV) console.debug(`[gamekit] seed ${seed}`);
+    return seed;
+  };
+  let world = createWorld(PARAMS, Date.now() >>> 0); // shown behind "tap to start", never played
   let state: 'ready' | 'playing' | 'over' = 'ready';
   let round = 0;
   let overAt = 0;
@@ -68,7 +80,7 @@ async function main(): Promise<void> {
       // Ads only between rounds, never while the player is acting.
       await platform.interstitial('round_end');
     }
-    world = createWorld(PARAMS, Date.now() >>> 0);
+    world = createWorld(PARAMS, newSeed());
     state = 'playing';
     round++;
     input.clear();
@@ -77,7 +89,7 @@ async function main(): Promise<void> {
   };
   bindInput(canvas, input, () => void start());
 
-  platform.loadingProgress(1);
+  progress(1);
   devLoader?.remove();
   platform.loadingEnd();
   canvas.focus();

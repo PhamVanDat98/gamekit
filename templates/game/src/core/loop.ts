@@ -8,6 +8,10 @@ export interface FixedStep {
   accumulator: number;
 }
 
+/** Simulation rate. main.ts and the replay tests both use it, so recordings replay at the same step. */
+// eslint-disable-next-line no-restricted-syntax -- technical simulation rate, not a gameplay number
+export const FIXED_HZ = 60;
+
 export function createFixedStep(hz: number, maxStepsPerFrame = 5): FixedStep {
   if (hz <= 0) throw new Error('hz must be > 0');
   return { stepSec: 1 / hz, maxStepsPerFrame, accumulator: 0 };
