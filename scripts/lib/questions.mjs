@@ -4,7 +4,9 @@ import readline from 'node:readline';
 import { GkError } from './log.mjs';
 import { checkSetting, listPortals, loadPortal } from './portals.mjs';
 
-export const ENGINES = ['unknown', 'unity', 'cocos', 'godot', 'unreal', 'flash', 'construct', 'laya', 'html5', 'other'];
+export const ENGINES = [
+  'unknown', 'unity', 'unreal', 'godot', 'cocos', 'flash', 'construct', 'laya', 'egret', 'playcanvas', 'html5', 'gamemaker', 'rpgmaker', 'renpy', 'defold', 'love2d', 'monogame', 'libgdx', 'openfl', 'solar2d', 'flutter', 'react-native', 'android-native', 'ios-native', 'native', 'other',
+];
 export const LANGUAGE_NAMES = {
   en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', it: 'Italiano', pt: 'Português', 'pt-br': 'Português (Brasil)',
   ru: 'Русский', tr: 'Türkçe', pl: 'Polski', vi: 'Tiếng Việt', id: 'Bahasa Indonesia', th: 'ไทย', ja: '日本語', ko: '한국어',
@@ -14,7 +16,7 @@ const LANG_PATTERN = '^[a-z]{2,3}(-[a-z0-9]{2,8})*$';
 
 const CORE_QUESTIONS = () => [
   { key: 'title', label: 'Tên game', description: 'Tên hiển thị của bản web. Game của bạn: giữ tên gốc được. Làm lại game người khác (init --third-party): phải đặt tên mới.', default: '{{TITLE}}', required: true },
-  { key: 'engine', label: 'Engine của game gốc', description: `Engine game gốc dùng, để GameKit gợi ý skill phân tích. Một trong: ${ENGINES.join(', ')}.`, default: 'unknown', required: true, enum: ENGINES },
+  { key: 'engine', label: 'Engine của game gốc', description: `Engine game gốc dùng, để GameKit gợi ý skill phân tích. Chưa biết thì để unknown: \`gamekit recon --write\` sẽ nhận diện từ bản build. Một trong: ${ENGINES.join(', ')}.`, default: 'unknown', required: true, enum: ENGINES },
   { key: 'sourcePath', label: 'Đường dẫn game gốc', description: 'Thư mục bản game gốc trên máy — chỉ để phân tích, không bao giờ đóng gói. Để trống nếu chưa có.', required: false },
   { key: 'portals', label: 'Portal phát hành', description: `Các portal sẽ phát hành, cách nhau dấu phẩy. Có: ${listPortals().filter((p) => p !== 'dev-mock').join(', ')}. dev-mock luôn có sẵn để chạy thử.`, default: 'azgames', type: 'list', required: true },
   { key: 'language', label: 'Ngôn ngữ mặc định', description: 'Ngôn ngữ cho người chơi mới khi không đoán được từ trình duyệt. Mã BCP 47 viết thường (en, es, pt-br) — phải có file Language/<mã>.json.', default: 'en', required: true, pattern: LANG_PATTERN },

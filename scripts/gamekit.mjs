@@ -15,6 +15,8 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   init <tên> --questions --json             In danh sách câu hỏi kèm giải thích (cho agent hỏi người dùng)
   config [--portal p] [--set k=v…] [--questions --json]   Điền thông tin portal còn thiếu, thêm portal
   status | next                             Game đang ở pha nào, việc gì tiếp
+  recon [đường dẫn] [--json] [--write]      Nhận diện bản build gốc (APK, XAPK, IPA, Steam, exe, .app, web, Electron…): engine,
+                                            nơi chứa logic/data, công cụ. Mặc định source.path; --write ghi notes/recon.md
   gate [--advance]                          Kiểm tra cổng của pha hiện tại
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
   parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)
@@ -29,7 +31,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'write']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -52,6 +54,7 @@ const COMMANDS = {
   config: () => import('./config.mjs').then((m) => m.run),
   status: () => import('./status.mjs').then((m) => m.run),
   next: () => import('./status.mjs').then((m) => m.run),
+  recon: () => import('./recon.mjs').then((m) => m.run),
   gate: () => import('./gate.mjs').then((m) => m.run),
   validate: () => import('./validate.mjs').then((m) => m.run),
   parity: () => import('./parity.mjs').then((m) => m.run),

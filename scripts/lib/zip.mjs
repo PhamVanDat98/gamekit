@@ -84,3 +84,95 @@ export function zipDir(dir, outFile) {
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, Buffer.concat([...locals, ...central, eocd]));
 }
+
+// ---------- Reading (gamekit recon): APK, XAPK, IPA, AAB, OBB… are zips ----------
+// Reads only the central directory, so a multi-GB OBB costs a few reads. Zip64 supported.
+
+/** Random-access source over a file on disk or a Buffer (an archive nested in another). */
+export function zipSource(fileOrBuffer) {
+  if (Buffer.isBuffer(fileOrBuffer)) {
+    const buf = fileOrBuffer;
+    return { size: buf.length, read: (pos, len) => buf.subarray(pos, pos + len), close() {} };
+  }
+  const fd = fs.openSync(fileOrBuffer, 'r');
+  const size = fs.fstatSync(fd).size;
+  return {
+    size,
+    read(pos, len) {
+      const out = Buffer.alloc(Math.max(0, Math.min(len, size - pos)));
+      fs.readSync(fd, out, 0, out.length, pos);
+      return out;
+    },
+    close: () => fs.closeSync(fd),
+  };
+}
+
+/** True when the bytes at the start look like a zip (local header or empty archive). */
+export const looksLikeZip = (head) => head.length >= 4 && head.readUInt32LE(0) === 0x04034b50;
+
+/** Entries of a zip: [{ name, size, compressedSize, method, offset }]. Throws on a broken archive. */
+export function listZip(src) {
+  const tailLen = Math.min(src.size, 22 + 0xffff);
+  const tail = src.read(src.size - tailLen, tailLen);
+  let e = -1;
+  for (let i = tail.length - 22; i >= 0; i--) if (tail.readUInt32LE(i) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new GkError('không phải file zip hợp lệ (không thấy central directory)');
+  let count = tail.readUInt16LE(e + 10);
+  let cdSize = tail.readUInt32LE(e + 12);
+  let cdOffset = tail.readUInt32LE(e + 16);
+  if (count === 0xffff || cdSize === LIMIT || cdOffset === LIMIT) {
+    const loc = e - 20; // zip64 end of central directory locator
+    if (loc < 0 || tail.readUInt32LE(loc) !== 0x07064b50) throw new GkError('zip64 hỏng (thiếu locator)');
+    const rec = src.read(Number(tail.readBigUInt64LE(loc + 8)), 56);
+    if (rec.readUInt32LE(0) !== 0x06064b50) throw new GkError('zip64 hỏng (thiếu end record)');
+    count = Number(rec.readBigUInt64LE(32));
+    cdSize = Number(rec.readBigUInt64LE(40));
+    cdOffset = Number(rec.readBigUInt64LE(48));
+  }
+  const cd = src.read(cdOffset, cdSize);
+  const out = [];
+  for (let p = 0, n = 0; n < count && p + 46 <= cd.length; n++) {
+    if (cd.readUInt32LE(p) !== 0x02014b50) throw new GkError('central directory của zip hỏng');
+    const method = cd.readUInt16LE(p + 10);
+    let compressedSize = cd.readUInt32LE(p + 20);
+    let size = cd.readUInt32LE(p + 24);
+    const nameLen = cd.readUInt16LE(p + 28);
+    const extraLen = cd.readUInt16LE(p + 30);
+    const commentLen = cd.readUInt16LE(p + 32);
+    let offset = cd.readUInt32LE(p + 42);
+    const name = cd.toString('utf8', p + 46, p + 46 + nameLen);
+    // zip64 extra field: only the values that overflowed are present, in this order.
+    for (let x = p + 46 + nameLen, end = x + extraLen; x + 4 <= end; ) {
+      const id = cd.readUInt16LE(x);
+      const len = cd.readUInt16LE(x + 2);
+      if (id === 0x0001) {
+        let q = x + 4;
+        const next = () => {
+          const v = Number(cd.readBigUInt64LE(q));
+          q += 8;
+          return v;
+        };
+        if (size === LIMIT) size = next();
+        if (compressedSize === LIMIT) compressedSize = next();
+        if (offset === LIMIT) offset = next();
+      }
+      x += 4 + len;
+    }
+    if (!name.endsWith('/')) out.push({ name, size, compressedSize, method, offset });
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return out;
+}
+
+/** Bytes of one entry (stored or deflate). `limit` caps how much is inflated (enough to sniff a header). */
+export function readZipEntry(src, entry, { limit = Infinity } = {}) {
+  const head = src.read(entry.offset, 30);
+  if (head.readUInt32LE(0) !== 0x04034b50) throw new GkError(`${entry.name}: local header của zip hỏng`);
+  const start = entry.offset + 30 + head.readUInt16LE(26) + head.readUInt16LE(28);
+  if (entry.method === 0) return src.read(start, Math.min(entry.size, limit));
+  if (entry.method !== 8) throw new GkError(`${entry.name}: kiểu nén ${entry.method} chưa hỗ trợ`);
+  if (limit >= entry.size) return zlib.inflateRawSync(src.read(start, entry.compressedSize));
+  // Enough to sniff a header: deflate never shrinks below ~1 output byte per input byte, so
+  // inflating the first `limit` compressed bytes (sync flush: no error on a cut stream) is plenty.
+  return zlib.inflateRawSync(src.read(start, Math.min(entry.compressedSize, limit)), { finishFlush: zlib.constants.Z_SYNC_FLUSH }).subarray(0, limit);
+}

@@ -16,6 +16,36 @@ export const SHIPPED_DIRS = ['assets', 'public'];
 /** Folders that must never be committed or packaged. */
 export const FORBIDDEN_DIRS = ['reference', 'decompiled', 'builds', '.gamekit/ghidra', '.gamekit/local'];
 
+/**
+ * Files of an original build or its decompiled code: never committed, wherever they sit
+ * (they belong in reference/, decompiled/, or outside the game folder).
+ */
+export const ORIGINAL_BUILD_FILE = new RegExp(
+  [
+    // packages and archives: Android, iOS, desktop, web wrappers
+    String.raw`\.(apk|xapk|apks|apkm|aab|obb|ipa|exe|msi|dmg|dll|so|dylib|jar|dex|asar|nw|love)$`,
+    // engine data: Unity, Unreal, Godot, GameMaker, RPG Maker, Ren'Py, Wolf, Flash, Defold, Solar2D, XNA
+    String.raw`\.(assets|ress|resource|unity3d|unityweb|pak|utoc|ucas|uasset|umap|pck|win|droid|rgssad|rgss2a|rgss3a|rvdata2?|rxdata|rpa|rpyc|wolf|swf|arcd|arci|car|xnb|jsc|luac)$`,
+    String.raw`(^|/)(global-metadata\.dat|globalgamemanagers|data\.unity3d|index\.android\.bundle|main\.jsbundle|hlboot\.dat)$`,
+    // source or decompiled code of the original (the web game is TypeScript)
+    String.raw`\.(cs|il|java|kt|smali|gd|gml|lua|as|rpy|decompiled)$`,
+  ].join('|'),
+  'i',
+);
+
+/** Why source.path (the original build) is a problem for this game folder, or null. */
+export function sourcePathProblem(root, game, { mustExist = false } = {}) {
+  const p = game?.source?.path;
+  if (!p) return mustExist ? 'source.path chưa điền' : null;
+  const abs = path.resolve(root, p);
+  if (mustExist && !exists(abs)) return `source.path "${p}" không tồn tại trên máy này`;
+  const rel = path.relative(root, abs).split(path.sep).join('/');
+  const inside = rel === '' || (!rel.startsWith('../') && rel !== '..' && !path.isAbsolute(rel));
+  if (inside && !FORBIDDEN_DIRS.some((d) => pathUnder(rel, d + '/') || rel === d))
+    return `source.path "${p}" nằm trong thư mục game — bản gốc sẽ bị commit. Chuyển ra ngoài thư mục game hoặc vào reference/ (gitignored)`;
+  return null;
+}
+
 const phaseIndex = (p) => (p === 'released' ? PHASES.length : PHASES.indexOf(p));
 
 /**
@@ -34,6 +64,8 @@ export function validateGame(root, { stage } = {}) {
     return { problems: pr, game };
   }
   const st = stage ?? Math.max(0, phaseIndex(game.phase));
+  const src = sourcePathProblem(root, game);
+  if (src) pr.error('game.yaml', src);
 
   const paramKeys = validateParams(root, st, pr);
   validateObligations(root, st, pr, paramKeys);

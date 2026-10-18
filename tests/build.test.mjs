@@ -81,7 +81,7 @@ test('questions: answers are parsed and checked; --set rejects unknown keys and 
   const q = (k) => qs.find((x) => x.key === k);
   assert.deepEqual(parseAnswer(q('languages'), ' EN, es ,es'), ['en', 'es']);
   assert.match(checkAnswer(q('languages'), ['en', 'Tiếng Việt']), /sai định dạng/);
-  assert.match(checkAnswer(q('engine'), 'gamemaker'), /một trong/);
+  assert.match(checkAnswer(q('engine'), 'gamemakr'), /một trong/);
   assert.match(checkAnswer(q('portals'), ['azgames', 'nope']), /nope/);
   assert.equal(checkAnswer(q('azgames.gameCode'), ''), null, 'câu portal được để trống');
   assert.match(checkAnswer(q('title'), ''), /bắt buộc/);
@@ -102,7 +102,7 @@ test('questions: terminal asks one by one, explains, re-asks a wrong answer, Ent
   output.on('data', (d) => (shown += d));
   // title=Enter, engine=sai→unity, sourcePath=Enter, portals=azgames, language=Enter, languages=en,es,
   // azgames: gameCode=g205, gameId=Enter, portalGid=Enter, signed=Enter (để trống)
-  input.end(['', 'gamemaker', 'unity', '', 'azgames', '', 'en,es', 'g205', '', '', ''].join('\n') + '\n');
+  input.end(['', 'gamemakr', 'unity', '', 'azgames', '', 'en,es', 'g205', '', '', ''].join('\n') + '\n');
   const a = await ask(qs, { input, output });
   assert.equal(a.title, 'G');
   assert.equal(a.engine, 'unity');

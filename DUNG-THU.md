@@ -8,7 +8,8 @@ GameKit là plugin cho Claude Code giúp **chuyển game di động (Unity, Coco
 
 | Đã chạy | Chưa có |
 | --- | --- |
-| Tạo project game web, theo dõi 6 pha, chấm cổng | Hướng dẫn riêng cho AI ở P0 (nhận diện, đánh giá), P1 (phân tích game gốc), P3 (chuyển sang web) — AI tự làm theo checklist, chất lượng chưa đều |
+| Tạo project game web, theo dõi 6 pha, chấm cổng | Hướng dẫn đầy đủ cho AI ở P1 (phân tích game gốc) theo từng engine, P3 (chuyển sang web) — AI tự làm theo checklist, chất lượng chưa đều |
+| Nhận diện game gốc ở P0 từ APK, XAPK, AAB, IPA, thư mục Steam, exe, .app, Electron, thư mục web… (`gamekit recon`) |
 | Hướng dẫn cho AI ở P2 (dựng lại, test đối chiếu với game gốc), P4 (SDK portal), P5 (đóng gói) | Quảng cáo, leaderboard thật trên azgames |
 | Đóng gói cho azgames và bản chạy thử ở máy (`dev-mock`), kiểm tra trước khi phát hành | Game 3D: chưa thử với game thật |
 
@@ -38,7 +39,7 @@ Khởi động lại Claude Code. Lần đầu GameKit tự cài thư viện c�
 
 ## Bắt đầu với một game
 
-1. Đặt project (hoặc file APK/bản build) của game gốc ở một thư mục riêng, ví dụ `D:\games-src\ten-game`. Đừng đặt bên trong thư mục game web sắp tạo.
+1. Đặt project (hoặc bản build: APK/XAPK, thư mục Steam, thư mục web…) của game gốc ở một thư mục riêng, ví dụ `D:\games-src\ten-game`. Đừng đặt bên trong thư mục game web sắp tạo.
 2. Mở Claude Code ở thư mục sẽ chứa game web (ví dụ `D:\games`) và nói:
    > Tạo game GameKit mới tên `ten-game` cho game Unity ở `D:\games-src\ten-game`.
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## Chưa phát hành
+Nhận diện game gốc ở P0, cho mọi dạng phát hành:
+- Lệnh `recon [đường dẫn] [--write] [--json]`: nhận dạng phát hành (APK, split APK XAPK/APKS/APKM, AAB, OBB, IPA, Windows/macOS/Linux, Electron/NW.js, web, project source), cửa hàng (Steam, GOG, Epic, itch) và ~40 biến thể engine (Unity Mono/IL2CPP/WebGL, Unreal, Godot, Cocos Creator/2d-x, GameMaker, RPG Maker MV/MZ/XP/VX, Ren'Py, Construct, Defold, LÖVE, MonoGame, libGDX, Flutter, React Native, Phaser/Pixi/three…), version Unity/Godot, nơi chứa logic/data, công cụ, cảnh báo (script mã hoá, OBB, Hermes, `.pak` AES…). Mở archive lồng nhau (XAPK → APK), zip64, `.asar`. `--write` ghi `notes/recon.md` (giữ mục "Kiểm tra tay") và điền `source.engine`/`engineVersion` khi còn trống.
+- Skill `game-recon` (P0): lấy đúng bản build theo từng dạng, kiểm chứng kết quả recon, kiểm kê asset, báo cáo `notes/triage.md`.
+- `source.engine` nhận thêm: egret, playcanvas, gamemaker, rpgmaker, renpy, defold, love2d, monogame, libgdx, openfl, solar2d, flutter, react-native, android-native, ios-native, native.
+- Sửa: pre-commit trước đây để lọt file build gốc (`game.apk`, `libil2cpp.so`, `Assembly-CSharp.dll`, `global-metadata.dat`…) nếu chúng nằm ngoài `reference/`; giờ chặn file build gốc và code gốc/decompile (`.cs`, `.java`, `.gd`, `.lua`…) ở mọi chỗ.
+- Sửa: cổng P0 chỉ xem `source.path` có điền hay không (đường dẫn sai vẫn qua). Giờ `{auto: source-path}` kiểm đường dẫn có trên máy và nằm ngoài thư mục game; `validate` báo lỗi khi bản gốc nằm trong thư mục game (sẽ bị commit), trừ `reference/`.
+- `gates/P0.md`: thêm `{auto: file:notes/recon.md}` và `{auto: file:notes/triage.md}`. Game cũ: chép `gates/P0.md` từ template nếu muốn dùng.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.
