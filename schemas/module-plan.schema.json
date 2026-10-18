@@ -6,6 +6,7 @@
   "required": ["base", "shared", "modules"],
   "additionalProperties": false,
   "properties": {
+    "kind": { "const": "build", "description": "Mặc định: dựng lại (P2). Phân tích (P1) dùng re-plan.yaml" },
     "base": { "type": "string", "description": "Nhánh gốc, thường là main" },
     "shared": {
       "type": "array",
@@ -13,6 +14,11 @@
       "description": "Đường dẫn chỉ agent chính được sửa (contracts/, params/, package.json…)"
     },
     "maxParallel": { "type": "integer", "minimum": 1, "maximum": 8 },
+    "links": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Thư mục local đã gitignore (decompiled/, reference/…) được symlink vào worktree của từng module"
+    },
     "modules": {
       "type": "array",
       "minItems": 1,

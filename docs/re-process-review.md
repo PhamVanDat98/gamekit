@@ -308,7 +308,7 @@ Thứ tự phụ thuộc: **W0** phải xong trước; các gói trong cùng m�
 
 | Gói | Lớp | Sở hữu (file) | Việc | Test (`tests/cli.test.mjs` hoặc file test riêng) |
 | --- | --- | --- | --- | --- |
-| **W0 Lược đồ chung** | 0 | `schemas/questions.schema.json` (mới), `schemas/module-plan.schema.json` (thêm `kind`, `links`, `areas`/`modules`, `wave` tuỳ chọn), `scripts/lib/plan.mjs` (mới: `loadPlan(root, kind)`, `units()`, `readySet()`, `branchOf(kind,id)`) | Chốt định dạng; giữ tương thích `module-plan.yaml` cũ | plan cũ vẫn hợp lệ; DAG vòng bị chặn; `readySet` đúng |
+| **W0 Lược đồ chung** (đã xong, xem 5.0b) | 0 | `schemas/questions.schema.json` (mới), `schemas/module-plan.schema.json` (thêm `kind`, `links`, `areas`/`modules`, `wave` tuỳ chọn), `scripts/lib/plan.mjs` (mới: `loadPlan(root, kind)`, `units()`, `readySet()`, `branchOf(kind,id)`) | Chốt định dạng; giữ tương thích `module-plan.yaml` cũ | plan cũ vẫn hợp lệ; DAG vòng bị chặn; `readySet` đúng |
 | **W1 Params/obligations nhiều file** | 1 | `scripts/validate.mjs` (params, obligations), `templates/game/src/core/params.ts`, `templates/game/spec/` | `loadObligations` gộp `spec/obligations.yaml` + `spec/obligations/*.yaml`; báo trùng khoá params giữa file; `params.ts` gộp `import.meta.glob('../../params/*.json', {eager:true})` theo tên file (giữ `game.json` gộp ở gốc để tương thích) | trùng khoá lỗi; game thử: test/typecheck/lint/pack xanh |
 | **W2 Câu hỏi & ghi chú** (mã quyết định theo mảng đã xong, xem 5.0) | 1 | `scripts/questions.mjs` (mới), `scripts/validate.mjs` (phần notes — tách thành `scripts/lib/validate-notes.mjs` để không đụng W1), `templates/game/notes/` | Đọc `notes/**/questions.yaml` (và cảnh báo nếu còn `QUESTIONS.md` kiểu cũ); kiểm liên kết; kiểm frontmatter ghi chú; lệnh `questions` | câu `answered` không có ghi chú → lỗi; `openReason` bắt buộc khi đóng |
 | **W3 Lập lịch song song** | 1 | `scripts/parallel.mjs` | `fanout/integrate --plan re|build --ready`, `--keep-going`, `links:` symlink, chia lượt `maxParallel`, tiền tố nhánh theo kind, brief giàu thông tin | worktree có symlink `decompiled/`; nhánh đỏ không chặn nhánh độc lập; con của nhánh đỏ bị bỏ qua |
@@ -326,6 +326,15 @@ Theo `AGENTS.md`: mỗi lệnh mới thêm vào `COMMANDS` + `HELP` trong `scrip
 - Nguồn: `DECISIONS.md` + mọi `notes/<mảng>/decisions.md` (`decisionEntries`); `params.deviation.decision` và `obligations[].decision` tra trong cả hai.
 - `validate`: mã trùng (cùng file hay khác file) là lỗi; trong `notes/<mảng>/decisions.md` chỉ được dùng `D-<mảng>-n` của chính mảng đó.
 - Agent chính vẫn có thể chuyển một quyết định sang `DECISIONS.md` mà giữ nguyên mã.
+
+### 5.0b Đã làm: W0 — lược đồ chung
+
+- `schemas/re-plan.schema.json`: `kind: re`, `base`, `shared`, `maxParallel`, `links`, `units`, `areas[{id, owns, dependsOn, brief, targets, buildModule}]`. Bỏ `wave`: mảng chạy theo đồ thị phụ thuộc.
+- `schemas/questions.schema.json`: `questions[{id <mảng>.<tên>, question, evidence, required, status open|partial|answered, notes, params, obligations, openReason, impact}]`.
+- `schemas/module-plan.schema.json`: thêm `kind: build` (tuỳ chọn) và `links`; `wave` vẫn bắt buộc cho tới W3.
+- `scripts/lib/plan.mjs`: `loadPlan(root, kind)`, `unitsOf`, `branchOf(kind, id)` (`re/<id>` · `mod/<id>`), `mergeMessage`/`mergeGrep` (bản `build` giữ nguyên `merge: <id> (đợt N)` để game đang dựng dở không bị ảnh hưởng), `topo`, `readySet(units, {merged, running, maxParallel})`, `checkUnits` (luật chung hai loại kế hoạch), `checkRePlan`. `validate.mjs` và `parallel.mjs` dùng lõi này thay cho bản riêng.
+- `validate`: kiểm `re-plan.yaml` (thêm luật: mảng phải sở hữu `notes/<id>/`, `buildModule` có trong `module-plan.yaml`, `links` tương đối, không trùng đường dẫn được sở hữu, phải được gitignore) và `notes/<mảng>/questions.yaml` (schema, tiền tố id, trùng id). Kiểm liên kết câu hỏi → ghi chú/params/nghĩa vụ để cho W2.
+- Template: `re-plan.example.yaml`, `notes/questions.example.yaml`.
 
 ### 5.1 Tương thích ngược
 

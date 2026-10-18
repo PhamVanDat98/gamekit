@@ -10,6 +10,9 @@ import { PHASES } from './lib/phases.mjs';
 import { pngInfo, isWebp } from './lib/png.mjs';
 import { loadLanguages, placeholders } from './lib/languages.mjs';
 import { checkSetting, loadPortal, missingSettings } from './lib/portals.mjs';
+import { checkRePlan, checkUnits, loadPlan, pathUnder, unitsOf } from './lib/plan.mjs';
+
+export { pathUnder };
 
 /** Folders whose files end up in a build and therefore need provenance. */
 export const SHIPPED_DIRS = ['assets', 'public'];
@@ -44,6 +47,8 @@ export function validateGame(root, { stage } = {}) {
   validateIcons(root, pr);
   validateProvenance(root, st, pr);
   validateModulePlan(root, pr);
+  validateRePlan(root, pr);
+  validateQuestions(root, pr);
   validateAssetManifest(root, pr);
   return { problems: pr, game };
 }
@@ -324,51 +329,82 @@ function isIgnored(root, dir) {
   return lines.includes(dir) || lines.includes(dir.split('/')[0]);
 }
 
-// ---------- module-plan.yaml ----------
-export function loadModulePlan(root) {
-  const f = path.join(root, 'module-plan.yaml');
-  return exists(f) ? readYaml(f) : null;
-}
-
-const norm = (p) => p.replace(/^\.\//, '');
-export const pathUnder = (file, prefix) => {
-  const f = norm(file);
-  const pre = norm(prefix);
-  return pre.endsWith('/') ? f.startsWith(pre) : f === pre || f.startsWith(pre + '/');
-};
-const overlaps = (a, b) => pathUnder(a, b) || pathUnder(b, a) || norm(a) === norm(b);
+// ---------- module-plan.yaml (P2) and re-plan.yaml (P1) ----------
+export const loadModulePlan = (root) => loadPlan(root, 'build');
 
 export function checkModulePlan(plan) {
   const pr = new Problems();
   const where = 'module-plan.yaml';
   for (const e of check('module-plan', plan)) pr.error(where, e);
   if (!pr.ok) return pr;
-  const ids = new Map();
-  for (const m of plan.modules) {
-    if (ids.has(m.id)) pr.error(where, `module trùng id ${m.id}`);
-    ids.set(m.id, m);
-  }
-  for (const m of plan.modules) {
-    for (const d of m.dependsOn ?? []) {
-      const dep = ids.get(d);
-      if (!dep) pr.error(where, `${m.id} phụ thuộc ${d} không tồn tại`);
-      else if (dep.wave >= m.wave) pr.error(where, `${m.id} (đợt ${m.wave}) phụ thuộc ${d} (đợt ${dep.wave}): phụ thuộc phải ở đợt trước`);
-    }
-    for (const o of m.owns) {
-      for (const s of plan.shared) if (overlaps(o, s)) pr.error(where, `${m.id} sở hữu ${o} nhưng đây là vùng dùng chung (${s})`);
-    }
-  }
-  const all = plan.modules.flatMap((m) => m.owns.map((o) => [m.id, o]));
-  for (let i = 0; i < all.length; i++)
-    for (let j = i + 1; j < all.length; j++)
-      if (all[i][0] !== all[j][0] && overlaps(all[i][1], all[j][1]))
-        pr.error(where, `${all[i][0]} và ${all[j][0]} cùng sở hữu ${all[i][1]} / ${all[j][1]}: mỗi file chỉ một chủ`);
+  checkUnits(plan, 'build', pr, where);
+  const waves = new Map(plan.modules.map((m) => [m.id, m.wave]));
+  for (const m of plan.modules)
+    for (const d of m.dependsOn ?? [])
+      if (waves.has(d) && waves.get(d) >= m.wave) pr.error(where, `${m.id} (đợt ${m.wave}) phụ thuộc ${d} (đợt ${waves.get(d)}): phụ thuộc phải ở đợt trước`);
   return pr;
+}
+
+/** Linked folders hold local copies of the original game; a link that git tracks would be committed from every worktree. */
+function checkLinks(root, plan, where, pr) {
+  for (const l of plan?.links ?? []) if (exists(path.join(root, l)) && !isIgnored(root, l.replace(/\/$/, ''))) pr.error(where, `links: ${l} phải được gitignore`);
 }
 
 function validateModulePlan(root, pr) {
   const plan = loadModulePlan(root);
-  if (plan) pr.merge(checkModulePlan(plan));
+  if (!plan) return;
+  const r = checkModulePlan(plan);
+  pr.merge(r);
+  if (r.ok) checkLinks(root, plan, 'module-plan.yaml', pr);
+}
+
+function validateRePlan(root, pr) {
+  const plan = loadPlan(root, 're');
+  if (!plan) return;
+  let modulePlan = null;
+  try {
+    modulePlan = loadModulePlan(root);
+  } catch {
+    // reported by validateModulePlan
+  }
+  const r = checkRePlan(plan, { modulePlan: modulePlan && checkModulePlan(modulePlan).ok ? modulePlan : null });
+  pr.merge(r);
+  if (r.ok) checkLinks(root, plan, 're-plan.yaml', pr);
+}
+
+// ---------- notes/<area>/questions.yaml: analysis questions of one area ----------
+const QUESTIONS_FILE = /^([a-z0-9][a-z0-9-]*)\/questions\.yaml$/;
+
+function validateQuestions(root, pr) {
+  let areas = null;
+  try {
+    const plan = loadPlan(root, 're');
+    if (plan) areas = new Set(unitsOf(plan, 're').map((a) => a.id));
+  } catch {
+    // reported by validateRePlan
+  }
+  const seen = new Map();
+  for (const rel of walk(path.join(root, 'notes'))) {
+    const area = QUESTIONS_FILE.exec(rel)?.[1];
+    if (!area) continue;
+    const where = `notes/${rel}`;
+    let data;
+    try {
+      data = readYaml(path.join(root, 'notes', rel));
+    } catch (e) {
+      pr.error(where, e.message);
+      continue;
+    }
+    const errs = check('questions', data);
+    for (const e of errs) pr.error(where, e);
+    if (errs.length) continue;
+    if (areas && !areas.has(area)) pr.warn(where, `re-plan.yaml không có mảng ${area}`);
+    for (const q of data.questions) {
+      if (!q.id.startsWith(`${area}.`)) pr.error(where, `${q.id}: câu hỏi của mảng ${area} phải có id ${area}.<tên>`);
+      if (seen.has(q.id)) pr.error(where, `trùng id câu hỏi ${q.id} (đã có trong ${seen.get(q.id)})`);
+      else seen.set(q.id, where);
+    }
+  }
 }
 
 // ---------- asset-manifest.json ----------

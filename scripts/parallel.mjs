@@ -7,13 +7,16 @@ import { log, GkError, Problems } from './lib/log.mjs';
 import { requireGameRoot, loadGame } from './lib/game.mjs';
 import { git, isClean, currentBranch, branchExists } from './lib/git.mjs';
 import { loadModulePlan, checkModulePlan, pathUnder } from './validate.mjs';
+import { branchOf as planBranch, mergeGrep, mergeMessage as planMerge, topo } from './lib/plan.mjs';
 
-export const branchOf = (id) => `mod/${id}`;
-const mergeMessage = (id, wave) => `merge: ${id} (đợt ${wave})`;
+export { topo };
+
+export const branchOf = (id) => planBranch('build', id);
+const mergeMessage = (id, wave) => planMerge('build', id, wave);
 
 /** A module counts as merged only when its merge commit is in base — survives branch deletion, ignores empty branches. */
 export function isMerged(root, base, id) {
-  const hits = git(root, ['log', base, '--merges', '--fixed-strings', `--grep=merge: ${id} (`, '--format=%H'], { allowFail: true });
+  const hits = git(root, ['log', base, '--merges', '--fixed-strings', `--grep=${mergeGrep('build', id)}`, '--format=%H'], { allowFail: true });
   return Boolean(hits);
 }
 
@@ -37,22 +40,6 @@ const waveOf = (plan, wave) => {
   if (!mods.length) throw new GkError(`Không có module nào ở đợt ${wave}`);
   return mods;
 };
-
-/** Order modules so dependencies inside the same list come first. */
-export function topo(mods) {
-  const ids = new Set(mods.map((m) => m.id));
-  const done = new Set();
-  const out = [];
-  const visit = (m, stack = []) => {
-    if (done.has(m.id)) return;
-    if (stack.includes(m.id)) throw new GkError(`Phụ thuộc vòng: ${[...stack, m.id].join(' → ')}`);
-    for (const d of m.dependsOn ?? []) if (ids.has(d)) visit(mods.find((x) => x.id === d), [...stack, m.id]);
-    done.add(m.id);
-    out.push(m);
-  };
-  mods.forEach((m) => visit(m));
-  return out;
-}
 
 export function briefFor(plan, m, game) {
   const shared = plan.shared.map((s) => `- \`${s}\``).join('\n');

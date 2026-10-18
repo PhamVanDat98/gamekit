@@ -1,0 +1,11 @@
+# Ví dụ notes/<mảng>/questions.yaml (khi chia mảng bằng re-plan.yaml). Chép vào notes/<mảng>/questions.yaml.
+# Không chia mảng thì dùng notes/QUESTIONS.md như cũ.
+# status: open | partial | answered. Câu còn mở khi đóng mảng: ghi openReason và impact.
+questions:
+  - id: player.q1
+    question: Tốc độ người chơi bao nhiêu, theo frame hay theo giây?
+    evidence: hằng số + hàm cập nhật vị trí
+    status: open
+    notes: []           # vd notes/player/movement.md
+    params: []          # vd player.speed
+    obligations: []     # vd player.move

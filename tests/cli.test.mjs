@@ -97,6 +97,44 @@ test('decisions: D-<area>-n lives in notes/<area>/decisions.md; duplicates and w
   assert.equal(gk(dir, 'validate').code, 1);
 });
 
+test('validate: re-plan.yaml and notes/<area>/questions.yaml (template examples are valid)', () => {
+  const dir = newGame('replan');
+  write(dir, 're-plan.yaml', read(dir, 're-plan.example.yaml'));
+  write(dir, 'module-plan.yaml', read(dir, 'module-plan.example.yaml'));
+  write(dir, 'notes/player/questions.yaml', read(dir, 'notes/questions.example.yaml'));
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 0, r.out);
+  // buildModule must name a module of module-plan.yaml
+  write(dir, 're-plan.yaml', read(dir, 're-plan.yaml').replace('buildModule: core-spawner', 'buildModule: core-nope'));
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /buildModule core-nope/);
+  write(dir, 're-plan.yaml', read(dir, 're-plan.example.yaml'));
+  // a linked folder must be gitignored, or every worktree would commit it
+  write(dir, 're-plan.yaml', read(dir, 're-plan.yaml').replace('  - reference/', '  - reference/\n  - tools/'));
+  write(dir, 'tools/x.txt', 'x');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /links: tools\/ phải được gitignore/);
+  write(dir, 're-plan.yaml', read(dir, 're-plan.example.yaml'));
+  // questions: schema, id prefix of the area, unique across areas, area known to the plan
+  write(dir, 'notes/player/questions.yaml', 'questions:\n  - { id: player.q1, question: Q, evidence: E, status: done }\n');
+  assert.equal(gk(dir, 'validate').code, 1);
+  write(dir, 'notes/player/questions.yaml', 'questions:\n  - { id: score.q1, question: Q, evidence: E, status: open }\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /score\.q1: câu hỏi của mảng player phải có id player\.<tên>/);
+  write(dir, 'notes/player/questions.yaml', 'questions:\n  - { id: player.q1, question: Q, evidence: E, status: open }\n  - { id: player.q1, question: Q2, evidence: E, status: answered }\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /trùng id câu hỏi player\.q1/);
+  write(dir, 'notes/player/questions.yaml', 'questions: []\n');
+  write(dir, 'notes/audio/questions.yaml', 'questions:\n  - { id: audio.q1, question: Q, evidence: E, status: partial }\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /re-plan\.yaml không có mảng audio/);
+});
+
 test('provenance: unlabeled assets fail; reference blocked from P3; placeholder blocked at P5', () => {
   const dir = newGame();
   write(dir, 'assets/hero.png', 'x');

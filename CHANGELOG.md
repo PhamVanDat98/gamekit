@@ -2,6 +2,9 @@
 
 ## Chưa phát hành
 - Mã quyết định theo mảng `D-<mảng>-n` (vd `D-player-1`), ghi trong `notes/<mảng>/decisions.md`: các mảng/module chạy song song không còn cùng sửa `DECISIONS.md`, không trùng số. `validate` chặn mã trùng và mã sai mảng; `D-n` trong `DECISIONS.md` giữ như cũ.
+- Kế hoạch chia mảng phân tích `re-plan.yaml` (`kind: re`, mẫu `re-plan.example.yaml`): mảng sở hữu file riêng (bắt buộc `notes/<mảng>/`), phụ thuộc theo đồ thị (không theo đợt), `links` (tư liệu local gitignored sẽ symlink vào worktree), `units` (đơn vị chuẩn), `buildModule` (module P2 nhận kết quả). `validate` kiểm schema, trùng sở hữu, vùng dùng chung, vòng phụ thuộc, `buildModule` có trong `module-plan.yaml`, `links` phải được gitignore. `module-plan.yaml` nhận thêm `kind: build` và `links`.
+- Câu hỏi theo mảng `notes/<mảng>/questions.yaml` (mẫu `notes/questions.example.yaml`): `validate` kiểm schema, id `<mảng>.<tên>`, trùng id giữa các mảng. `notes/QUESTIONS.md` vẫn dùng được khi không chia mảng.
+- `scripts/lib/plan.mjs`: lõi chung cho hai loại kế hoạch (nhánh `re/<id>` / `mod/<id>`, `topo`, `readySet` — đơn vị sẵn sàng chạy theo phụ thuộc và `maxParallel`). Lệnh `fanout`/`integrate` chưa dùng `re-plan.yaml` (gói W3).
 - `docs/re-process-review.md`: rà soát quy trình RE và kế hoạch chạy song song.
 
 ## 0.2.0 — 2026-10-16
