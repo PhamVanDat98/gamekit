@@ -10,25 +10,27 @@ const HELP = `GameKit — port & reskin web game
 
 Dùng: gamekit <lệnh> [tuỳ chọn]
 
-  init <tên> [--title] [--engine] [--dir] [--set k=v…] [--no-input] [--third-party]   Tạo game mới; hỏi thông tin dự án (terminal) hoặc nhận --set.
+  init <tên> [--title] [--engine] [--dir] [--set k=v…] [--no-input] [--third-party] [--no-git] [--no-install]
+                                            Tạo game mới; hỏi thông tin dự án (terminal) hoặc nhận --set.
                                             Mặc định là game của bạn; --third-party khi làm lại game người khác (bắt buộc reskin)
-  init <tên> --questions --json             In danh sách câu hỏi kèm giải thích (cho agent hỏi người dùng)
-  config [--portal p] [--set k=v…] [--questions --json]   Điền thông tin portal còn thiếu, thêm portal
+  init <tên> --questions                    In danh sách câu hỏi kèm giải thích dạng JSON (cho agent hỏi người dùng)
+  config [--portal p] [--set k=v…] [--questions]   Điền thông tin portal còn thiếu, thêm portal
   status | next                             Game đang ở pha nào, việc gì tiếp
-  gate [--advance]                          Kiểm tra cổng của pha hiện tại
+  gate [--advance] [--by tên]               Kiểm tra cổng của pha hiện tại; --advance sang pha sau
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
   parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)
-  provenance add <file…> --label <nhãn>     Gắn nguồn gốc asset (reference|generated|own|licensed|placeholder)
+  provenance add <file…> --label <nhãn> [--source …] [--license …] [--note …]
+                                            Gắn nguồn gốc asset (reference|generated|own|licensed|placeholder; licensed cần --license)
   provenance list [--label]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
   release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)
   fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
-  check-ownership [--module id]             Module chỉ sửa trong thư mục được giao
-  integrate --wave N [--test "cmd"] [--cleanup]   Merge theo phụ thuộc, test sau mỗi lần
+  check-ownership [--module id] [--branch b] Module chỉ sửa trong thư mục được giao
+  integrate --wave N [--test "cmd"] [--cleanup] [--dry-run]   Merge từng module của đợt, test sau mỗi lần
   precommit                                 (git hook) chặn asset gốc, code decompile, asset chưa nhãn
 `;
 
-// Flags that are boolean switches; they never consume the next word.
+// Flags that are boolean switches; they never consume the next word. (`json` is kept so old `--questions --json` calls still parse.)
 const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party']);
 
 export function parseArgs(argv) {
@@ -75,6 +77,12 @@ export async function main(argv = process.argv.slice(2)) {
   if (!load) {
     log.fail(`Không có lệnh "${cmd}"`);
     log.info(HELP);
+    return 2;
+  }
+  // `--title` with nothing after it would otherwise become the string "true".
+  const empty = Object.keys(args).find((k) => k !== '_' && !BOOL.has(k) && [].concat(args[k]).includes(true));
+  if (empty) {
+    log.fail(`--${empty} cần một giá trị (vd. --${empty} <giá trị> hoặc --${empty}=<giá trị>)`);
     return 2;
   }
   ensureDeps();

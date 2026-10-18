@@ -3,17 +3,17 @@ import path from 'node:path';
 import { log, Problems } from './lib/log.mjs';
 import { requireGameRoot } from './lib/game.mjs';
 import { git } from './lib/git.mjs';
-import { readYaml } from './lib/io.mjs';
+import YAML from 'yaml';
 import { check } from './lib/schema.mjs';
 import { loadProvenance, SHIPPED_DIRS, FORBIDDEN_DIRS, pathUnder } from './validate.mjs';
 
 export async function run(args) {
   const root = requireGameRoot(args.cwd);
   const pr = new Problems();
-  // -z keeps non-ASCII (Vietnamese) paths verbatim instead of quoting them.
-  const staged = (git(root, ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z'], { raw: true }) || '').split('\0').filter(Boolean);
-  // Judge by the provenance.json being committed, not the working copy.
-  const stagedProv = git(root, ['show', ':provenance.json'], { allowFail: true, raw: true });
+  // -z keeps non-ASCII (Vietnamese) paths verbatim; --relative makes paths game-relative when the game is a subfolder of a bigger repo.
+  const staged = (git(root, ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '--relative', '-z'], { raw: true }) || '').split('\0').filter(Boolean);
+  // Judge by the files being committed, not the working copy.
+  const stagedProv = git(root, ['show', ':./provenance.json'], { allowFail: true, raw: true });
   let prov;
   try {
     prov = stagedProv ? JSON.parse(stagedProv) : loadProvenance(root);
@@ -30,7 +30,14 @@ export async function run(args) {
       else if (label === 'reference') pr.error(f, 'asset reference của game gốc không được commit vào thư mục phát hành');
     }
   }
-  if (staged.includes('game.yaml')) for (const e of check('game', readYaml(path.join(root, 'game.yaml')))) pr.error('game.yaml', e);
+  if (staged.includes('game.yaml')) {
+    try {
+      const text = git(root, ['show', ':./game.yaml'], { raw: true });
+      for (const e of check('game', YAML.parse(text))) pr.error('game.yaml', e);
+    } catch (e) {
+      pr.error('game.yaml', e.message);
+    }
+  }
   if (!pr.ok) log.info('Commit bị chặn bởi GameKit:');
   return pr.report('pre-commit') ? 0 : 1;
 }

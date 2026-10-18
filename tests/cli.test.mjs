@@ -3,13 +3,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
+import { gk, newGame, token, sh, write, read, editJson, editYaml, tmpDir } from './helpers.mjs';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
 import { ownershipProblems } from '../scripts/parallel.mjs';
 import { parseArgs } from '../scripts/gamekit.mjs';
 import { evaluateParity, testsFromVitestReport, brokenFilesFromVitestReport } from '../scripts/parity.mjs';
 import YAML from 'yaml';
+
+/** Stand-in for P2 work: the template's demo numbers replaced by "the original game's". */
+function portDemoData(dir) {
+  for (const f of ['params/game.json', 'spec/oracles/obstacle-speed.json']) write(dir, f, read(dir, f).replaceAll('template-demo:', 'đo từ game gốc:'));
+}
 
 test('init creates a valid game with git, hook and schemas', () => {
   const dir = newGame();
@@ -48,8 +53,30 @@ test('params: every value needs a source; TODO is a warning before P2 and an err
   assert.match(r.out, /source/);
 });
 
+test('validate: demo numbers are a warning before P2 and an error from P2; malformed data files are reported, not crashes', () => {
+  const dir = newGame('demo');
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /template-demo/);
+  r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /params\/game\.json.*template-demo/);
+  assert.match(r.out, /obstacle-speed\.json.*template-demo/);
+  portDemoData(dir);
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0);
+  write(dir, 'params/x.json', 'null');
+  write(dir, 'Language/fr.json', '[]');
+  write(dir, 'provenance.json', JSON.stringify({ entries: [{ label: 'own' }] }));
+  write(dir, 'asset-manifest.json', JSON.stringify({ assets: [{ id: 'x' }] }));
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.doesNotMatch(r.out, /TypeError|Cannot|must be of type/);
+  for (const f of ['params/x.json', 'Language/fr.json', 'provenance.json', 'asset-manifest.json']) assert.ok(r.out.includes(f), `${f}\n${r.out}`);
+});
+
 test('params: deviation needs a DECISIONS entry and approval from P2', () => {
   const dir = newGame();
+  portDemoData(dir);
   editJson(dir, 'params/game.json', (p) => {
     p.player.speed.deviation = { original: 300, reason: 'cảm ứng', decision: 'D-1', approved: false };
   });
@@ -67,6 +94,7 @@ test('params: deviation needs a DECISIONS entry and approval from P2', () => {
 
 test('provenance: unlabeled assets fail; reference blocked from P3; placeholder blocked at P5', () => {
   const dir = newGame();
+  portDemoData(dir);
   write(dir, 'assets/hero.png', 'x');
   assert.equal(gk(dir, 'validate').code, 1);
   assert.equal(gk(dir, 'provenance', 'add', 'assets/hero.png', '--label', 'reference').code, 0);
@@ -464,6 +492,7 @@ test('validate: oracle tables in spec/oracles need a source and cases', () => {
 
 test('params: confidence is observed|derived|inferred; inferred needs a tolerance from P2', () => {
   const dir = newGame('conf');
+  portDemoData(dir);
   editJson(dir, 'params/game.json', (p) => {
     p.player.size.confidence = 'guess';
   });
@@ -513,6 +542,7 @@ test('init: --set answers go to game.yaml; missing portal settings are reported,
 
 test('config: fills missing settings with --set, adds a portal and its checklist, lists what is still open', () => {
   const dir = newGame('cfg');
+  portDemoData(dir);
   let r = gk(dir, 'config', '--questions', '--json');
   assert.equal(r.code, 0);
   assert.deepEqual(JSON.parse(r.out).map((q) => q.key), ['azgames.gameCode', 'azgames.signed']);
@@ -552,6 +582,7 @@ test('status lists portal settings still missing', () => {
 
 test('validate: portal settings — bad format always fails, missing warns before P4 and fails from P4', () => {
   const dir = newGame('vps');
+  portDemoData(dir);
   let r = gk(dir, 'validate');
   assert.equal(r.code, 0);
   assert.match(r.out, /portalSettings\.azgames\.gameCode chưa điền/);
@@ -751,4 +782,59 @@ test('ownership: game.yaml without the field counts as own; unknown values are r
   const r = gk(dir, 'validate');
   assert.equal(r.code, 1);
   assert.match(r.out, /ownership/);
+});
+
+test('provenance add: "." labels game files only (no leading /, no .git or node_modules); outside paths and licensed without --license are refused', () => {
+  const dir = newGame('prv');
+  write(dir, 'assets/a.png', 'x');
+  fs.mkdirSync(path.join(dir, 'node_modules/x'), { recursive: true });
+  write(dir, 'node_modules/x/i.js', '');
+  let r = gk(path.join(dir, 'assets'), 'provenance', 'add', '.', '--label', 'own');
+  assert.equal(r.code, 0, r.out);
+  r = gk(dir, 'provenance', 'add', '.', '--label', 'own');
+  assert.equal(r.code, 0, r.out);
+  const paths = JSON.parse(read(dir, 'provenance.json')).entries.map((e) => e.path);
+  assert.ok(paths.includes('assets/a.png'));
+  assert.ok(paths.every((p) => !p.startsWith('/') && !/^(\.git|node_modules|\.gamekit)\//.test(p)), paths.join('\n'));
+  write(path.dirname(dir), 'outside.txt', 'x');
+  assert.match(gk(dir, 'provenance', 'add', '../outside.txt', '--label', 'own').out, /ngoài thư mục game/);
+  r = gk(dir, 'provenance', 'add', 'assets/a.png', '--label', 'licensed');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /--license/);
+});
+
+test('pre-commit judges the staged game.yaml and works when the game is a subfolder of a bigger repo', () => {
+  const dir = newGame('pyml');
+  const good = read(dir, 'game.yaml');
+  write(dir, 'game.yaml', good.replace(/^phase: P0/m, 'phase: P9'));
+  sh(dir, 'git', 'add', 'game.yaml');
+  write(dir, 'game.yaml', good);
+  assert.throws(() => sh(dir, 'git', 'commit', '-qm', 'x'), /phase/);
+  sh(dir, 'git', 'reset', '-q');
+
+  const repo = tmpDir();
+  sh(repo, 'git', 'init', '-q');
+  assert.equal(gk(repo, 'init', 'sub', '--no-git', '--no-install').code, 0);
+  const sub = path.join(repo, 'sub');
+  write(sub, 'assets/new.png', 'x');
+  sh(repo, 'git', 'add', '-A');
+  const r = gk(sub, 'precommit');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /assets\/new\.png/);
+});
+
+test('cli: an invalid phase, a bad game name and a flag without its value are clear errors, not crashes', () => {
+  const dir = newGame('bad');
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^phase: P0/m, 'phase: P9'));
+  for (const cmd of ['status', 'gate']) {
+    const r = gk(dir, cmd);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /phase "P9" không hợp lệ/);
+  }
+  const parent = tmpDir();
+  for (const name of ['a-', 'a--b', '-a']) assert.match(gk(parent, 'init', name, '--no-install', '--no-git').out, /Tên: chữ thường/);
+  const r = gk(parent, 'init', 'x', '--title');
+  assert.equal(r.code, 2);
+  assert.match(r.out, /--title cần một giá trị/);
+  assert.ok(!fs.existsSync(path.join(parent, 'x')));
 });

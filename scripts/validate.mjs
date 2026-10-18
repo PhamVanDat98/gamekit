@@ -35,15 +35,23 @@ export function validateGame(root, { stage } = {}) {
   }
   const st = stage ?? Math.max(0, phaseIndex(game.phase));
 
-  const paramKeys = validateParams(root, st, pr);
-  validateObligations(root, st, pr, paramKeys);
-  validateOracles(root, pr);
-  validatePortalSettings(game, st, pr);
-  validateLanguages(root, game, pr);
-  validateIcons(root, pr);
-  validateProvenance(root, st, pr);
-  validateModulePlan(root, pr);
-  validateAssetManifest(root, pr);
+  // A malformed file (null, wrong shape) is reported against that file instead of crashing validate and gate.
+  const guard = (where, fn) => {
+    try {
+      return fn();
+    } catch (e) {
+      pr.error(where, e instanceof GkError ? e.message : `dữ liệu sai dạng (${e.message})`);
+    }
+  };
+  const paramKeys = guard('params', () => validateParams(root, st, pr)) ?? new Set();
+  guard(OBLIGATIONS_FILE, () => validateObligations(root, st, pr, paramKeys));
+  guard('spec/oracles', () => validateOracles(root, st, pr));
+  guard('game.yaml', () => validatePortalSettings(game, st, pr));
+  guard('Language', () => validateLanguages(root, game, pr));
+  guard('public/Icons', () => validateIcons(root, pr));
+  guard('provenance.json', () => validateProvenance(root, st, pr));
+  guard('module-plan.yaml', () => validateModulePlan(root, pr));
+  guard('asset-manifest.json', () => validateAssetManifest(root, pr));
   return { problems: pr, game };
 }
 
@@ -57,6 +65,10 @@ export function collectParams(obj, prefix = '', out = []) {
   }
   return out;
 }
+
+const isObject = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+/** Sources the template ships with: fine while learning the pipeline, not once the real game is being rebuilt (P2). */
+const DEMO_SOURCE = /^template-demo\b/i;
 
 export function decisionIds(root) {
   const f = path.join(root, 'DECISIONS.md');
@@ -82,12 +94,14 @@ function validateParams(root, st, pr) {
       continue;
     }
     for (const e of check('params', data)) pr.error(where, e);
+    if (!isObject(data)) continue;
     const stem = rel.replace(/\.json$/, '').replaceAll('/', '.');
     for (const [key, p] of collectParams(data)) {
       keys.add(key).add(`${stem}.${key}`);
       const src = String(p.source ?? '').trim();
       if (!src) pr.error(where, `${key}: thiếu source (luật cứng: số liệu phải có nguồn từ game gốc)`);
       else if (/^todo\b/i.test(src)) (strict ? pr.error : pr.warn).call(pr, where, `${key}: source còn TODO`);
+      else if (DEMO_SOURCE.test(src)) (strict ? pr.error : pr.warn).call(pr, where, `${key}: vẫn là số của game demo (template-demo) — thay bằng số của game gốc`);
       if (p.confidence === 'inferred' && p.tolerance == null)
         (strict ? pr.error : pr.warn).call(pr, where, `${key}: giá trị ước lượng (inferred) cần tolerance để parity test so được`);
       if (p.deviation) {
@@ -138,15 +152,22 @@ function validateObligations(root, st, pr, paramKeys) {
 }
 
 // ---------- spec/oracles/*.json: input → output tables from the original game ----------
-function validateOracles(root, pr) {
+function validateOracles(root, st, pr) {
   const dir = path.join(root, 'spec', 'oracles');
+  const strict = st >= PHASES.indexOf('P2');
   for (const rel of walk(dir).filter((f) => f.endsWith('.json'))) {
     const where = `spec/oracles/${rel}`;
+    let data;
     try {
-      for (const e of check('oracle', readJson(path.join(dir, rel)))) pr.error(where, e);
+      data = readJson(path.join(dir, rel));
     } catch (e) {
       pr.error(where, e.message);
+      continue;
     }
+    const errs = check('oracle', data);
+    for (const e of errs) pr.error(where, e);
+    if (!errs.length && DEMO_SOURCE.test(String(data.source ?? '').trim()))
+      (strict ? pr.error : pr.warn).call(pr, where, 'vẫn là bảng của game demo (template-demo) — thay bằng dữ liệu game gốc');
   }
 }
 
@@ -183,6 +204,11 @@ function validateLanguages(root, game, pr) {
   } catch (e) {
     pr.error('Language', e.message);
     return;
+  }
+  for (const [c, dict] of Object.entries(langs)) {
+    if (isObject(dict)) continue;
+    pr.error(`Language/${c}.json`, 'phải là object { "khoá": "chuỗi" }');
+    delete langs[c];
   }
   const en = langs.en;
   if (!en) {
@@ -261,7 +287,9 @@ function validateProvenance(root, st, pr) {
     pr.error('provenance.json', e.message);
     return;
   }
-  for (const e of check('provenance', prov)) pr.error('provenance.json', e);
+  const errs = check('provenance', prov);
+  for (const e of errs) pr.error('provenance.json', e);
+  if (errs.length) return; // entries without a valid path can't be matched against files
   const byPath = new Map();
   for (const e of prov.entries ?? []) {
     if (byPath.has(e.path)) pr.error('provenance.json', `trùng mục ${e.path}`);
@@ -364,7 +392,9 @@ function validateAssetManifest(root, pr) {
     pr.error(where, e.message);
     return;
   }
-  for (const e of check('asset-manifest', man)) pr.error(where, e);
+  const errs = check('asset-manifest', man);
+  for (const e of errs) pr.error(where, e);
+  if (errs.length) return;
   for (const a of man.assets ?? []) {
     const file = path.join(root, a.path);
     if (!exists(file)) continue; // not generated yet

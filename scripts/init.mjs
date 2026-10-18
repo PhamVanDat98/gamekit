@@ -28,7 +28,7 @@ async function collectAnswers(args, questions) {
 
 export async function run(args) {
   const name = args._[0];
-  if (!name || !/^[a-z0-9][a-z0-9-]*$/.test(name)) throw new GkError('Dùng: gamekit init <ten-game> [--title "Tên"] [--engine unity] [--dir <thư mục cha>] [--set khoá=giá-trị…]. Tên: chữ thường, số, gạch ngang.');
+  if (!name || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) throw new GkError('Dùng: gamekit init <ten-game> [--title "Tên"] [--engine unity] [--dir <thư mục cha>] [--set khoá=giá-trị…]. Tên: chữ thường, số, gạch ngang giữa các từ.');
   const questions = allQuestions({ name, title: args.title ? String(args.title) : defaultTitle(name) });
   if (args.questions) {
     log.info(JSON.stringify(questions, null, 2));
@@ -37,6 +37,18 @@ export async function run(args) {
   const dest = path.resolve(args.dir ?? args.cwd ?? process.cwd(), name);
   if (exists(dest) && fs.readdirSync(dest).length) throw new GkError(`${dest} đã có và không rỗng`);
   const answers = await collectAnswers(args, questions);
+  const created = !exists(dest);
+  try {
+    return await scaffold(args, { name, dest, answers, questions });
+  } catch (e) {
+    // Don't leave a half-made game behind: a rerun would stop at "không rỗng".
+    if (created) fs.rmSync(dest, { recursive: true, force: true });
+    else if (exists(dest)) for (const f of fs.readdirSync(dest)) fs.rmSync(path.join(dest, f), { recursive: true, force: true });
+    throw e;
+  }
+}
+
+async function scaffold(args, { name, dest, answers, questions }) {
   const title = answers.title;
   const engine = answers.engine;
   const portals = ['dev-mock', ...(answers.portals ?? []).filter((p) => p !== 'dev-mock')];

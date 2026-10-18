@@ -1,3 +1,5 @@
+import { GkError } from './log.mjs';
+
 // The 6-phase pipeline. Skills listed are the ones `next` suggests, in order.
 // `thirdParty` overrides a phase for games remade from someone else's (source.ownership: third-party).
 export const PHASES = ['P0', 'P1', 'P2', 'P3', 'P4', 'P5'];
@@ -12,7 +14,7 @@ export const PHASE_INFO = {
     human: 'Bạn duyệt bố cục và điều khiển trên web.',
     thirdParty: { name: 'Reskin', skills: ['web-relayout', 'style-direction', 'style-preview', 'asset-spec', 'apply-style', 'replace-graphics', 'replace-audio', 'rename-and-text'], human: 'Bạn chọn style.' },
   },
-  P4: { name: 'Tích hợp', skills: ['platform-sdk', 'add-analytics', 'add-leaderboard', 'add-save', 'add-i18n'] },
+  P4: { name: 'Tích hợp', skills: ['platform-sdk', 'add-analytics', 'add-leaderboard', 'add-save'] },
   P5: { name: 'Phát hành', skills: ['package-web-build', 'perf-budget', 'qa-smoke', 'store-assets', 'release-check'], human: 'Bạn playtest bản cuối.' },
 };
 
@@ -31,6 +33,7 @@ export const AVAILABLE_SKILLS = new Set([
 
 /** Phase name, skills and the user's decision for this game's ownership. */
 export function phaseInfo(phase, ownership = 'own') {
+  if (!Object.hasOwn(PHASE_INFO, phase)) throw new GkError(`game.yaml: phase "${phase}" không hợp lệ (${PHASES.join(', ')}, released) — chạy gamekit validate`);
   const { thirdParty, ...base } = PHASE_INFO[phase];
   return ownership === 'third-party' && thirdParty ? { ...base, ...thirdParty } : base;
 }

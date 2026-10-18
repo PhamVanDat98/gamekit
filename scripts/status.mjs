@@ -58,15 +58,13 @@ function print(root) {
     log.info('\nThông tin portal còn thiếu (cần trước khi pack) — `gamekit config --portal <id>`:');
     for (const m of s.missing) log.info(`  - ${m}`);
   }
-  {
-    log.info('\nSkill cho pha này (theo thứ tự):');
-    for (const sk of s.skills) {
-      const avail = AVAILABLE_SKILLS.has(sk) ? '' : '  (chưa có trong bản này — làm theo hướng dẫn chung)';
-      log.info(`  - ${sk}${avail}`);
-    }
-    if (s.human) log.info(`\nĐiểm bạn quyết ở pha này: ${s.human}`);
-    log.info('\nKhi xong: `gamekit gate` để kiểm tra cổng, `gamekit gate --advance` để sang pha sau.');
+  log.info('\nSkill cho pha này (theo thứ tự):');
+  for (const sk of s.skills) {
+    const avail = AVAILABLE_SKILLS.has(sk) ? '' : '  (chưa có trong bản này — làm theo hướng dẫn chung)';
+    log.info(`  - ${sk}${avail}`);
   }
+  if (s.human) log.info(`\nĐiểm bạn quyết ở pha này: ${s.human}`);
+  log.info('\nKhi xong: `gamekit gate` để kiểm tra cổng, `gamekit gate --advance` để sang pha sau.');
   return 0;
 }
 
