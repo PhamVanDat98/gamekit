@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
-import { parseGate } from '../scripts/gate.mjs';
+import { gk, newGame, token, sh, write, read, editJson, editYaml, tmpDir, ROOT } from './helpers.mjs';
+import { gateItemsFor, parseGate } from '../scripts/gate.mjs';
+import { portMapStatus } from '../scripts/unity.mjs';
+import { scanCsharp } from '../scripts/lib/csharp.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
 import { ownershipProblems, topo } from '../scripts/parallel.mjs';
 import { parseArgs } from '../scripts/gamekit.mjs';
@@ -716,4 +718,130 @@ test('ownership: game.yaml without the field counts as own; unknown values are r
   const r = gk(dir, 'validate');
   assert.equal(r.code, 1);
   assert.match(r.out, /ownership/);
+});
+
+// ---------- unity scan: read a Unity project's source ----------
+const UNITY_FIXTURE = path.join(ROOT, 'tests', 'fixtures', 'unity-project');
+
+test('csharp: serialized fields with literal defaults, Unity messages and JS pitfalls by line', () => {
+  const r = scanCsharp(read(UNITY_FIXTURE, 'Assets/Scripts/PlayerController.cs'));
+  const c = r.classes.find((x) => x.name === 'PlayerController');
+  assert.equal(c.base, 'MonoBehaviour');
+  const f = Object.fromEntries(c.fields.map((x) => [x.name, x.literal]));
+  // public / [SerializeField] only; static, const, [NonSerialized] and plain private are not serialized
+  assert.deepEqual(Object.keys(f).sort(), ['canDash', 'jumpCurve', 'jumpForce', 'maxJumps', 'playerName', 'speed']);
+  assert.deepEqual([f.speed, f.jumpForce, f.maxJumps, f.canDash, f.playerName, f.jumpCurve], [5, 12.5, 2, true, 'Hero', undefined]);
+  assert.deepEqual(r.messages, ['Awake', 'Update', 'OnTriggerEnter2D']);
+  const ids = r.pitfalls.map((p) => p.id);
+  for (const id of ['round', 'int-math', 'input-axis', 'destroy', 'static-state']) assert.ok(ids.includes(id), id);
+  assert.ok(!ids.includes('rotation'));
+  assert.deepEqual(scanCsharp(read(UNITY_FIXTURE, 'Assets/Scripts/Spawner.cs')).pitfalls.map((p) => p.id), ['random-range', 'coroutine']);
+});
+
+test('unity scan: Inspector values beat code defaults, prefab overrides in scenes, port map, settings', () => {
+  const dir = newGame('uscan');
+  const r = gk(dir, 'unity', 'scan', '--src', UNITY_FIXTURE);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /50 Hz/);
+  const report = read(dir, 'notes/unity/REPORT.md');
+  assert.match(report, /\| PlayerController\.speed \| `5f` \| `8` \| Assets\/Prefabs\/Player\.prefab › Player \|/);
+  assert.match(report, /\| PlayerController\.speed \| `5f` \| `10` \| Assets\/Scenes\/Main\.unity › Player \(ghi đè prefab/);
+  assert.match(report, /\| Spawner\.interval \| `2f` \| `1\.5` \| Assets\/Scenes\/Main\.unity › World\/Spawner \|/);
+  assert.match(report, /\| LevelData\.targetScore \| `100` \| `250` \|/);
+  assert.match(report, /PlayerController\.canDash \| `true` \| `0`/);
+  assert.doesNotMatch(report, /PlayerController\.jumpForce \| `12\.5f`/, 'same value in code and prefab is not an override');
+  assert.match(report, /0\.25s → Footstep\(\)/);
+  assert.match(report, /Idle\*\* clip=— speed=1 · → Run \[Speed Greater 0\.1\]/);
+  assert.match(report, /Pixels Per Unit: 100/);
+  const draft = JSON.parse(read(dir, 'notes/unity/params-draft.json'));
+  assert.equal(draft.Spawner.interval.value, 1.5);
+  assert.equal(draft.Spawner.interval.confidence, 'observed');
+  assert.match(draft.Spawner.interval.source, /Main\.unity › World\/Spawner › Spawner\.interval/);
+  assert.ok(draft['PlayerController@Prefabs/Player › Player'].jumpCurve.value.m_Curve.length === 2);
+  const serialized = JSON.parse(read(dir, 'notes/unity/data/serialized.json'));
+  const rb = serialized['Assets/Prefabs/Player.prefab'].components.find((c) => c.type === 'Rigidbody2D');
+  assert.equal(rb.fields.m_GravityScale, 2.5);
+  const sr = serialized['Assets/Prefabs/Player.prefab'].components.find((c) => c.type === 'SpriteRenderer');
+  assert.equal(sr.fields.m_Sprite, 'Assets/Art/hero.png');
+  const map = YAML.parse(read(dir, 'spec/port-map.yaml'));
+  const st = Object.fromEntries(map.scripts.map((s) => [s.script, s.status]));
+  assert.deepEqual(st, {
+    'Assets/Editor/Tool.cs': 'skip',
+    'Assets/Plugins/Demigiant/DOTweenStub.cs': 'skip',
+    'Assets/Scripts/LevelData.cs': 'todo',
+    'Assets/Scripts/PlayerController.cs': 'todo',
+    'Assets/Scripts/Spawner.cs': 'todo',
+  });
+  const game = YAML.parse(read(dir, 'game.yaml'));
+  assert.equal(game.source.engineVersion, '2022.3.10f1');
+  assert.equal(game.source.path, UNITY_FIXTURE);
+  assert.equal(gk(dir, 'validate').code, 0);
+
+  // A re-scan keeps what the agent filled in.
+  write(dir, 'src/core/player.ts', 'export {};\n');
+  const edited = map.scripts.map((s) => (s.script.endsWith('PlayerController.cs') ? { ...s, status: 'done', target: ['src/core/player.ts'] } : s));
+  write(dir, 'spec/port-map.yaml', YAML.stringify({ ...map, scripts: edited }));
+  assert.equal(gk(dir, 'unity', 'scan').code, 0, 'source.path from game.yaml');
+  const again = YAML.parse(read(dir, 'spec/port-map.yaml')).scripts.find((s) => s.script.endsWith('PlayerController.cs'));
+  assert.deepEqual([again.status, again.target], ['done', ['src/core/player.ts']]);
+});
+
+test('unity scan: a build or a random folder is refused with what to do', () => {
+  const dir = newGame('ubuild');
+  const build = path.join(tmpDir(), 'Game_Data');
+  fs.mkdirSync(path.join(build, 'Managed'), { recursive: true });
+  let r = gk(dir, 'unity', 'scan', '--src', path.dirname(build));
+  assert.equal(r.code, 1);
+  assert.match(r.out, /bản build.*re-notes/s);
+  r = gk(dir, 'unity', 'scan', '--src', tmpDir());
+  assert.equal(r.code, 1);
+  assert.match(r.out, /không phải project Unity/);
+  r = gk(dir, 'unity', 'scan');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /--src/);
+  assert.equal(gk(dir, 'unity').code, 1);
+});
+
+test('gate: {engine: …} items only for that engine; port-map needs a scan at P1 and every script resolved at P2', () => {
+  const items = parseGate('- [ ] a {engine: unity}\n- [ ] b {auto: port-map} {engine: unity} {only: own}\n- [ ] c');
+  assert.deepEqual(items.map((i) => [i.text, i.auto, i.engine, i.only]), [
+    ['a', null, 'unity', null],
+    ['b', 'port-map', 'unity', 'own'],
+    ['c', null, null, null],
+  ]);
+  assert.equal(gateItemsFor({ source: { engine: 'godot' } }, '- [ ] a {engine: unity}\n- [ ] c').length, 1);
+
+  const dir = newGame('ugate');
+  assert.match(portMapStatus(dir, { strict: false }).detail, /unity scan/);
+  editYaml(dir, (g) => (g.source.path = path.join(tmpDir(), 'nothing-here')));
+  assert.equal(portMapStatus(dir, { strict: false }).ok, false, 'a missing project is not "only a build"');
+  gk(dir, 'unity', 'scan', '--src', UNITY_FIXTURE);
+  assert.equal(portMapStatus(dir, { strict: false }).ok, true);
+  let s = portMapStatus(dir, { strict: true });
+  assert.equal(s.ok, false);
+  assert.match(s.detail, /3 script chưa xong/);
+  const map = YAML.parse(read(dir, 'spec/port-map.yaml'));
+  for (const e of map.scripts) if (e.status === 'todo') Object.assign(e, { status: 'done', target: ['src/core/world.ts'] });
+  map.scripts[0].note = '';
+  write(dir, 'spec/port-map.yaml', YAML.stringify(map));
+  s = portMapStatus(dir, { strict: true });
+  assert.match(s.detail, /skip thiếu note/);
+  assert.equal(gk(dir, 'validate').code, 1, 'validate: skip needs a note');
+  map.scripts[0].note = 'editor';
+  map.scripts[2].target = ['src/core/nope.ts'];
+  write(dir, 'spec/port-map.yaml', YAML.stringify(map));
+  assert.match(portMapStatus(dir, { strict: true }).detail, /nope\.ts không có/);
+  assert.match(gk(dir, 'validate').out, /target src\/core\/nope\.ts không có/);
+  map.scripts[2].target = ['src/core/world.ts'];
+  write(dir, 'spec/port-map.yaml', YAML.stringify(map));
+  assert.deepEqual(portMapStatus(dir, { strict: true }), { ok: true, detail: '' });
+});
+
+test('init: Unity games get the Unity semantics helpers; other engines do not', () => {
+  const dir = newGame('uhelp');
+  for (const f of ['src/core/unity/mathf.ts', 'src/core/unity/scheduler.ts', 'src/view/unity-space.ts', 'tests/core/unity.test.ts']) assert.ok(fs.existsSync(path.join(dir, f)), f);
+  const parent = tmpDir();
+  assert.equal(gk(parent, 'init', 'gd', '--engine', 'godot', '--no-install', '--no-git').code, 0);
+  assert.ok(!fs.existsSync(path.join(parent, 'gd', 'src/core/unity')));
+  assert.doesNotMatch(gk(path.join(parent, 'gd'), 'status').out, /engine-unity/);
 });

@@ -10,7 +10,10 @@ GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, 
 ## Gọi CLI
 - Trong thư mục game: `npm run gk -- <lệnh>` (shim `scripts/gk.mjs` trỏ tới plugin).
 - Từ Claude Code ở bất kỳ đâu: `node "${CLAUDE_PLUGIN_ROOT}/scripts/gamekit.mjs" <lệnh>`.
-- Lệnh: `init`, `config`, `status`, `gate [--advance]`, `validate`, `parity`, `provenance add|list`, `pack`, `release-check`, `fanout`, `check-ownership`, `integrate`. `gamekit help` để xem đủ.
+- Lệnh: `init`, `config`, `status`, `gate [--advance]`, `validate`, `parity`, `unity scan`, `provenance add|list`, `pack`, `release-check`, `fanout`, `check-ownership`, `integrate`. `gamekit help` để xem đủ.
+
+## Game gốc là Unity
+Dùng skill **engine-unity** từ P1. Có source project: `gamekit unity scan` trước khi đọc code — số liệu lấy từ giá trị inspector (`notes/unity/params-draft.json`), không từ mặc định trong code; mỗi script được theo dõi trong `spec/port-map.yaml` tới khi `done`/`skip`; core dùng `src/core/unity/` (Mathf, Random.Range, AnimationCurve, coroutine đúng ngữ nghĩa Unity).
 
 ## Tạo game mới (agent)
 1. `gamekit init <tên> --questions --json` → danh sách câu hỏi (label, description, example, default, required). Không có TTY thì init không tự hỏi.
@@ -22,8 +25,8 @@ GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, 
 | Pha | Việc | Skill | Người dùng quyết |
 | --- | --- | --- | --- |
 | P0 Intake | Nhận diện engine, kiểm kê, chấm khả thi | game-recon, triage | Làm hay bỏ |
-| P1 Phân tích | Trích logic, số liệu, asset, UI từ game gốc | engine-*, **re-notes**, gameplay-spec, asset-inventory, ui-extract | |
-| P2 Dựng lại | Dựng lại bằng JS/TS, chơi được (asset gốc nếu là game của người dùng, placeholder nếu làm lại) | runtime-select, **module-plan**, **rebuild-game**, **integrate**, **parity-check** | |
+| P1 Phân tích | Trích logic, số liệu, asset, UI từ game gốc | engine-* (**engine-unity**), **re-notes**, gameplay-spec, asset-inventory, ui-extract | |
+| P2 Dựng lại | Dựng lại bằng JS/TS, chơi được (asset gốc nếu là game của người dùng, placeholder nếu làm lại) | engine-*, runtime-select, **module-plan**, **rebuild-game**, **integrate**, **parity-check** | |
 | P3 Chuyển sang web | Điều khiển, bố cục web, nén asset. `third-party`: thêm reskin (style, asset mới theo spec) | web-relayout; `third-party`: style-*, asset-spec, apply-style, replace-* | Duyệt bố cục; `third-party`: chọn style |
 | P4 Tích hợp | SDK portal, analytics, leaderboard, save | **platform-sdk**, add-* | |
 | P5 Phát hành | Đóng gói, hiệu năng, QA, ảnh store | **package-web-build**, perf-budget, qa-smoke, store-assets, **release-check** | Playtest cuối |
@@ -46,7 +49,7 @@ Cổng tự bỏ các mục `{only: …}` không áp cho game này.
 5. **Art brief** (`third-party`) mô tả thiết kế mới, không viết "vẽ lại nhân vật X của game gốc".
 
 ## Cấu trúc một game
-`src/core/` logic thuần, deterministic (không DOM, không render, `Rng` có seed, fixed timestep) · `src/view/` render + input, chỉ đọc state · `src/platform/` interface chung cho mọi portal · `src/contracts/` type dùng chung · `params/` số liệu có nguồn · `spec/` (gameplay spec, `obligations.yaml` nghĩa vụ parity, `oracles/` bảng từ game gốc) · `notes/` (ghi chú RE, `QUESTIONS.md`) · `gates/` · `DECISIONS.md` · `provenance.json` · `module-plan.yaml` (khi dựng song song).
+`src/core/` logic thuần, deterministic (không DOM, không render, `Rng` có seed, fixed timestep; game Unity có thêm `src/core/unity/`) · `src/view/` render + input, chỉ đọc state · `src/platform/` interface chung cho mọi portal · `src/contracts/` type dùng chung · `params/` số liệu có nguồn · `spec/` (gameplay spec, `obligations.yaml` nghĩa vụ parity, `oracles/` bảng từ game gốc, `port-map.yaml` script gốc → file TS) · `notes/` (ghi chú RE, `QUESTIONS.md`, `unity/` kết quả quét) · `gates/` · `DECISIONS.md` · `provenance.json` · `module-plan.yaml` (khi dựng song song).
 
 ## Test
 - `core/` và adapter: **TDD** (dùng skill test-driven-development của Superpowers nếu có). Giá trị kỳ vọng lấy từ `params/` = game gốc, kèm `tolerance`.

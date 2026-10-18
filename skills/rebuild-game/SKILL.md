@@ -9,11 +9,13 @@ Mục tiêu cổng P2: chơi được trọn vẹn (`own`: với asset gốc nh�
 
 ## 1. Có project chưa?
 - Chưa có `game.yaml`: `gamekit init <ten-game> --title "<Tên>" --engine <engine gốc> --dir <thư mục cha>`. Mặc định là game của người dùng (`own`): giữ tên gốc được. Làm lại game người khác: thêm `--third-party`, đặt tên mới và điền `release.forbiddenTerms` bằng tên/thương hiệu game gốc.
-- `own` có source gốc (C#…): đọc thẳng code để lấy logic và số; vẫn viết test trước, viết lại cho hợp `core/`/`view/`, không dịch máy từng dòng.
+- `own` có source gốc (C#…): đọc thẳng code để lấy logic; **số lấy từ dữ liệu serialized, không từ giá trị mặc định trong code** (Unity: `gamekit unity scan`, skill **engine-unity**). Vẫn viết test trước, viết lại cho hợp `core/`/`view/`, không dịch máy từng dòng.
+- Unity: làm từng script theo `spec/port-map.yaml` (`todo` → `doing` → `done` + `target`, hoặc `skip` + `note`); dùng `src/core/unity/` cho Mathf, Random.Range, AnimationCurve, coroutine/Invoke. Cổng P2 chặn khi còn script chưa xử lý.
 - Đã có (đi từ P0/P1): kiểm tra `gamekit status` báo P2.
 
 ## 2. Chọn runtime (thay cho skill runtime-select chưa có)
-- 2D đơn giản, ít sprite: canvas thuần (template sẵn). Nhiều sprite, hiệu ứng: Pixi. Cần scene/physics có sẵn: Phaser. 3D: Three.js. Vật lý phức tạp: Rapier (wasm) hoặc viết riêng nếu game gốc dùng công thức đơn giản — ưu tiên **tái hiện đúng công thức gốc** hơn thay bằng engine vật lý khác.
+- Nhịp mô phỏng (`runtime.fixedStepHz`): game gốc có fixed step riêng (Unity: Fixed Timestep, thường 50 Hz) thì dùng đúng nhịp đó, đừng để mặc định 60.
+- 2D đơn giản, ít sprite: canvas thuần (template sẵn). Nhiều sprite, hiệu ứng: Pixi. Cần scene/physics có sẵn: Phaser. 3D: Three.js. Vật lý 2D của Unity (Box2D): planck.js — cùng engine. Vật lý phức tạp khác: Rapier (wasm) hoặc viết riêng nếu game gốc dùng công thức đơn giản — ưu tiên **tái hiện đúng công thức gốc** hơn thay bằng engine vật lý khác.
 - Ghi lựa chọn + lý do vào `DECISIONS.md` và `runtime` trong game.yaml. Thư viện render chỉ được dùng trong `view/`.
 
 ## 3. Số liệu trước, code sau

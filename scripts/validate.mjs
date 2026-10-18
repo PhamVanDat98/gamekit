@@ -44,6 +44,7 @@ export function validateGame(root, { stage } = {}) {
   validateProvenance(root, st, pr);
   validateModulePlan(root, pr);
   validateAssetManifest(root, pr);
+  validatePortMap(root, pr);
   return { problems: pr, game };
 }
 
@@ -372,6 +373,28 @@ function validateAssetManifest(root, pr) {
     if (info.width !== w || info.height !== a.height)
       pr.error(where, `${a.id}: ${a.path} là ${info.width}×${info.height}, spec cần ${w}×${a.height}`);
     if (a.alpha === true && info.alpha === false) pr.error(where, `${a.id}: cần nền trong suốt nhưng PNG không có kênh alpha`);
+  }
+}
+
+// ---------- spec/port-map.yaml: where each original script went ----------
+function validatePortMap(root, pr) {
+  const f = path.join(root, 'spec', 'port-map.yaml');
+  if (!exists(f)) return;
+  const where = 'spec/port-map.yaml';
+  let data;
+  try {
+    data = readYaml(f);
+  } catch (e) {
+    pr.error(where, e.message);
+    return;
+  }
+  const errs = check('port-map', data);
+  for (const e of errs) pr.error(where, e);
+  if (errs.length) return;
+  for (const e of data.scripts) {
+    if (e.status === 'done' && !e.target?.length) pr.error(where, `${e.script}: done cần target (file TS chứa logic tương ứng)`);
+    for (const t of e.target ?? []) if (!exists(path.join(root, t))) pr.error(where, `${e.script}: target ${t} không có`);
+    if (e.status === 'skip' && !e.note?.trim()) pr.error(where, `${e.script}: skip cần note (lý do không port)`);
   }
 }
 

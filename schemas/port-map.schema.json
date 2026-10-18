@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gamekit/port-map.schema.json",
+  "title": "spec/port-map.yaml — mỗi script của project gốc đã chuyển sang đâu",
+  "type": "object",
+  "required": ["scripts"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "source": { "type": ["string", "null"], "description": "Project gốc đã quét" },
+    "scripts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["script", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "script": { "type": "string", "minLength": 1, "description": "Đường dẫn script trong project gốc" },
+          "classes": { "type": "array", "items": { "type": "string" } },
+          "kind": { "type": "string", "description": "MonoBehaviour, ScriptableObject, plain, Editor" },
+          "usedIn": { "type": "integer", "minimum": 0, "description": "Số scene/prefab/asset dùng script này" },
+          "pitfalls": { "type": "array", "items": { "type": "string" }, "description": "Bẫy khi chuyển sang JS (skill engine-unity)" },
+          "status": { "enum": ["todo", "doing", "done", "skip"], "description": "done cần target; skip cần note" },
+          "target": { "type": "array", "items": { "type": "string" }, "description": "File TS chứa logic tương ứng (đường dẫn trong game)" },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

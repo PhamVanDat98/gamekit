@@ -53,6 +53,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | `gate [--advance]` | Chấm `gates/<pha>.md`: mục `{auto: …}` chạy script, mục `(bạn)` chỉ người dùng tick |
 | `validate [--stage Px]` | Schema `game.yaml`, `params/*.json` (mọi giá trị có `source`; `confidence` = observed/derived/inferred, inferred cần `tolerance` từ P2), `spec/obligations.yaml`, `spec/oracles/*.json`, provenance, `module-plan.yaml`, `asset-manifest.json` |
 | `parity [--report file.json]` | Chạy vitest, đóng từng nghĩa vụ trong `spec/obligations.yaml` bằng test gắn thẻ `[id:case]`. Test đỏ, skip/todo, thiếu case hay thẻ lạ đều tính là chưa đạt |
+| `unity scan [--src <project>]` | Quét project Unity có source: settings (Fixed Timestep, gravity, layer…), scene, script + bẫy khi sang JS theo từng dòng, **giá trị inspector khác mặc định trong code**, override prefab trong scene, Animator, animation event, PPU → `notes/unity/REPORT.md`, `notes/unity/params-draft.json`, `notes/unity/data/`, `spec/port-map.yaml` |
 | `provenance add <file…> --label …` | Nhãn `reference / generated / own / licensed / placeholder` |
 | `pack [--portal] [--all] [--version V] [--compress] [--zip]` | `builds/<YYMMDDNN>/<portal>/{index.html, preview.html, version.txt, <v>/…}` + `builds/<v>/manifest.json` (+ zip) |
 | `release-check [--version V] [--portal p]` | Mặc định bản mới nhất. Kiểm bố cục az-v1, footer bản quyền, chặn asset reference/placeholder, tên game gốc, link ngoài, đường dẫn tuyệt đối, vượt ngân sách tải |
@@ -67,10 +68,11 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 .claude-plugin/   plugin.json, marketplace.json
 hooks/            SessionStart → using-gamekit + gamekit status
 commands/         /gamekit:status, /gamekit:next
-skills/           using-gamekit, rebuild-game, module-plan, integrate, platform-sdk, package-web-build, release-check
+skills/           using-gamekit, engine-unity, rebuild-game, module-plan, integrate, platform-sdk, package-web-build, release-check
 portals/          vỏ portal dùng chung: azgames, dev-mock (portal.yaml, kit.mjs, shell.html, loader.entry.js, Icons/), shared/
 scripts/          CLI gamekit.mjs + lệnh; lib/
 schemas/          game, params, provenance, module-plan, asset-manifest (JSON Schema)
+templates/engines/ phần riêng từng engine (unity: src/core/unity/, src/view/unity-space.ts)
 templates/game/   Vite + TS: core/ (deterministic), view/, platform/ (interface, PauseBus, dev-mock), contracts/, tests, gates, .vscode, AGENTS.md
 tests/            node --test
 ```
@@ -80,6 +82,18 @@ tests/            node --test
 - `src/core/` logic thuần: `Rng` có seed, fixed timestep, input ghi/phát lại. ESLint chặn DOM, `Math.random`, `Date.now`, thư viện render và số lạ.
 - `src/platform/`: `Platform` (game gọi) và `PortalAdapter` (mỗi portal một file mỏng). `createPlatform()` lo pause + tắt tiếng khi ad, gameplay start/stop cân bằng, không chồng ad, lọc tên event, save fallback. Build chỉ bundle adapter của portal đang đóng gói (`virtual:gk-adapter`).
 - Game demo (né vật rơi) để pipeline chạy được từ đầu đến cuối; thay bằng game thật ở P2.
+
+## Game Unity có source
+
+Port từ source Unity hay sai vì số game chạy nằm trong scene/prefab (không phải giá trị mặc định trong code), vì `Random.Range`, `Mathf.Round`, coroutine, FixedUpdate 50 Hz, toạ độ y-up khác JS, và vì hành vi nằm ngoài code (Animator, animation event, AnimationCurve, Rigidbody2D). Quy trình (skill `engine-unity`):
+
+```bash
+npm run gk -- unity scan --src ~/UnityProjects/MyGame   # cần Asset Serialization = Force Text
+# đọc notes/unity/REPORT.md → params/ từ notes/unity/params-draft.json
+# P2: từng script trong spec/port-map.yaml: todo → done (+ target) / skip (+ note); cổng P2 chặn nếu còn sót
+```
+
+Game `--engine unity` có thêm `src/core/unity/` (Mathf, Random.Range, AnimationCurve, Scheduler cho coroutine/Invoke — có test) và `src/view/unity-space.ts`. Oracle thật từ Unity Editor: `skills/engine-unity/references/GameKitRecorder.cs`. Game Unity tạo trước bản này: chép `templates/engines/unity/` vào game, thêm hai mục `{engine: unity}` từ `templates/game/gates/P1.md`, `P2.md`.
 
 ## Nâng cấp game cũ
 

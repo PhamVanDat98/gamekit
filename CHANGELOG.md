@@ -1,5 +1,12 @@
 # Changelog
 
+## Chưa phát hành
+Port game Unity có source:
+- Lệnh `unity scan`: đọc project Unity (Force Text) — settings (Fixed Timestep, gravity, layer, sorting layer, input axes), scene trong build, camera/CanvasScaler, mọi script (field serialized + giá trị mặc định, Unity message, bẫy khi sang JS theo dòng), giá trị serialized trong scene/prefab/ScriptableObject kể cả override prefab trong scene, Animator (state, transition, điều kiện), animation event, sprite PPU/rect/pivot. Ra `notes/unity/REPORT.md` (bảng **Inspector ghi đè**: giá trị game chạy khác mặc định trong code), `notes/unity/params-draft.json` (giá trị dạng params, `confidence: observed`), `notes/unity/data/`, `spec/port-map.yaml`.
+- `spec/port-map.yaml` (schema mới): mỗi script gốc `todo | doing | done | skip`; `validate` kiểm target/note; cổng P1/P2 có `{auto: port-map}`. Cổng nhận thẻ `{engine: …}`.
+- Game `--engine unity` có `src/core/unity/` (Mathf.Round về số chẵn, Sign(0)=1, intDiv, Repeat, DeltaAngle, SmoothDamp…; Random.Range int/float; AnimationCurve Hermite; Scheduler cho coroutine/Invoke theo thời gian mô phỏng) và `src/view/unity-space.ts` (world y-up ↔ canvas), có test. `init` chép `templates/engines/<engine>/`.
+- Skill `engine-unity`: vì sao port sai, quy trình quét → params → từng script, bảng lifecycle, bảng bẫy (`references/pitfalls.md`), `GameKitRecorder.cs` ghi oracle `observed` thẳng từ Unity Editor. `rebuild-game`, `re-notes`, `using-gamekit`, AGENTS.md của game trỏ tới đây.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.

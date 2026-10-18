@@ -54,7 +54,11 @@ export async function run(args) {
     if (/\.json$/.test(rel)) return JSON.stringify(v).slice(1, -1);
     return v;
   };
-  copyDir(TEMPLATE, dest, { transform: (s, rel) => s.replace(/\{\{(NAME|TITLE|ENGINE|CREATED)\}\}/g, (_, k) => esc(k, rel)) });
+  const transform = (s, rel) => s.replace(/\{\{(NAME|TITLE|ENGINE|CREATED)\}\}/g, (_, k) => esc(k, rel));
+  copyDir(TEMPLATE, dest, { transform });
+  // Engine-specific helpers (templates/engines/<engine>/), e.g. Unity's Mathf/Random/coroutine semantics.
+  const overlay = path.join(GAMEKIT_ROOT, 'templates', 'engines', engine);
+  if (exists(overlay)) copyDir(overlay, dest, { transform });
   const gameErrors = check('game', readYaml(path.join(dest, 'game.yaml')));
   if (gameErrors.length) throw new GkError(`game.yaml sinh ra không hợp lệ: ${gameErrors.join('; ')}`);
   updateGame(dest, [

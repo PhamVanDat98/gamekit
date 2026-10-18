@@ -11,6 +11,7 @@ import { requireGameRoot, loadGame, updateGame, nowIso, ownershipOf } from './li
 import { PHASES, nextPhase, phaseInfo } from './lib/phases.mjs';
 import { validateGame } from './validate.mjs';
 import { parityDetail, parityForGame } from './parity.mjs';
+import { portMapStatus } from './unity.mjs';
 
 /**
  * Gate file syntax (gates/P2.md):
@@ -18,6 +19,7 @@ import { parityDetail, parityForGame } from './parity.mjs';
  *   - [ ] Item only the user decides (bạn)
  *   - [ ] Item checked by a script {auto: validate}
  *   - [ ] Item for one kind of game only {only: third-party}   (own | third-party, see source.ownership)
+ *   - [ ] Item for one source engine only {engine: unity}
  * Auto items are re-run every time; their checkbox is ignored.
  */
 export function parseGate(text) {
@@ -35,16 +37,18 @@ export function parseGate(text) {
     };
     const auto = tag('auto');
     const only = tag('only');
+    const engine = tag('engine');
     const human = /\(bạn\)\s*$/i.test(body);
-    items.push({ text: body, checked: m[1] !== ' ', auto, human, only });
+    items.push({ text: body, checked: m[1] !== ' ', auto, human, only, engine });
   }
   return items;
 }
 
-/** Gate items that apply to this game (drops `{only: …}` items for the other kind of game). */
+/** Gate items that apply to this game (drops `{only: …}` items for the other kind of game, `{engine: …}` for other engines). */
 export function gateItemsFor(game, text) {
   const ownership = ownershipOf(game);
-  return parseGate(text).filter((it) => !it.only || it.only === ownership);
+  const engine = game?.source?.engine;
+  return parseGate(text).filter((it) => (!it.only || it.only === ownership) && (!it.engine || it.engine === engine));
 }
 
 function runAuto(root, name, phase) {
@@ -60,6 +64,7 @@ function runAuto(root, name, phase) {
       return { ok: false, detail: e.message };
     }
   }
+  if (name === 'port-map') return portMapStatus(root, { strict: PHASES.indexOf(phase) >= PHASES.indexOf('P2') });
   if (name.startsWith('field:')) {
     // field:release.forbiddenTerms → the game.yaml value must be non-empty
     const key = name.slice(6).trim();

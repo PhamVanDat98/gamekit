@@ -26,8 +26,10 @@ test('skills: frontmatter name matches the folder and description says when to u
 
 test('skills: AVAILABLE_SKILLS lists exactly the shipped skills, each suggested by a phase', () => {
   assert.deepEqual([...AVAILABLE_SKILLS].sort(), skillDirs());
-  const suggested = new Set(Object.values(PHASE_INFO).flatMap((p) => p.skills));
-  for (const s of AVAILABLE_SKILLS) if (s !== 'using-gamekit') assert.ok(suggested.has(s), `${s} không có trong pha nào`);
+  const suggested = Object.values(PHASE_INFO).flatMap((p) => p.skills);
+  // `engine-<engine>` stands for every engine-* skill (status fills in game.yaml source.engine).
+  const matches = (s) => suggested.some((x) => x === s || (x.includes('<engine>') && s.startsWith(x.replace('<engine>', ''))));
+  for (const s of AVAILABLE_SKILLS) if (s !== 'using-gamekit') assert.ok(matches(s), `${s} không có trong pha nào`);
 });
 
 test('skills: relative links inside a skill point to files that exist', () => {

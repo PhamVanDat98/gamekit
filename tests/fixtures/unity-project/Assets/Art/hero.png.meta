@@ -1,0 +1,13 @@
+fileFormatVersion: 2
+guid: c1000000000000000000000000000001
+TextureImporter:
+  serializedVersion: 12
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+  spriteMode: 1
+  spritePixelsToUnits: 100
+  spritePivot: {x: 0.5, y: 0.5}
+  spriteSheet:
+    serializedVersion: 2
+    sprites: []

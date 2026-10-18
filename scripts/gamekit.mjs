@@ -18,6 +18,8 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   gate [--advance]                          Kiểm tra cổng của pha hiện tại
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
   parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)
+  unity scan [--src <project>]              Quét project Unity (có source): settings, script, giá trị inspector, animator
+                                            → notes/unity/REPORT.md, notes/unity/params-draft.json, spec/port-map.yaml
   provenance add <file…> --label <nhãn>     Gắn nguồn gốc asset (reference|generated|own|licensed|placeholder)
   provenance list [--label]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
@@ -56,6 +58,7 @@ const COMMANDS = {
   validate: () => import('./validate.mjs').then((m) => m.run),
   parity: () => import('./parity.mjs').then((m) => m.run),
   provenance: () => import('./provenance.mjs').then((m) => m.run),
+  unity: () => import('./unity.mjs').then((m) => m.run),
   pack: () => import('./pack.mjs').then((m) => m.run),
   'release-check': () => import('./release-check.mjs').then((m) => m.run),
   fanout: () => import('./parallel.mjs').then((m) => m.fanout),

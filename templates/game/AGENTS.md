@@ -13,6 +13,9 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 5. **Popup Settings phải giữ footer bản quyền** (`platform.info.copyright`) — portal yêu cầu, không bỏ khi đổi giao diện.
 6. **Mọi text hiển thị đi qua `t()`** và `Language/en.json` (+ các ngôn ngữ khác), không viết cứng trong `src/`.
 
+## Game gốc là Unity
+Có source project: `npm run gk -- unity scan` trước khi đọc code, đọc hết `notes/unity/REPORT.md`. Số liệu lấy từ giá trị inspector (`notes/unity/params-draft.json`), **không** từ giá trị mặc định trong code C#. Mỗi script gốc là một dòng trong `spec/port-map.yaml` (`done` + `target` hoặc `skip` + `note`). Port C# thì dùng `src/core/unity/` (Mathf.Round, Random.Range, AnimationCurve, coroutine… đúng ngữ nghĩa Unity), core giữ toạ độ Unity (y lên, world unit), `src/view/unity-space.ts` đổi sang pixel. Chi tiết: skill `engine-unity`.
+
 ## Cấu trúc
 - `src/core/` logic thuần, deterministic: không DOM, không thư viện render, thời gian từ fixed step, ngẫu nhiên từ `Rng` có seed. **Viết test trước** (TDD).
 - `src/view/` render và input thiết bị; chỉ đọc state. Kiểm tra bằng screenshot/checklist, không unit test.
@@ -27,6 +30,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Trạng thái, việc tiếp theo | `npm run gk -- status` |
 | Kiểm tra dữ liệu | `npm run gk -- validate` |
 | Test / typecheck / lint | `npm test` · `npm run typecheck` · `npm run lint` |
+| Quét project Unity gốc | `npm run gk -- unity scan [--src <project>]` → `notes/unity/`, `spec/port-map.yaml` |
 | Parity với game gốc | `npm run gk -- parity` (nghĩa vụ trong `spec/obligations.yaml`, test gắn thẻ `[id:case]`) |
 | Kiểm tra cổng, sang pha sau | `npm run gk -- gate` · `npm run gk -- gate --advance` |
 | Dựng song song | `npm run gk -- fanout --wave N` → subagent làm theo `.gamekit/local/BRIEF.md` → `npm run gk -- integrate --wave N` |
