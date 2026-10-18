@@ -23,6 +23,7 @@
           "description": "observed: đọc thẳng từ game gốc (hằng số, file data). derived: tính ra từ logic gốc. inferred: ước lượng (đo video, thử tay) — từ P2 phải có tolerance"
         },
         "tolerance": { "type": "number", "minimum": 0, "description": "Sai số tương đối cho parity test (0.02 = 2%)" },
+        "evidence": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^ev_[0-9a-f]{64}$" }, "description": "Evidence id của REA (ev_…) đã cho ra giá trị này; phải có trong notes/re-log.jsonl" },
         "deviation": {
           "type": "object",
           "required": ["reason", "decision", "approved"],

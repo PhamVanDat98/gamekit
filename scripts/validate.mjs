@@ -10,6 +10,7 @@ import { PHASES } from './lib/phases.mjs';
 import { pngInfo, isWebp } from './lib/png.mjs';
 import { loadLanguages, placeholders } from './lib/languages.mjs';
 import { checkSetting, loadPortal, missingSettings } from './lib/portals.mjs';
+import { LOG_FILE, readLog, unloggedEvidence } from './lib/relog.mjs';
 
 /** Folders whose files end up in a build and therefore need provenance. */
 export const SHIPPED_DIRS = ['assets', 'public'];
@@ -38,6 +39,7 @@ export function validateGame(root, { stage } = {}) {
   const paramKeys = validateParams(root, st, pr);
   validateObligations(root, st, pr, paramKeys);
   validateOracles(root, pr);
+  validateEvidence(root, pr);
   validatePortalSettings(game, st, pr);
   validateLanguages(root, game, pr);
   validateIcons(root, pr);
@@ -148,6 +150,14 @@ function validateOracles(root, pr) {
       pr.error(where, e.message);
     }
   }
+}
+
+// ---------- evidence: ids cited in params/spec must come from the RE journal ----------
+function validateEvidence(root, pr) {
+  const { entries, bad } = readLog(root);
+  if (bad.length) pr.error(LOG_FILE, `dòng không phải JSON: ${bad.slice(0, 5).join(', ')}`);
+  for (const c of unloggedEvidence(root, entries))
+    pr.error(c.where, `evidence ${c.id} không có trong ${LOG_FILE} — ghi lại bước đó (\`gamekit re log "<tóm tắt>" --evidence <id>\`) hoặc bỏ id sai`);
 }
 
 // ---------- portalSettings: answers to each portal kit's questions ----------

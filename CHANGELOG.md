@@ -1,5 +1,14 @@
 # Changelog
 
+## Chưa phát hành
+Theo dõi RE, REA làm bước phân tích của P1:
+- Lệnh `re`: câu hỏi trong `notes/QUESTIONS.md` theo trạng thái, số bước và evidence mỗi câu, bước gần đây, cảnh báo (bước chưa gắn câu hỏi, phân tích lặp y hệt, kết quả bị cắt/chưa đủ, game third-party dùng tool chạy game). `--watch` cập nhật trực tiếp, `--json` cho agent; `re focus <Q#>` chọn câu đang làm; `re log` ghi tay (công cụ GUI, Codex).
+- Nhật ký `notes/re-log.jsonl`: chỉ ghi tool, đối tượng, evidence id, giới hạn kết quả — không ghi nội dung trả về.
+- Hook PostToolUse tự ghi tool REA (`mcp__rea__*`) và lệnh RE qua Bash (ilspycmd, Il2CppDumper, Cpp2IL, AssetRipper, jadx, apktool, gdre_tools, ffdec, wasm2wat, analyzeHeadless, `rea`), và nhắc agent ngay trong phiên khi bước chưa gắn câu hỏi, lặp lại, hoặc kết quả chưa đủ.
+- `evidence: ["ev_…"]` (id Evidence của REA) cho params, oracle, nghĩa vụ; `validate` chặn id không có trong nhật ký.
+- Cổng P1 có mục `{auto: re}`: trạng thái câu hỏi hợp lệ, câu đã trả lời có kết luận, evidence có trong nhật ký. Task VS Code "GameKit: theo dõi RE".
+- Skill `re-notes` viết lại theo vòng hỏi → soi (REA) → đọc bằng chứng → dùng, kèm bảng tool REA theo engine.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.

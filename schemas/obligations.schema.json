@@ -27,6 +27,7 @@
           "params": { "type": "array", "items": { "type": "string" }, "description": "Khoá params liên quan, vd player.speed" },
           "oracle": { "type": "string", "description": "File bảng oracle, vd spec/oracles/pan.json" },
           "source": { "type": "string", "description": "Ghi chú RE mô tả hành vi, vd notes/player.md" },
+          "evidence": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^ev_[0-9a-f]{64}$" }, "description": "Evidence id của REA (ev_…) cho hành vi này; phải có trong notes/re-log.jsonl" },
           "status": { "enum": ["active", "blocked", "out-of-scope"], "default": "active" },
           "decision": { "type": "string", "pattern": "^D-\\d+$", "description": "Bắt buộc khi blocked/out-of-scope: mục trong DECISIONS.md" },
           "approved": { "type": "boolean", "description": "Người dùng đã duyệt việc không kiểm chứng nghĩa vụ này" }

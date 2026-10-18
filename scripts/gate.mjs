@@ -11,12 +11,13 @@ import { requireGameRoot, loadGame, updateGame, nowIso, ownershipOf } from './li
 import { PHASES, nextPhase, phaseInfo } from './lib/phases.mjs';
 import { validateGame } from './validate.mjs';
 import { parityDetail, parityForGame } from './parity.mjs';
+import { reReport } from './re.mjs';
 
 /**
  * Gate file syntax (gates/P2.md):
  *   - [ ] Item an agent may tick once it verified it
  *   - [ ] Item only the user decides (bạn)
- *   - [ ] Item checked by a script {auto: validate}
+ *   - [ ] Item checked by a script {auto: validate}   (validate | parity | re | test | typecheck | lint | pack | release-check | field:k | file:f)
  *   - [ ] Item for one kind of game only {only: third-party}   (own | third-party, see source.ownership)
  * Auto items are re-run every time; their checkbox is ignored.
  */
@@ -59,6 +60,10 @@ function runAuto(root, name, phase) {
     } catch (e) {
       return { ok: false, detail: e.message };
     }
+  }
+  if (name === 're') {
+    const { errors } = reReport(root);
+    return { ok: !errors.length, detail: errors.slice(0, 3).join('; ') };
   }
   if (name.startsWith('field:')) {
     // field:release.forbiddenTerms → the game.yaml value must be non-empty

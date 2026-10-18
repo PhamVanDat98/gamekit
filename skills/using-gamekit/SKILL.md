@@ -10,7 +10,7 @@ GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, 
 ## Gọi CLI
 - Trong thư mục game: `npm run gk -- <lệnh>` (shim `scripts/gk.mjs` trỏ tới plugin).
 - Từ Claude Code ở bất kỳ đâu: `node "${CLAUDE_PLUGIN_ROOT}/scripts/gamekit.mjs" <lệnh>`.
-- Lệnh: `init`, `config`, `status`, `gate [--advance]`, `validate`, `parity`, `provenance add|list`, `pack`, `release-check`, `fanout`, `check-ownership`, `integrate`. `gamekit help` để xem đủ.
+- Lệnh: `init`, `config`, `status`, `gate [--advance]`, `validate`, `parity`, `re [focus|log] [--watch]`, `provenance add|list`, `pack`, `release-check`, `fanout`, `check-ownership`, `integrate`. `gamekit help` để xem đủ.
 
 ## Tạo game mới (agent)
 1. `gamekit init <tên> --questions --json` → danh sách câu hỏi (label, description, example, default, required). Không có TTY thì init không tự hỏi.
@@ -46,7 +46,7 @@ Cổng tự bỏ các mục `{only: …}` không áp cho game này.
 5. **Art brief** (`third-party`) mô tả thiết kế mới, không viết "vẽ lại nhân vật X của game gốc".
 
 ## Cấu trúc một game
-`src/core/` logic thuần, deterministic (không DOM, không render, `Rng` có seed, fixed timestep) · `src/view/` render + input, chỉ đọc state · `src/platform/` interface chung cho mọi portal · `src/contracts/` type dùng chung · `params/` số liệu có nguồn · `spec/` (gameplay spec, `obligations.yaml` nghĩa vụ parity, `oracles/` bảng từ game gốc) · `notes/` (ghi chú RE, `QUESTIONS.md`) · `gates/` · `DECISIONS.md` · `provenance.json` · `module-plan.yaml` (khi dựng song song).
+`src/core/` logic thuần, deterministic (không DOM, không render, `Rng` có seed, fixed timestep) · `src/view/` render + input, chỉ đọc state · `src/platform/` interface chung cho mọi portal · `src/contracts/` type dùng chung · `params/` số liệu có nguồn · `spec/` (gameplay spec, `obligations.yaml` nghĩa vụ parity, `oracles/` bảng từ game gốc) · `notes/` (ghi chú RE, `QUESTIONS.md`, nhật ký `re-log.jsonl`) · `gates/` · `DECISIONS.md` · `provenance.json` · `module-plan.yaml` (khi dựng song song).
 
 ## Test
 - `core/` và adapter: **TDD** (dùng skill test-driven-development của Superpowers nếu có). Giá trị kỳ vọng lấy từ `params/` = game gốc, kèm `tolerance`.

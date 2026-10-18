@@ -18,6 +18,9 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   gate [--advance]                          Kiểm tra cổng của pha hiện tại
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
   parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)
+  re [--watch] [--json] [--last N]          Theo dõi RE: câu hỏi, bước phân tích, evidence (notes/re-log.jsonl); --watch cập nhật trực tiếp
+  re focus <Q#> | --clear                   Câu hỏi đang làm — các bước phân tích sau đó gắn vào câu này
+  re log "<tóm tắt>" [--kind note|inspect|conclude] [--q Q#] [--tool t] [--evidence ev_…]   Ghi tay một bước (công cụ GUI, Codex)
   provenance add <file…> --label <nhãn>     Gắn nguồn gốc asset (reference|generated|own|licensed|placeholder)
   provenance list [--label]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
@@ -29,7 +32,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'watch', 'clear']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -55,6 +58,7 @@ const COMMANDS = {
   gate: () => import('./gate.mjs').then((m) => m.run),
   validate: () => import('./validate.mjs').then((m) => m.run),
   parity: () => import('./parity.mjs').then((m) => m.run),
+  re: () => import('./re.mjs').then((m) => m.run),
   provenance: () => import('./provenance.mjs').then((m) => m.run),
   pack: () => import('./pack.mjs').then((m) => m.run),
   'release-check': () => import('./release-check.mjs').then((m) => m.run),

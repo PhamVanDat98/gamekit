@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
+import { spawnSync } from 'node:child_process';
+import { ROOT, gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
 import { ownershipProblems, topo } from '../scripts/parallel.mjs';
@@ -716,4 +717,109 @@ test('ownership: game.yaml without the field counts as own; unknown values are r
   const r = gk(dir, 'validate');
   assert.equal(r.code, 1);
   assert.match(r.out, /ownership/);
+});
+
+// ---------- re: RE journal and live monitoring ----------
+const HOOK = path.join(ROOT, 'hooks', 're-monitor.mjs');
+const runHook = (input) => spawnSync(process.execPath, [HOOK], { input: JSON.stringify(input), encoding: 'utf8' }).stdout;
+const EV = (c) => `ev_${c.repeat(64)}`;
+const addQuestions = (dir, rows) => fs.appendFileSync(path.join(dir, 'notes/QUESTIONS.md'), rows.map((r) => `| ${r.join(' | ')} |\n`).join(''));
+const reJson = (dir) => JSON.parse(gk(dir, 're', '--json').out);
+const journal = (dir) => read(dir, 'notes/re-log.jsonl').trim().split('\n').map((l) => JSON.parse(l));
+
+test('re: questions by state; focus tags later steps; log checks its input', () => {
+  const dir = newGame('re1');
+  addQuestions(dir, [['Q2', 'Bóng tăng tốc theo level?', 'hằng số', 'một phần', ''], ['Q3', 'RNG?', 'hàm Random', 'đã trả lời', 'notes/rng.md']]);
+  let r = reJson(dir);
+  assert.deepEqual([r.totals.questions, r.totals.open, r.totals.partial, r.totals.answered], [3, 1, 1, 1]);
+  assert.equal(r.focus, null);
+  assert.equal(gk(dir, 're', 'focus', 'Q9').code, 1, 'unknown question');
+  assert.equal(gk(dir, 're', 'focus', 'q2').code, 0);
+  assert.equal(gk(dir, 're', 'log', 'x', '--evidence', 'ev_123').code, 1, 'evidence must be a REA id');
+  assert.equal(gk(dir, 're', 'log', 'x', '--kind', 'guess').code, 1);
+  assert.equal(gk(dir, 're', 'log', 'ILSpy: BallController.LevelUp nhân 1.15', '--kind', 'inspect', '--evidence', EV('a')).code, 0);
+  assert.equal(gk(dir, 're', 'log', 'đo video', '--q', 'Q3').code, 0);
+  const j = journal(dir);
+  assert.deepEqual(j.map((e) => [e.kind, e.q]), [['focus', 'Q2'], ['inspect', 'Q2'], ['note', 'Q3']]);
+  assert.equal(j[0].phase, 'P0');
+  r = reJson(dir);
+  assert.equal(r.focus, 'Q2');
+  const q2 = r.questions.find((q) => q.id === 'Q2');
+  assert.deepEqual([q2.steps, q2.evidence], [1, 1]);
+  const out = gk(dir, 're').out;
+  assert.match(out, /Q2\s+một phần.*1 bước · 1 evidence.*← đang làm/);
+  assert.match(out, /Gần đây:/);
+  assert.equal(gk(dir, 're', 'focus', '--clear').code, 0);
+  assert.equal(reJson(dir).focus, null);
+});
+
+test('re: the hook records REA and RE command-line calls only, inside a game, and nudges the agent', () => {
+  const dir = newGame('re2');
+  const rea = { cwd: dir, tool_name: 'mcp__rea__analyze_function', tool_input: { path: '/g/Game_Data/Managed/Assembly-CSharp.dll', function: 'Ball.Update' } };
+  let out = runHook({ ...rea, tool_response: { structuredContent: { evidence_id: EV('b'), normalized_result: { truncated: true } } } });
+  assert.match(out, /chưa gắn câu hỏi/);
+  assert.match(out, /chưa đầy đủ \(truncated\)/);
+  // same analysis, keys in another order → flagged as a repeat
+  out = runHook({ ...rea, tool_input: { function: 'Ball.Update', path: '/g/Game_Data/Managed/Assembly-CSharp.dll' }, tool_response: 'ok' });
+  assert.match(out, /y hệt đã chạy 1 lần/);
+  runHook({ cwd: dir, tool_name: 'Bash', tool_input: { command: 'ilspycmd -t Ball Assembly-CSharp.dll' }, tool_response: { stdout: '' } });
+  runHook({ cwd: dir, tool_name: 'Bash', tool_input: { command: 'ls -la && npm test' }, tool_response: { stdout: '' } });
+  runHook({ cwd: dir, tool_name: 'Read', tool_input: { file_path: 'x' } });
+  runHook({ cwd: path.dirname(dir), tool_name: 'mcp__rea__open_binary', tool_input: {} });
+  const j = journal(dir);
+  assert.deepEqual(j.map((e) => [e.via, e.tool]), [['rea', 'analyze_function'], ['rea', 'analyze_function'], ['cli', 'ilspy']]);
+  assert.equal(j[0].target, 'Assembly-CSharp.dll Ball.Update');
+  assert.deepEqual(j[0].evidence, [EV('b')]);
+  assert.deepEqual(j[0].limits, ['truncated']);
+  assert.ok(!JSON.stringify(j).includes('normalized_result'), 'tool output is never stored');
+  const r = reJson(dir);
+  assert.equal(r.totals.steps, 3);
+  assert.ok(r.warnings.some((w) => /3 bước phân tích chưa gắn câu hỏi/.test(w)));
+  assert.ok(r.warnings.some((w) => /y hệt chạy 2 lần/.test(w)));
+  assert.ok(r.warnings.some((w) => /chưa đầy đủ/.test(w)));
+  gk(dir, 're', 'focus', 'Q1');
+  out = runHook({ cwd: dir, tool_name: 'mcp__plugin_rea_rea__open_binary', tool_input: { path: '/g/x.exe' }, tool_response: 'ok' });
+  assert.equal(out, '', 'nothing to say for a fresh, tagged, complete step');
+  assert.equal(journal(dir).at(-1).q, 'Q1');
+});
+
+test('re: bad question states, answers without conclusion and unlogged evidence fail validate and the P1 gate', () => {
+  const dir = newGame('re3');
+  addQuestions(dir, [['Q2', 'a', 'b', 'xong', ''], ['Q3', 'c', 'd', 'da tra loi', '']]);
+  editJson(dir, 'params/game.json', (p) => {
+    p.player.speed.evidence = [EV('c')];
+  });
+  let r = gk(dir, 're');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /Q2 có trạng thái "xong"/);
+  assert.match(r.out, /Q3 đã trả lời nhưng cột kết luận trống/, 'states without diacritics are understood');
+  assert.match(r.out, /player\.speed: evidence ev_cccccccc… không có trong notes\/re-log\.jsonl/);
+  assert.equal(gk(dir, 'validate').code, 1, 'validate also rejects unlogged evidence');
+  editJson(dir, 'params/game.json', (p) => {
+    p.player.speed.evidence = ['ev_short'];
+  });
+  assert.equal(gk(dir, 'validate').code, 1, 'schema: evidence must be a REA id');
+  editJson(dir, 'params/game.json', (p) => {
+    p.player.speed.evidence = [EV('c')];
+  });
+  gk(dir, 're', 'log', 'speed', '--evidence', EV('c'));
+  assert.equal(gk(dir, 'validate').code, 0);
+  write(dir, 'notes/QUESTIONS.md', read(dir, 'notes/QUESTIONS.md').replace('| xong |', '| mở |').replace('| da tra loi |  |', '| đã trả lời | notes/x.md |'));
+  assert.equal(gk(dir, 're').code, 0);
+  // P1 gate runs {auto: re}
+  editYaml(dir, (g) => {
+    g.phase = 'P1';
+  });
+  write(dir, 'notes/QUESTIONS.md', read(dir, 'notes/QUESTIONS.md').replace('| mở |', '| ? |'));
+  const gate = gk(dir, 'gate');
+  assert.match(gate.out, /✘ Câu hỏi và nhật ký RE nhất quán.*\[auto: re\].*Q1 có trạng thái "\?"/);
+});
+
+test('re: a third-party game is warned when a runtime REA tool touched the original', () => {
+  const dir = newGame('re4', '--third-party');
+  const out = runHook({ cwd: dir, tool_name: 'mcp__rea__capture_process_scenario', tool_input: {}, tool_response: 'ok' });
+  assert.match(out, /chỉ được phân tích file tĩnh/);
+  assert.ok(reJson(dir).warnings.some((w) => /1 lần chạy\/gắn vào game: capture_process_scenario/.test(w)));
+  const own = newGame('re5');
+  assert.doesNotMatch(runHook({ cwd: own, tool_name: 'mcp__rea__capture_process_scenario', tool_input: {}, tool_response: 'ok' }), /file tĩnh/);
 });

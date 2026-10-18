@@ -9,6 +9,7 @@
     "$schema": { "type": "string" },
     "source": { "type": "string", "minLength": 1, "description": "Lấy từ đâu trong game gốc: file + hàm/offset, bảng data, hoặc đo từ video" },
     "confidence": { "enum": ["observed", "derived", "inferred"] },
+    "evidence": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^ev_[0-9a-f]{64}$" }, "description": "Evidence id của REA (ev_…) đã cho ra bảng này; phải có trong notes/re-log.jsonl" },
     "description": { "type": "string" },
     "tolerance": { "type": "number", "minimum": 0, "description": "Sai số tương đối mặc định cho mọi case" },
     "cases": {

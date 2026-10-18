@@ -36,6 +36,7 @@ npm run dev                 # chơi thử với dev-mock (?ad=fail|skip|none|slo
 npm run gk -- status        # pha hiện tại, việc còn mở, skill tiếp theo
 npm test                    # parity + replay + platform
 npm run gk -- parity        # mọi nghĩa vụ trong spec/obligations.yaml đã có test xanh?
+npm run gk -- re --watch    # theo dõi phân tích game gốc (P1) trực tiếp
 npm run gk -- gate          # kiểm tra cổng; --advance để sang pha sau
 npm run gk -- pack --all --zip
 npm run gk -- release-check
@@ -53,6 +54,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | `gate [--advance]` | Chấm `gates/<pha>.md`: mục `{auto: …}` chạy script, mục `(bạn)` chỉ người dùng tick |
 | `validate [--stage Px]` | Schema `game.yaml`, `params/*.json` (mọi giá trị có `source`; `confidence` = observed/derived/inferred, inferred cần `tolerance` từ P2), `spec/obligations.yaml`, `spec/oracles/*.json`, provenance, `module-plan.yaml`, `asset-manifest.json` |
 | `parity [--report file.json]` | Chạy vitest, đóng từng nghĩa vụ trong `spec/obligations.yaml` bằng test gắn thẻ `[id:case]`. Test đỏ, skip/todo, thiếu case hay thẻ lạ đều tính là chưa đạt |
+| `re [--watch] [--json]` · `re focus <Q#>` · `re log "…"` | Theo dõi RE: câu hỏi trong `notes/QUESTIONS.md` theo trạng thái, bước phân tích và evidence của từng câu (nhật ký `notes/re-log.jsonl`), bước gần đây, cảnh báo (bước chưa gắn câu, phân tích lặp, kết quả bị cắt, game third-party dùng tool chạy game). Trong Claude Code hook tự ghi tool REA và lệnh RE; nơi khác ghi tay bằng `re log`. Cổng P1 chấm `{auto: re}` |
 | `provenance add <file…> --label …` | Nhãn `reference / generated / own / licensed / placeholder` |
 | `pack [--portal] [--all] [--version V] [--compress] [--zip]` | `builds/<YYMMDDNN>/<portal>/{index.html, preview.html, version.txt, <v>/…}` + `builds/<v>/manifest.json` (+ zip) |
 | `release-check [--version V] [--portal p]` | Mặc định bản mới nhất. Kiểm bố cục az-v1, footer bản quyền, chặn asset reference/placeholder, tên game gốc, link ngoài, đường dẫn tuyệt đối, vượt ngân sách tải |
@@ -65,9 +67,9 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 
 ```
 .claude-plugin/   plugin.json, marketplace.json
-hooks/            SessionStart → using-gamekit + gamekit status
+hooks/            SessionStart → using-gamekit + gamekit status; PostToolUse → nhật ký RE (tool REA, lệnh RE)
 commands/         /gamekit:status, /gamekit:next
-skills/           using-gamekit, rebuild-game, module-plan, integrate, platform-sdk, package-web-build, release-check
+skills/           using-gamekit, re-notes, parity-check, rebuild-game, module-plan, integrate, platform-sdk, package-web-build, release-check
 portals/          vỏ portal dùng chung: azgames, dev-mock (portal.yaml, kit.mjs, shell.html, loader.entry.js, Icons/), shared/
 scripts/          CLI gamekit.mjs + lệnh; lib/
 schemas/          game, params, provenance, module-plan, asset-manifest (JSON Schema)
