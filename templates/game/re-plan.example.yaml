@@ -1,6 +1,8 @@
 # Ví dụ re-plan.yaml: chia phân tích game gốc (P1) thành mảng để nhiều agent làm song song.
 # Đổi tên thành re-plan.yaml khi dùng. Agent chính viết file này, commit lên main rồi mới chia việc.
 # Mỗi mảng chỉ ghi vào file của mình; quyết định của mảng mang mã D-<mảng>-n trong notes/<mảng>/decisions.md.
+# params/<mảng>.json nằm dưới PARAMS.<mảng>: tên mảng không được trùng nhóm trong params/game.json
+# (game demo có world, player, obstacle, score — xoá phần demo đó khi chia mảng, validate sẽ báo nếu trùng).
 kind: re
 base: main
 maxParallel: 4

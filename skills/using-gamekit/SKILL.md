@@ -30,7 +30,7 @@ GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, 
 
 Skill **in đậm** có trong bản này. Skill khác chưa có: làm theo luật dưới đây và checklist trong `gates/<pha>.md`, ghi lại cách làm để sau đúc thành skill.
 
-Mỗi pha kết thúc bằng một cổng (`gates/P*.md`). `gamekit gate` kiểm tra; mục `{auto: …}` do script chấm; mục `(bạn)` **chỉ người dùng được tick** — hỏi họ, không tự tick. Chỉ chạy `gamekit gate --advance` khi người dùng đồng ý.
+Mỗi pha kết thúc bằng một cổng (`gates/P*.md`). Chia mảng phân tích thì mỗi mảng có cổng riêng `gamekit gate --area <id>`; cổng P1 có `{auto: areas}` = mọi mảng đã merge và qua cổng mảng. `gamekit gate` kiểm tra; mục `{auto: …}` do script chấm; mục `(bạn)` **chỉ người dùng được tick** — hỏi họ, không tự tick. Chỉ chạy `gamekit gate --advance` khi người dùng đồng ý.
 
 ## Game của ai: `source.ownership`
 - **`own` (mặc định)**: game của chính người dùng — có source, hoặc mất source chỉ còn bản build (APK…). Giữ nguyên hình, âm thanh, tên, text. Không hỏi lại điều này; chỉ đổi khi người dùng nói đây là game của người khác.

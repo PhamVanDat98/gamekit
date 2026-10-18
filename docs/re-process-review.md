@@ -313,7 +313,7 @@ Thứ tự phụ thuộc: **W0** phải xong trước; các gói trong cùng m�
 | **W2 Câu hỏi & ghi chú** (đã xong, xem 5.0 và 5.0e) | 1 | `scripts/questions.mjs` (mới), `scripts/validate.mjs` (phần notes — tách thành `scripts/lib/validate-notes.mjs` để không đụng W1), `templates/game/notes/` | Đọc `notes/**/questions.yaml` (và cảnh báo nếu còn `QUESTIONS.md` kiểu cũ); kiểm liên kết; kiểm frontmatter ghi chú; lệnh `questions` | câu `answered` không có ghi chú → lỗi; `openReason` bắt buộc khi đóng |
 | **W3 Lập lịch song song** (đã xong, xem 5.0d) | 1 | `scripts/parallel.mjs` | `fanout/integrate --plan re|build --ready`, `--keep-going`, `links:` symlink, chia lượt `maxParallel`, tiền tố nhánh theo kind, brief giàu thông tin | worktree có symlink `decompiled/`; nhánh đỏ không chặn nhánh độc lập; con của nhánh đỏ bị bỏ qua |
 | **W4 Recon** | 1 | `scripts/recon.mjs` (mới), `schemas/inventory.schema.json` | Nhận diện engine, kiểm kê, ghi `notes/inventory.json`, điền `game.yaml` | thư mục giả cho từng engine (Unity Mono, IL2CPP, WebGL, Godot, APK) |
-| **W5 Cổng** | 2 (sau W2, W3) | `scripts/gate.mjs`, `templates/game/gates/P1.md`, `P2.md` | `gate --area`; auto `areas`, `questions`, `file:spec/gameplay-spec.md`, `merged` (mọi module đã merge + worktree gỡ); chạy auto song song; dùng chung một lần vitest | cổng mảng qua/không qua; P2 chạy vitest đúng 1 lần |
+| **W5 Cổng** (đã xong, xem 5.0f) | 2 (sau W2, W3) | `scripts/gate.mjs`, `templates/game/gates/P1.md`, `P2.md` | `gate --area`; auto `areas`, `questions`, `file:spec/gameplay-spec.md`, `merged` (mọi module đã merge + worktree gỡ); chạy auto song song; dùng chung một lần vitest | cổng mảng qua/không qua; P2 chạy vitest đúng 1 lần |
 | **W6 Parity một phần** | 2 (sau W1) | `scripts/parity.mjs` | `--area`, `--module`, `--json`, `--mutate` | lọc đúng; mutate làm nghĩa vụ đỏ |
 | **W7 Status/next** | 2 (sau W3) | `scripts/status.mjs`, `commands/next.md` | Đơn vị sẵn sàng / đang chạy / chờ integrate / bị chặn; `next` gợi ý giao **nhiều** việc một lượt | output có các nhóm |
 | **W8 Skill** | 3 | `skills/re-plan/` (mới), `skills/re-notes/`, `skills/game-recon/` (mới), `skills/module-plan/`, `skills/integrate/`, `skills/using-gamekit/`, `scripts/lib/phases.mjs` (`AVAILABLE_SKILLS`), `README.md`, `CHANGELOG.md` | Viết theo luồng mới; nêu cách giao song song (Claude Code: nhiều Agent trong một lượt; Codex: mỗi worktree một session) | `tests/skills.test.mjs` (frontmatter) |
@@ -360,6 +360,14 @@ Theo `AGENTS.md`: mỗi lệnh mới thêm vào `COMMANDS` + `HELP` trong `scrip
 - Cảnh báo trước P2, lỗi từ P2: câu `answered` không có `notes`; ghi chú được trỏ tới thiếu phần; câu bắt buộc (`required` mặc định true) chưa `answered` mà thiếu `openReason` hoặc `impact`. Đây là mục cổng P1 "mọi câu đã trả lời hoặc ghi rõ lý do" ở dạng máy chấm được — W5 sẽ đưa vào cổng.
 - `gamekit questions [--area] [--json]` (`scripts/questions.mjs`).
 - Chưa làm: kiểm `notes/QUESTIONS.md` kiểu cũ (vẫn là bảng tự do); phát hiện code decompile dán vào ghi chú.
+
+### 5.0f Đã làm: W5 — cổng
+
+- `areaGate(root, id)` trong `scripts/gate.mjs`: `validateGame` ở stage P2, giữ lỗi có `where` nằm trong `owns` của mảng (bỏ lỗi "chưa nạp trong `src/core/params.ts`" và lỗi câu hỏi chặn — hàng câu hỏi báo riêng); có ít nhất một câu hỏi, không câu bắt buộc nào chặn; nghĩa vụ trong file mảng sở hữu đều có `source`. Không ghi trạng thái: `{auto: areas}` tính lại mỗi lần (đã merge = có merge commit `merge: re/<id> (`).
+- `{auto: merged}`, `{auto: questions}`; `gateItemsFor(game, text, root)` lọc `{only: split|single}` (status cũng truyền root).
+- `evaluateGate` thành async: mục auto chạy song song qua `lib/proc.mjs` (`runAsync`), trừ `pack` và `release-check` chạy lần lượt sau cùng. `vitestRun` trong `parity.mjs` chạy vitest một lần cho cả `parity` và `test` khi `scripts.test` đúng là `vitest run`; script test khác thì chạy riêng như cũ.
+- Đo trên game demo (máy phiên này): cổng P2 7,4 s → 3,6 s.
+- Lưu ý dùng: một mục cổng chỉ nhận một thẻ `{only: …}`; tên mảng không được trùng nhóm của `params/game.json` (game demo có `world`, `player`, `obstacle`, `score`).
 
 ### 5.1 Tương thích ngược
 

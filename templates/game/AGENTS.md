@@ -29,7 +29,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Test / typecheck / lint | `npm test` · `npm run typecheck` · `npm run lint` |
 | Câu hỏi phân tích theo mảng | `npm run gk -- questions` (`notes/<mảng>/questions.yaml`) |
 | Parity với game gốc | `npm run gk -- parity` (nghĩa vụ trong `spec/obligations.yaml`, test gắn thẻ `[id:case]`) |
-| Kiểm tra cổng, sang pha sau | `npm run gk -- gate` · `npm run gk -- gate --advance` |
+| Kiểm tra cổng, sang pha sau | `npm run gk -- gate` · `npm run gk -- gate --advance` · cổng một mảng phân tích: `npm run gk -- gate --area <id>` |
 | Phân tích song song (P1) | `re-plan.yaml` → `npm run gk -- fanout --plan re --ready` → subagent làm theo `.gamekit/local/BRIEF.md` → `npm run gk -- integrate --plan re --ready` (lặp lại tới khi mọi mảng merge) |
 | Dựng song song (P2) | `module-plan.yaml` → `npm run gk -- fanout --ready` (hoặc `--wave N`) → subagent → `npm run gk -- integrate --ready` |
 | Thông tin portal còn thiếu | `npm run gk -- config --portal <id>` |

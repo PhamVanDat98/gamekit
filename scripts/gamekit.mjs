@@ -15,7 +15,8 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   init <tên> --questions --json             In danh sách câu hỏi kèm giải thích (cho agent hỏi người dùng)
   config [--portal p] [--set k=v…] [--questions --json]   Điền thông tin portal còn thiếu, thêm portal
   status | next                             Game đang ở pha nào, việc gì tiếp
-  gate [--advance]                          Kiểm tra cổng của pha hiện tại
+  gate [--advance]                          Kiểm tra cổng của pha hiện tại (mục auto chạy song song)
+  gate --area <id>                          Cổng của một mảng phân tích (re-plan.yaml): đủ điều kiện để dựng lại chưa
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, re-plan, câu hỏi, asset-manifest
   questions [--area id] [--json]            Câu hỏi phân tích theo mảng (notes/<mảng>/questions.yaml): tiến độ, câu bắt buộc chưa xong
   parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)

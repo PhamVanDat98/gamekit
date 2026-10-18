@@ -35,6 +35,8 @@ export function missingNoteParts(text) {
 }
 
 const isOpen = (q) => q.status !== 'answered';
+/** Text of the problem for a required question still open without a reason (the area gate reports it once). */
+export const BLOCKING_QUESTION = 'câu bắt buộc còn';
 const isRequired = (q) => q.required !== false;
 
 /**
@@ -71,7 +73,7 @@ export function checkQuestions(root, pr, { strict, paramKeys, obligationIds, are
       if (obligationIds) for (const o of q.obligations ?? []) if (!obligationIds.has(o)) pr.error(where, `${q.id}: không có nghĩa vụ ${o} trong spec/obligations`);
       if (q.status === 'answered' && !(q.notes ?? []).length) flag(where, `${q.id}: đã trả lời nhưng chưa trỏ tới ghi chú nào (notes)`);
       if (isOpen(q) && isRequired(q) && !(q.openReason && q.impact))
-        flag(where, `${q.id}: câu bắt buộc còn ${q.status} — trả lời, hoặc ghi openReason và impact (ảnh hưởng tới bản port)`);
+        flag(where, `${q.id}: ${BLOCKING_QUESTION} ${q.status} — trả lời, hoặc ghi openReason và impact (ảnh hưởng tới bản port)`);
     }
   }
   for (const [n, missing] of notesChecked) if (missing.length) flag(n, `ghi chú thiếu: ${missing.join(', ')} (skill re-notes)`);

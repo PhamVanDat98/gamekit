@@ -30,7 +30,7 @@ export function summarize(root) {
     if (planned && d > planned) lines.push(`⚠ Vượt thời gian dự kiến — cân nhắc quay lại triage (luật cắt lỗ).`);
   }
   const gateFile = path.join(root, 'gates', `${phase}.md`);
-  const pending = exists(gateFile) ? gateItemsFor(game, fs.readFileSync(gateFile, 'utf8')).filter((i) => !i.auto && !i.checked) : [];
+  const pending = exists(gateFile) ? gateItemsFor(game, fs.readFileSync(gateFile, 'utf8'), root).filter((i) => !i.auto && !i.checked) : [];
   const skills = info.skills.map((s) => s.replace('<engine>', game.source?.engine ?? 'unknown'));
   const missing = [];
   for (const p of game.portals ?? []) {
