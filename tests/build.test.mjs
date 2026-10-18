@@ -389,3 +389,13 @@ test('release-check: unbuilt, dirty or stale packages are refused', async () => 
   assert.match(checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir)).errors.join('\n'), /HEAD/);
   assert.match(checkBuild(dir, '26101601', 'dev-mock', game, loadProvenance(dir)).errors.join('\n'), /chưa có gói/);
 });
+
+test('languages: a translation with its own plural forms gets none of en\'s forms for that key', async () => {
+  const { buildLanguages } = await import('../scripts/lib/languages.mjs');
+  const sources = {
+    en: { _meta: { name: 'English' }, 'coins.one': '{count} coin', 'coins.other': '{count} coins', 'lives.one': '{count} life', 'lives.other': '{count} lives', title: 'Title' },
+    ru: { _meta: { name: 'Русский' }, 'coins.other': '{count} монет' },
+  };
+  const ru = JSON.parse(buildLanguages(sources, ['ru']).files.ru);
+  assert.deepEqual(ru, { 'lives.one': '{count} life', 'lives.other': '{count} lives', title: 'Title', 'coins.other': '{count} монет' });
+});

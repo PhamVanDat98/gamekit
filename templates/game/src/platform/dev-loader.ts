@@ -15,7 +15,8 @@ export function installDevLoader(): void {
   const code = dicts.has(wanted) ? wanted : 'en';
   // Right-to-left languages (ar, fa…) flip the page as the portal loader does.
   if ((dicts.get(code)?._meta as { dir?: string } | undefined)?.dir === 'rtl') document.documentElement.dir = 'rtl';
-  window.GM_LANG = { code, dict: { ...en, ...(dicts.get(code) ?? {}) }, available };
+  document.documentElement.lang = code;
+  window.GM_LANG = { code, dict: withEnFallback(en, dicts.get(code) ?? {}), available };
   window.GM_LOADER = {
     copyright: `© ${new Date().getFullYear()} GameKit (dev)`,
     version: 'dev',
@@ -29,6 +30,21 @@ export function installDevLoader(): void {
     },
     ready() {},
   };
+}
+
+const PLURAL = /^(.+)\.(zero|one|two|few|many|other)$/;
+const pluralBase = (k: string) => PLURAL.exec(k)?.[1];
+
+/**
+ * Keys missing from a translation come from en — except plural forms of a key the translation already
+ * pluralises: ru with only `coins.other` must not get en's `coins.one` ("1 coin" in a Russian game).
+ * Same rule as `gamekit pack` (scripts/lib/languages.mjs in the plugin).
+ */
+export function withEnFallback(en: Record<string, unknown>, dict: Record<string, unknown>): Record<string, unknown> {
+  const own = new Set(Object.keys(dict).map(pluralBase).filter(Boolean));
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(en)) if (!own.has(pluralBase(k))) out[k] = v;
+  return Object.assign(out, dict);
 }
 
 function read(key: string): string | null {
