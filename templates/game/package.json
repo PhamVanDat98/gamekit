@@ -7,7 +7,7 @@
     "dev": "vite",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.core.json",
     "lint": "eslint .",
     "gk": "node scripts/gk.mjs",
     "status": "node scripts/gk.mjs status",

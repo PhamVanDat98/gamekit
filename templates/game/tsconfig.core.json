@@ -1,0 +1,9 @@
+{
+  // core/ checked again without DOM or Vite types: window, fetch, crypto, HTMLCanvasElement… are type errors here.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2020"],
+    "types": []
+  },
+  "include": ["src/core", "src/contracts"]
+}
