@@ -1,7 +1,8 @@
 # Nghĩa vụ parity: mỗi hành vi của game gốc mà bản web phải tái hiện (skill parity-check).
 # Đóng bằng test gắn thẻ [id:case] trong tên, vd it('[player.move:edge] …'). `gamekit parity` chấm.
 # Case: normal | edge | invalid | oracle (bảng spec/oracles) | replay.
-# Không làm một nghĩa vụ: status blocked|out-of-scope + decision D-n + approved (người dùng duyệt).
+# Không làm một nghĩa vụ: status blocked|out-of-scope + decision D-n (hoặc D-<mảng>-n) + approved (người dùng duyệt).
+# Chia mảng: nghĩa vụ của mảng <m> nằm ở spec/obligations/<m>.yaml, id bắt đầu bằng "<m>." — gộp chung khi chấm.
 # Các mục dưới đây là của game demo trong template — thay bằng cơ chế của game gốc ở P2.
 obligations:
   - id: player.move

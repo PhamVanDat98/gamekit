@@ -18,15 +18,18 @@ Chạy song song chỉ an toàn khi **contract được chốt trước**. Agent
 4. **Stub**: mỗi module một file export hàm rỗng/throw `not implemented` đúng chữ ký contract, để project build và typecheck được ngay.
 5. **module-plan.yaml** (xem `module-plan.example.yaml` trong game, schema `.gamekit/schemas/module-plan.schema.json`):
    - `shared`: `src/contracts/`, `params/`, `package.json`, `package-lock.json`, `game.yaml`, `module-plan.yaml` và mọi file dùng chung khác — chỉ agent chính sửa.
-   - Mỗi module: `id`, `wave`, `owns` (thư mục, mỗi file một chủ), `dependsOn` (chỉ module ở đợt trước), `contracts`, `tests`, `brief` (trích spec liên quan + tiêu chí parity cụ thể).
+   - Mỗi module: `id`, `wave`, `owns` (thư mục, mỗi file một chủ), `dependsOn` (chỉ module ở đợt trước), `contracts`, `tests`, `obligations` (nghĩa vụ parity module đóng — bỏ trống nếu một mảng của `re-plan.yaml` có `buildModule` trỏ tới module này), `brief` (trích spec liên quan + tiêu chí parity cụ thể).
    - Đợt điển hình: 1 = các `core/*` + `view/ui` trên state giả + asset; 2 = `view/scene`, `view/fx`, input; 3 = tích hợp.
    - `maxParallel`: 3–5.
 6. `gamekit validate` sạch (kiểm tra trùng sở hữu, phụ thuộc sai đợt, đụng vùng shared) → commit lên `main`.
-7. `gamekit fanout --wave 1`: tạo worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>`, viết `.gamekit/local/BRIEF.md`, symlink `node_modules`.
+7. `gamekit fanout --ready` (hoặc `--wave 1`): tạo worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>`, viết `.gamekit/local/BRIEF.md`, symlink `node_modules` và các thư mục trong `links`. `--ready` mở mọi module có phụ thuộc đã merge, không chờ cả đợt; không vượt `maxParallel` (tính cả worktree đang mở). Module dựng lại một mảng phân tích (`buildModule` trong `re-plan.yaml`) được kèm nghĩa vụ của mảng trong brief.
+
+Phân tích (P1) chia mảng bằng `re-plan.yaml` (mẫu `re-plan.example.yaml`) và chạy cùng cơ chế: `gamekit fanout --plan re --ready` → `gamekit integrate --plan re --ready`. Mảng không có đợt, chỉ có `dependsOn`.
 
 ## Giao việc
 - **Claude Code**: trong cùng một lượt, gọi Agent tool cho từng module (song song), prompt: "Làm việc trong thư mục <worktree>. Đọc .gamekit/local/BRIEF.md và làm theo. Dùng TDD cho core/. Trả lời bằng tóm tắt việc đã làm và đề xuất đổi contract nếu có."
 - **Codex**: mỗi worktree một session.
+- Quyết định riêng của module (sai khác game gốc, bỏ một nghĩa vụ) ghi vào `notes/<id>/decisions.md` với mã `D-<id>-n`; subagent không sửa `DECISIONS.md`. Thêm `notes/<id>/` vào `owns` của module.
 - Subagent đề xuất đổi contract → agent chính quyết, sửa trên `main`, rebase/giao lại module bị ảnh hưởng. Subagent không tự sửa vùng shared (`check-ownership` chặn).
 
 Xong đợt → skill **integrate**.

@@ -1,0 +1,38 @@
+# Ví dụ re-plan.yaml: chia phân tích game gốc (P1) thành mảng để nhiều agent làm song song.
+# Đổi tên thành re-plan.yaml khi dùng. Agent chính viết file này, commit lên main rồi mới chia việc.
+# Mỗi mảng chỉ ghi vào file của mình; quyết định của mảng mang mã D-<mảng>-n trong notes/<mảng>/decisions.md.
+# params/<mảng>.json nằm dưới PARAMS.<mảng>: tên mảng không được trùng nhóm trong params/game.json
+# (game demo có world, player, obstacle, score — xoá phần demo đó khi chia mảng, validate sẽ báo nếu trùng).
+kind: re
+base: main
+maxParallel: 4
+shared:              # chỉ agent chính được sửa
+  - DECISIONS.md
+  - notes/inventory.json   # gamekit recon — targets của mỗi mảng chọn từ đây
+  - spec/gameplay-spec.md
+  - src/contracts/
+  - game.yaml
+  - re-plan.yaml
+  - module-plan.yaml
+links:               # tư liệu local (gitignored) mọi mảng cần đọc, symlink vào worktree
+  - decompiled/
+  - reference/
+units:               # đơn vị chuẩn chốt trước khi chia, để mọi mảng ghi params cùng đơn vị
+  time: s
+  distance: px
+  speed: px/s
+areas:
+  - id: player
+    owns: [notes/player/, params/player.json, spec/oracles/player/, spec/obligations/player.yaml, spec/player.md]
+    targets: [Assembly-CSharp.dll:PlayerController]
+    buildModule: core-player
+    brief: Di chuyển, va chạm của nhân vật; đơn vị gốc (theo frame hay theo giây).
+  - id: spawner
+    owns: [notes/spawner/, params/spawner.json, spec/oracles/spawner/, spec/obligations/spawner.yaml, spec/spawner.md]
+    targets: [Assembly-CSharp.dll:ObstacleSpawner]
+    buildModule: core-spawner
+    brief: Chu kỳ sinh chướng ngại, tốc độ rơi theo thời gian, cách dùng RNG và seed.
+  - id: score
+    owns: [notes/score/, params/score.json, spec/obligations/score.yaml, spec/score.md]
+    dependsOn: [player]   # điểm tính theo trạng thái nhân vật
+    brief: Cách cộng điểm, kỷ lục, lưu điểm.

@@ -49,16 +49,21 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | --- | --- |
 | `init <tên>` | Tạo game từ `templates/game`, git init, cài hook, cài dependency. Hỏi thông tin (TTY) hoặc `--set k=v`; `--questions --json` in câu hỏi cho agent; `--third-party` khi làm lại game người khác |
 | `config [--portal p] [--set k=v]` | Điền thông tin portal còn thiếu hoặc thêm portal (chép checklist vào `gates/P4.md`) |
-| `status` / `next` | Pha, thời gian ở pha (cảnh báo vượt dự kiến), việc còn mở, skill tiếp theo |
-| `gate [--advance]` | Chấm `gates/<pha>.md`: mục `{auto: …}` chạy script, mục `(bạn)` chỉ người dùng tick |
+| `recon [đường dẫn] [--no-hash] [--no-write] [--json]` | Nhận diện engine game gốc theo dấu hiệu file (thư mục build hoặc APK/IPA/ZIP — đọc mục lục zip, không giải nén), phiên bản Unity; kiểm kê file vào `notes/inventory.json`; điền `source.engine/path/engineVersion` còn trống |
+| `status` / `next` | Pha, thời gian ở pha (cảnh báo vượt dự kiến), việc còn mở, skill tiếp theo. Có `re-plan.yaml` / `module-plan.yaml`: việc song song — xong chờ integrate, đang làm, sẵn sàng giao ngay, đủ `maxParallel`, chờ phụ thuộc — kèm lệnh nên chạy |
+| `gate [--advance]` | Chấm `gates/<pha>.md`: mục `{auto: …}` chạy script (song song; `test` + `parity` dùng chung một lần vitest), mục `(bạn)` chỉ người dùng tick. `{only: split\|single}` theo việc có `re-plan.yaml` |
+| `gate --area <id>` | Cổng một mảng phân tích: luật P2 trên file của mảng, câu hỏi bắt buộc xong, nghĩa vụ có nguồn |
 | `validate [--stage Px]` | Schema `game.yaml`, `params/*.json` (mọi giá trị có `source`; `confidence` = observed/derived/inferred, inferred cần `tolerance` từ P2), `spec/obligations.yaml`, `spec/oracles/*.json`, provenance, `module-plan.yaml`, `asset-manifest.json` |
+| `questions [--area id] [--json]` | Câu hỏi phân tích theo mảng (`notes/<mảng>/questions.yaml`): tiến độ, câu bắt buộc chưa xong (chưa trả lời mà chưa ghi `openReason` + `impact`) |
 | `parity [--report file.json]` | Chạy vitest, đóng từng nghĩa vụ trong `spec/obligations.yaml` bằng test gắn thẻ `[id:case]`. Test đỏ, skip/todo, thiếu case hay thẻ lạ đều tính là chưa đạt |
+| `parity --area id \| --module id \| --obligation a,b [--json]` | Chỉ chấm và chỉ chạy test của nghĩa vụ trong phạm vi |
+| `parity --mutate` | Đổi bảng oracle / số params của từng nghĩa vụ, chạy lại test của nó: oracle phải làm test đỏ (lỗi nếu không); params chỉ cảnh báo |
 | `provenance add <file…> --label …` | Nhãn `reference / generated / own / licensed / placeholder` |
 | `pack [--portal] [--all] [--version V] [--compress] [--zip]` | `builds/<YYMMDDNN>/<portal>/{index.html, preview.html, version.txt, <v>/…}` + `builds/<v>/manifest.json` (+ zip) |
 | `release-check [--version V] [--portal p]` | Mặc định bản mới nhất. Kiểm bố cục az-v1, footer bản quyền, chặn asset reference/placeholder, tên game gốc, link ngoài, đường dẫn tuyệt đối, vượt ngân sách tải |
-| `fanout --wave N` | Mỗi module một worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>` + `BRIEF.md` |
+| `fanout [--plan build\|re] [--wave N \| --ready]` | Mỗi module một worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>` (mảng phân tích: `re-<id>`, nhánh `re/<id>`) + `BRIEF.md`; symlink `node_modules` và `links` (tư liệu local). `--ready`: mọi đơn vị có phụ thuộc đã merge, tối đa `maxParallel` |
 | `check-ownership` | Module chỉ sửa trong thư mục được giao, không đụng vùng shared |
-| `integrate --wave N [--cleanup]` | Merge theo phụ thuộc, test sau mỗi merge, đỏ thì hoàn tác |
+| `integrate [--plan build\|re] [--wave N \| --ready] [--keep-going] [--cleanup]` | Merge theo phụ thuộc, test sau mỗi merge (mảng: `validate`), đỏ thì hoàn tác. `--ready` bỏ qua đơn vị chưa xong; `--keep-going` bỏ qua đơn vị lỗi và đơn vị phụ thuộc nó |
 | `precommit` | Git hook: chặn `reference/`, `decompiled/`, code decompile, asset chưa nhãn |
 
 ## Cấu trúc plugin
@@ -67,7 +72,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 .claude-plugin/   plugin.json, marketplace.json
 hooks/            SessionStart → using-gamekit + gamekit status
 commands/         /gamekit:status, /gamekit:next
-skills/           using-gamekit, rebuild-game, module-plan, integrate, platform-sdk, package-web-build, release-check
+skills/           using-gamekit, game-recon, re-plan, re-notes, rebuild-game, module-plan, integrate, parity-check, platform-sdk, package-web-build, release-check
 portals/          vỏ portal dùng chung: azgames, dev-mock (portal.yaml, kit.mjs, shell.html, loader.entry.js, Icons/), shared/
 scripts/          CLI gamekit.mjs + lệnh; lib/
 schemas/          game, params, provenance, module-plan, asset-manifest (JSON Schema)

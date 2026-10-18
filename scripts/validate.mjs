@@ -10,6 +10,10 @@ import { PHASES } from './lib/phases.mjs';
 import { pngInfo, isWebp } from './lib/png.mjs';
 import { loadLanguages, placeholders } from './lib/languages.mjs';
 import { checkSetting, loadPortal, missingSettings } from './lib/portals.mjs';
+import { checkRePlan, checkUnits, loadPlan, pathUnder, unitsOf } from './lib/plan.mjs';
+import { checkQuestions } from './lib/notes.mjs';
+
+export { pathUnder };
 
 /** Folders whose files end up in a build and therefore need provenance. */
 export const SHIPPED_DIRS = ['assets', 'public'];
@@ -35,6 +39,7 @@ export function validateGame(root, { stage } = {}) {
   }
   const st = stage ?? Math.max(0, phaseIndex(game.phase));
 
+  validateDecisions(root, pr);
   const paramKeys = validateParams(root, st, pr);
   validateObligations(root, st, pr, paramKeys);
   validateOracles(root, pr);
@@ -43,7 +48,10 @@ export function validateGame(root, { stage } = {}) {
   validateIcons(root, pr);
   validateProvenance(root, st, pr);
   validateModulePlan(root, pr);
+  validateRePlan(root, pr);
+  validateQuestions(root, st, pr, paramKeys);
   validateAssetManifest(root, pr);
+  validateInventory(root, pr);
   return { problems: pr, game };
 }
 
@@ -58,13 +66,41 @@ export function collectParams(obj, prefix = '', out = []) {
   return out;
 }
 
-export function decisionIds(root) {
-  const f = path.join(root, 'DECISIONS.md');
-  if (!exists(f)) return new Set();
-  const text = fs.readFileSync(f, 'utf8').replace(/```[\s\S]*?```/g, ''); // ignore the template example
-  const ids = text.match(/^#{2,3}\s+(D-\d+)\b/gm) ?? [];
-  return new Set(ids.map((h) => h.replace(/^#+\s+/, '')));
+/** Decision ids: D-n (main agent, DECISIONS.md) or D-<area>-n (one area's own file, so parallel areas never collide). */
+export const DECISION_ID = /^D-(?:([a-z0-9][a-z0-9-]*)-)?\d+$/;
+/** Each area records its decisions in its own file; the main agent keeps DECISIONS.md. */
+const AREA_DECISIONS = /^notes\/([a-z0-9][a-z0-9-]*)\/decisions\.md$/;
+
+/** Every decision heading (## D-… / ### D-…) with the file it is in. Code fences (the template example) are skipped. */
+export function decisionEntries(root) {
+  const files = ['DECISIONS.md', ...walk(path.join(root, 'notes')).map((f) => `notes/${f}`).filter((f) => AREA_DECISIONS.test(f))];
+  const out = [];
+  for (const rel of files) {
+    const f = path.join(root, rel);
+    if (!exists(f)) continue;
+    const text = fs.readFileSync(f, 'utf8').replace(/```[\s\S]*?```/g, '');
+    for (const m of text.matchAll(/^#{2,3}\s+(D-[a-z0-9-]*\d)\b/gm)) out.push({ id: m[1], file: rel });
+  }
+  return out;
 }
+
+export const decisionIds = (root) => new Set(decisionEntries(root).map((e) => e.id));
+
+function validateDecisions(root, pr) {
+  const seen = new Map();
+  for (const { id, file } of decisionEntries(root)) {
+    const area = AREA_DECISIONS.exec(file)?.[1];
+    const prefix = DECISION_ID.exec(id);
+    if (!prefix) pr.error(file, `${id}: mã quyết định phải là D-n hoặc D-<mảng>-n`);
+    else if (area && prefix[1] !== area) pr.error(file, `${id}: quyết định của mảng ${area} phải đặt mã D-${area}-n`);
+    if (seen.has(id)) pr.error(file, `trùng mã quyết định ${id} (đã có trong ${seen.get(id)})`);
+    else seen.set(id, file);
+  }
+}
+
+const ROOT_PARAMS = 'game.json';
+/** The game module that loads params/*.json; validate checks every file is imported there. */
+export const PARAMS_LOADER = 'src/core/params.ts';
 
 function validateParams(root, st, pr) {
   const dir = path.join(root, 'params');
@@ -72,6 +108,11 @@ function validateParams(root, st, pr) {
   const strict = st >= PHASES.indexOf('P2'); // from P2 on, no TODO sources and no unapproved deviations
   const decisions = decisionIds(root);
   const keys = new Set();
+  const owner = new Map(); // full key → file, so two files never define the same number
+  const groupOwner = new Map();
+  const loader = path.join(root, PARAMS_LOADER);
+  // Comments are dropped so the usage example in the template's comment never counts as an import.
+  const loaderText = exists(loader) ? fs.readFileSync(loader, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '') : null;
   for (const rel of files) {
     const where = `params/${rel}`;
     let data;
@@ -83,8 +124,26 @@ function validateParams(root, st, pr) {
     }
     for (const e of check('params', data)) pr.error(where, e);
     const stem = rel.replace(/\.json$/, '').replaceAll('/', '.');
+    // params/game.json sits at the root of PARAMS; every other file under its name (params/player.json → player.*).
+    const isRoot = rel === ROOT_PARAMS;
+    const prefix = isRoot ? '' : `${stem}.`;
+    // A top-level group of PARAMS comes from one place: a key of game.json, params/<g>.json, or files under params/<g>/.
+    const nested = rel.includes('/');
+    const groups = isRoot ? Object.keys(data).filter((k) => k !== '$schema') : [stem.split('.')[0]];
+    for (const g of groups) {
+      const prev = groupOwner.get(g);
+      if (!prev) groupOwner.set(g, { where, nested });
+      else if (prev.where !== where && !(prev.nested && nested)) pr.error(where, `nhóm ${g} trùng với ${prev.where} — mỗi nhóm params chỉ nằm trong một file`);
+    }
+    if (!isRoot && loaderText !== null && !new RegExp(`['"][./]*params/${rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`).test(loaderText))
+      // P1 areas write params before any code reads them; the game must load every file from P2 on.
+      (strict ? pr.error : pr.warn).call(pr, where, `chưa được nạp trong ${PARAMS_LOADER} — thêm import và một dòng vào FILES (game không đọc được số này)`);
     for (const [key, p] of collectParams(data)) {
-      keys.add(key).add(`${stem}.${key}`);
+      const full = `${prefix}${key}`;
+      if (owner.has(full) && owner.get(full) !== where) pr.error(where, `${full} đã có trong ${owner.get(full)}`);
+      else owner.set(full, where);
+      keys.add(full);
+      if (isRoot) keys.add(`${stem}.${key}`);
       const src = String(p.source ?? '').trim();
       if (!src) pr.error(where, `${key}: thiếu source (luật cứng: số liệu phải có nguồn từ game gốc)`);
       else if (/^todo\b/i.test(src)) (strict ? pr.error : pr.warn).call(pr, where, `${key}: source còn TODO`);
@@ -92,7 +151,7 @@ function validateParams(root, st, pr) {
         (strict ? pr.error : pr.warn).call(pr, where, `${key}: giá trị ước lượng (inferred) cần tolerance để parity test so được`);
       if (p.deviation) {
         const d = p.deviation;
-        if (!decisions.has(d.decision)) pr.error(where, `${key}: deviation trỏ tới ${d.decision} nhưng DECISIONS.md không có mục này`);
+        if (!decisions.has(d.decision)) pr.error(where, `${key}: deviation trỏ tới ${d.decision} nhưng không có mục này trong DECISIONS.md hay notes/<mảng>/decisions.md`);
         if (!d.approved) (strict ? pr.error : pr.warn).call(pr, where, `${key}: sai khác game gốc chưa được duyệt (${d.decision})`);
       }
     }
@@ -100,39 +159,62 @@ function validateParams(root, st, pr) {
   return keys;
 }
 
-// ---------- spec/obligations.yaml: parity obligations ----------
+// ---------- spec/obligations.yaml + spec/obligations/<area>.yaml: parity obligations ----------
 export const OBLIGATIONS_FILE = 'spec/obligations.yaml';
+const OBLIGATIONS_DIR = 'spec/obligations';
+export const OBLIGATIONS_WHERE = `${OBLIGATIONS_FILE} / ${OBLIGATIONS_DIR}/*.yaml`;
 
+/** Every ledger file: the shared spec/obligations.yaml, then one per area (spec/obligations/<area>.yaml). Throws on bad YAML. */
+export function loadObligationFiles(root) {
+  const rels = [OBLIGATIONS_FILE, ...walk(path.join(root, OBLIGATIONS_DIR)).filter((f) => /^[^/]+\.ya?ml$/.test(f)).sort().map((f) => `${OBLIGATIONS_DIR}/${f}`)];
+  return rels.filter((rel) => exists(path.join(root, rel))).map((rel) => ({ rel, data: readYaml(path.join(root, rel)) }));
+}
+
+/** All obligations in one ledger, or null when there is no ledger file. */
 export function loadObligations(root) {
-  const f = path.join(root, OBLIGATIONS_FILE);
-  return exists(f) ? readYaml(f) : null;
+  const files = loadObligationFiles(root);
+  if (!files.length) return null;
+  return { obligations: files.flatMap((f) => (Array.isArray(f.data?.obligations) ? f.data.obligations : [])) };
+}
+
+/** Schema errors per file, plus the area rule: ids in spec/obligations/<area>.yaml start with "<area>.". */
+export function obligationFileErrors(files) {
+  const out = [];
+  for (const { rel, data } of files) {
+    for (const e of check('obligations', data)) out.push([rel, e]);
+    const area = rel.startsWith(`${OBLIGATIONS_DIR}/`) ? path.basename(rel).replace(/\.ya?ml$/, '') : null;
+    if (area && Array.isArray(data?.obligations))
+      for (const o of data.obligations) if (typeof o?.id === 'string' && !o.id.startsWith(`${area}.`)) out.push([rel, `${o.id}: nghĩa vụ của mảng ${area} phải có id ${area}.<tên>`]);
+  }
+  return out;
 }
 
 function validateObligations(root, st, pr, paramKeys) {
-  const where = OBLIGATIONS_FILE;
-  let data;
+  let files;
   try {
-    data = loadObligations(root);
+    files = loadObligationFiles(root);
   } catch (e) {
-    pr.error(where, e.message);
+    pr.error(OBLIGATIONS_WHERE, e.message);
     return;
   }
-  if (!data) return;
-  const errs = check('obligations', data);
-  for (const e of errs) pr.error(where, e);
+  const errs = obligationFileErrors(files);
+  for (const [rel, e] of errs) pr.error(rel, e);
   if (errs.length) return;
   const strict = st >= PHASES.indexOf('P2');
   const decisions = decisionIds(root);
-  const seen = new Set();
-  for (const o of data.obligations) {
-    if (seen.has(o.id)) pr.error(where, `trùng id ${o.id}`);
-    seen.add(o.id);
-    for (const k of o.params ?? []) if (!paramKeys.has(k)) pr.error(where, `${o.id}: params ${k} không có trong params/`);
-    if (o.oracle && !exists(path.join(root, o.oracle))) pr.error(where, `${o.id}: không có file oracle ${o.oracle}`);
-    if ((o.status ?? 'active') !== 'active') {
-      if (!o.decision) pr.error(where, `${o.id}: ${o.status} cần decision D-n trong DECISIONS.md`);
-      else if (!decisions.has(o.decision)) pr.error(where, `${o.id}: trỏ tới ${o.decision} nhưng DECISIONS.md không có mục này`);
-      if (!o.approved) (strict ? pr.error : pr.warn).call(pr, where, `${o.id}: ${o.status} chưa được người dùng duyệt (${o.decision ?? 'thiếu D-n'})`);
+  const seen = new Map();
+  for (const { rel: where, data } of files) {
+    for (const o of data.obligations) {
+      if (seen.has(o.id)) pr.error(where, `trùng id ${o.id}${seen.get(o.id) !== where ? ` (đã có trong ${seen.get(o.id)})` : ''}`);
+      else seen.set(o.id, where);
+      for (const k of o.params ?? []) if (!paramKeys.has(k)) pr.error(where, `${o.id}: params ${k} không có trong params/`);
+      if (o.oracle && !exists(path.join(root, o.oracle))) pr.error(where, `${o.id}: không có file oracle ${o.oracle}`);
+      if (o.source && !exists(path.join(root, o.source))) pr.error(where, `${o.id}: không có ghi chú ${o.source} (source)`);
+      if ((o.status ?? 'active') !== 'active') {
+        if (!o.decision) pr.error(where, `${o.id}: ${o.status} cần decision D-n (hoặc D-<mảng>-n) trong DECISIONS.md / notes/<mảng>/decisions.md`);
+        else if (!decisions.has(o.decision)) pr.error(where, `${o.id}: trỏ tới ${o.decision} nhưng không có mục này trong DECISIONS.md hay notes/<mảng>/decisions.md`);
+        if (!o.approved) (strict ? pr.error : pr.warn).call(pr, where, `${o.id}: ${o.status} chưa được người dùng duyệt (${o.decision ?? 'thiếu D-n'})`);
+      }
     }
   }
 }
@@ -299,51 +381,73 @@ function isIgnored(root, dir) {
   return lines.includes(dir) || lines.includes(dir.split('/')[0]);
 }
 
-// ---------- module-plan.yaml ----------
-export function loadModulePlan(root) {
-  const f = path.join(root, 'module-plan.yaml');
-  return exists(f) ? readYaml(f) : null;
-}
-
-const norm = (p) => p.replace(/^\.\//, '');
-export const pathUnder = (file, prefix) => {
-  const f = norm(file);
-  const pre = norm(prefix);
-  return pre.endsWith('/') ? f.startsWith(pre) : f === pre || f.startsWith(pre + '/');
-};
-const overlaps = (a, b) => pathUnder(a, b) || pathUnder(b, a) || norm(a) === norm(b);
+// ---------- module-plan.yaml (P2) and re-plan.yaml (P1) ----------
+export const loadModulePlan = (root) => loadPlan(root, 'build');
 
 export function checkModulePlan(plan) {
   const pr = new Problems();
   const where = 'module-plan.yaml';
   for (const e of check('module-plan', plan)) pr.error(where, e);
   if (!pr.ok) return pr;
-  const ids = new Map();
-  for (const m of plan.modules) {
-    if (ids.has(m.id)) pr.error(where, `module trùng id ${m.id}`);
-    ids.set(m.id, m);
-  }
-  for (const m of plan.modules) {
-    for (const d of m.dependsOn ?? []) {
-      const dep = ids.get(d);
-      if (!dep) pr.error(where, `${m.id} phụ thuộc ${d} không tồn tại`);
-      else if (dep.wave >= m.wave) pr.error(where, `${m.id} (đợt ${m.wave}) phụ thuộc ${d} (đợt ${dep.wave}): phụ thuộc phải ở đợt trước`);
-    }
-    for (const o of m.owns) {
-      for (const s of plan.shared) if (overlaps(o, s)) pr.error(where, `${m.id} sở hữu ${o} nhưng đây là vùng dùng chung (${s})`);
-    }
-  }
-  const all = plan.modules.flatMap((m) => m.owns.map((o) => [m.id, o]));
-  for (let i = 0; i < all.length; i++)
-    for (let j = i + 1; j < all.length; j++)
-      if (all[i][0] !== all[j][0] && overlaps(all[i][1], all[j][1]))
-        pr.error(where, `${all[i][0]} và ${all[j][0]} cùng sở hữu ${all[i][1]} / ${all[j][1]}: mỗi file chỉ một chủ`);
+  checkUnits(plan, 'build', pr, where);
+  const waves = new Map(plan.modules.map((m) => [m.id, m.wave]));
+  for (const m of plan.modules)
+    for (const d of m.dependsOn ?? [])
+      if (waves.has(d) && waves.get(d) >= m.wave) pr.error(where, `${m.id} (đợt ${m.wave}) phụ thuộc ${d} (đợt ${waves.get(d)}): phụ thuộc phải ở đợt trước`);
   return pr;
+}
+
+/** Linked folders hold local copies of the original game; a link that git tracks would be committed from every worktree. */
+function checkLinks(root, plan, where, pr) {
+  for (const l of plan?.links ?? []) if (exists(path.join(root, l)) && !isIgnored(root, l.replace(/\/$/, ''))) pr.error(where, `links: ${l} phải được gitignore`);
 }
 
 function validateModulePlan(root, pr) {
   const plan = loadModulePlan(root);
-  if (plan) pr.merge(checkModulePlan(plan));
+  if (!plan) return;
+  const r = checkModulePlan(plan);
+  pr.merge(r);
+  if (!r.ok) return;
+  checkLinks(root, plan, 'module-plan.yaml', pr);
+  let ids = null;
+  try {
+    ids = new Set((loadObligations(root)?.obligations ?? []).map((o) => o?.id));
+  } catch {
+    // reported by validateObligations
+  }
+  if (ids) for (const m of plan.modules) for (const o of m.obligations ?? []) if (!ids.has(o)) pr.error('module-plan.yaml', `${m.id}: không có nghĩa vụ ${o} trong spec/obligations`);
+}
+
+function validateRePlan(root, pr) {
+  const plan = loadPlan(root, 're');
+  if (!plan) return;
+  let modulePlan = null;
+  try {
+    modulePlan = loadModulePlan(root);
+  } catch {
+    // reported by validateModulePlan
+  }
+  const r = checkRePlan(plan, { modulePlan: modulePlan && checkModulePlan(modulePlan).ok ? modulePlan : null });
+  pr.merge(r);
+  if (r.ok) checkLinks(root, plan, 're-plan.yaml', pr);
+}
+
+// ---------- notes/<area>/questions.yaml: analysis questions of one area (scripts/lib/notes.mjs) ----------
+function validateQuestions(root, st, pr, paramKeys) {
+  let areas = null;
+  let obligationIds = null;
+  try {
+    const plan = loadPlan(root, 're');
+    if (plan) areas = new Set(unitsOf(plan, 're').map((a) => a.id));
+  } catch {
+    // reported by validateRePlan
+  }
+  try {
+    obligationIds = new Set((loadObligations(root)?.obligations ?? []).map((o) => o?.id));
+  } catch {
+    // reported by validateObligations
+  }
+  checkQuestions(root, pr, { strict: st >= PHASES.indexOf('P2'), paramKeys, obligationIds, areas });
 }
 
 // ---------- asset-manifest.json ----------
@@ -372,6 +476,17 @@ function validateAssetManifest(root, pr) {
     if (info.width !== w || info.height !== a.height)
       pr.error(where, `${a.id}: ${a.path} là ${info.width}×${info.height}, spec cần ${w}×${a.height}`);
     if (a.alpha === true && info.alpha === false) pr.error(where, `${a.id}: cần nền trong suốt nhưng PNG không có kênh alpha`);
+  }
+}
+
+// ---------- notes/inventory.json (gamekit recon) ----------
+function validateInventory(root, pr) {
+  const f = path.join(root, 'notes', 'inventory.json');
+  if (!exists(f)) return;
+  try {
+    for (const e of check('inventory', readJson(f))) pr.error('notes/inventory.json', e);
+  } catch (e) {
+    pr.error('notes/inventory.json', e.message);
   }
 }
 

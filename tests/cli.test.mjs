@@ -11,6 +11,13 @@ import { parseArgs } from '../scripts/gamekit.mjs';
 import { evaluateParity, testsFromVitestReport } from '../scripts/parity.mjs';
 import YAML from 'yaml';
 
+/** P0 needs notes/inventory.json: run recon on a tiny original build next to the game. */
+const withInventory = (dir) => {
+  write(path.dirname(dir), 'orig/game.swf', 'x');
+  const r = gk(dir, 'recon', '../orig');
+  assert.equal(r.code, 0, r.out);
+};
+
 test('init creates a valid game with git, hook and schemas', () => {
   const dir = newGame();
   assert.ok(fs.existsSync(path.join(dir, 'game.yaml')));
@@ -65,6 +72,505 @@ test('params: deviation needs a DECISIONS entry and approval from P2', () => {
   assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0);
 });
 
+test('decisions: D-<area>-n lives in notes/<area>/decisions.md; duplicates and wrong-area ids fail', () => {
+  const dir = newGame('dec');
+  editJson(dir, 'params/game.json', (p) => {
+    p.player.speed.deviation = { original: 300, reason: 'cảm ứng', decision: 'D-player-1', approved: true };
+  });
+  write(dir, 'spec/obligations.yaml', 'obligations:\n  - { id: a, title: A, cases: [normal] }\n  - { id: b, title: B, cases: [normal], status: out-of-scope, decision: D-level-gen-2, approved: true }\n');
+  let r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /D-player-1/);
+  assert.match(r.out, /D-level-gen-2/);
+  write(dir, 'notes/player/decisions.md', '# Quyết định mảng player\n\n## D-player-1 Tăng tốc cho cảm ứng\n');
+  write(dir, 'notes/level-gen/decisions.md', '## D-level-gen-2 Bỏ chế độ online\n');
+  r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 0, r.out);
+  // An area only uses its own prefix, so two areas never pick the same number.
+  write(dir, 'notes/level-gen/decisions.md', '## D-level-gen-2 Bỏ chế độ online\n\n## D-3 Số chung\n\n## D-player-4 Mảng khác\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /D-3: quyết định của mảng level-gen phải đặt mã D-level-gen-n/);
+  assert.match(r.out, /D-player-4: quyết định của mảng level-gen/);
+  write(dir, 'notes/level-gen/decisions.md', '## D-level-gen-2 Bỏ chế độ online\n');
+  fs.appendFileSync(path.join(dir, 'DECISIONS.md'), '\n## D-player-1 Chuyển lên file chung nhưng vẫn còn trong mảng\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /trùng mã quyết định D-player-1/);
+  // Schemas still reject malformed ids.
+  editJson(dir, 'params/game.json', (p) => {
+    p.player.speed.deviation.decision = 'D-Player-1';
+  });
+  assert.equal(gk(dir, 'validate').code, 1);
+});
+
+test('validate: re-plan.yaml and notes/<area>/questions.yaml (template examples are valid)', () => {
+  const dir = newGame('replan');
+  write(dir, 're-plan.yaml', read(dir, 're-plan.example.yaml'));
+  write(dir, 'module-plan.yaml', read(dir, 'module-plan.example.yaml'));
+  write(dir, 'notes/player/questions.yaml', read(dir, 'notes/questions.example.yaml'));
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 0, r.out);
+  // buildModule must name a module of module-plan.yaml
+  write(dir, 're-plan.yaml', read(dir, 're-plan.yaml').replace('buildModule: core-spawner', 'buildModule: core-nope'));
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /buildModule core-nope/);
+  write(dir, 're-plan.yaml', read(dir, 're-plan.example.yaml'));
+  // a linked folder must be gitignored, or every worktree would commit it
+  write(dir, 're-plan.yaml', read(dir, 're-plan.yaml').replace('  - reference/', '  - reference/\n  - tools/'));
+  write(dir, 'tools/x.txt', 'x');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /links: tools\/ phải được gitignore/);
+  write(dir, 're-plan.yaml', read(dir, 're-plan.example.yaml'));
+  // questions: schema, id prefix of the area, unique across areas, area known to the plan
+  write(dir, 'notes/player/questions.yaml', 'questions:\n  - { id: player.q1, question: Q, evidence: E, status: done }\n');
+  assert.equal(gk(dir, 'validate').code, 1);
+  write(dir, 'notes/player/questions.yaml', 'questions:\n  - { id: score.q1, question: Q, evidence: E, status: open }\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /score\.q1: câu hỏi của mảng player phải có id player\.<tên>/);
+  write(dir, 'notes/player/questions.yaml', 'questions:\n  - { id: player.q1, question: Q, evidence: E, status: open }\n  - { id: player.q1, question: Q2, evidence: E, status: answered }\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /trùng id câu hỏi player\.q1/);
+  write(dir, 'notes/player/questions.yaml', 'questions: []\n');
+  write(dir, 'notes/audio/questions.yaml', 'questions:\n  - { id: audio.q1, question: Q, evidence: E, status: partial }\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /re-plan\.yaml không có mảng audio/);
+});
+
+test('params per area: params/<name>.json sits under its name, must be loaded by src/core/params.ts, groups never overlap', () => {
+  const dir = newGame('pfiles');
+  const speed = { value: 4, unit: 'px/frame', source: 'PlayerController.Update', confidence: 'observed' };
+  write(dir, 'params/hero.json', JSON.stringify({ run: { speed } }));
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 0, 'P1 areas write params before the game reads them: a warning');
+  assert.match(r.out, /params\/hero\.json.*chưa được nạp trong src\/core\/params\.ts/);
+  r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 1, 'from P2 the game must load it; the usage example in the comment does not count');
+  write(dir, 'src/core/params.ts', read(dir, 'src/core/params.ts')
+    .replace("import game from '../../params/game.json';", "import game from '../../params/game.json';\nimport hero from '../../params/hero.json';")
+    .replace('const FILES = {};', 'const FILES = { hero };'));
+  assert.equal(gk(dir, 'validate').code, 0);
+  // obligations name the key the game reads: hero.run.speed
+  write(dir, 'spec/obligations/hero.yaml', 'obligations:\n  - { id: hero.run, title: Chạy, cases: [normal], params: [hero.run.speed] }\n');
+  assert.equal(gk(dir, 'validate').code, 0);
+  write(dir, 'spec/obligations/hero.yaml', 'obligations:\n  - { id: hero.run, title: Chạy, cases: [normal], params: [run.speed] }\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /params run\.speed không có/);
+  fs.rmSync(path.join(dir, 'spec/obligations'), { recursive: true });
+  // a group defined in game.json and in its own file would shadow each other in PARAMS
+  write(dir, 'params/player.json', JSON.stringify({ speed }));
+  write(dir, 'src/core/params.ts', read(dir, 'src/core/params.ts').replace("import hero from", "import player from '../../params/player.json';\nimport hero from").replace('{ hero }', '{ hero, player }'));
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /nhóm player trùng với/);
+});
+
+test('obligations per area: spec/obligations/<area>.yaml joins the ledger, ids carry the area, duplicates across files fail', () => {
+  const dir = newGame('ofiles');
+  write(dir, 'spec/obligations/enemy.yaml', 'obligations:\n  - { id: enemy.ring, title: Vòng đạn, cases: [normal] }\n');
+  assert.equal(gk(dir, 'validate').code, 0);
+  write(dir, 'spec/obligations/enemy.yaml', 'obligations:\n  - { id: ring, title: Vòng đạn, cases: [normal] }\n');
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /ring: nghĩa vụ của mảng enemy phải có id enemy\.<tên>/);
+  write(dir, 'spec/obligations/player.yaml', 'obligations:\n  - { id: player.move, title: Trùng với file chung, cases: [normal] }\n');
+  write(dir, 'spec/obligations/enemy.yaml', 'obligations: []\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /trùng id player\.move \(đã có trong spec\/obligations\.yaml\)/);
+  // parity reads the whole ledger: an area obligation without tests stays open
+  fs.rmSync(path.join(dir, 'spec/obligations/player.yaml'));
+  write(dir, 'spec/obligations/enemy.yaml', 'obligations:\n  - { id: enemy.ring, title: Vòng đạn, cases: [normal] }\n');
+  const passed = (name) => ({ fullName: name, status: 'passed', title: name });
+  const names = ['[player.move:normal] a', '[player.move:edge] b', '[obstacle.speed:normal] c', '[obstacle.speed:oracle] d', '[obstacle.spawn:normal] e', '[score.rate:normal] f', '[rules.collision:normal] g', '[run.replay:replay] h'];
+  write(dir, 'report.json', JSON.stringify({ testResults: [{ name: 'x', assertionResults: names.map(passed) }] }));
+  r = gk(dir, 'parity', '--report', 'report.json');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /enemy\.ring — Vòng đạn: thiếu test xanh cho case: normal/);
+  write(dir, 'report.json', JSON.stringify({ testResults: [{ name: 'x', assertionResults: [...names, '[enemy.ring:normal] i'].map(passed) }] }));
+  r = gk(dir, 'parity', '--report', 'report.json');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /parity: 7\/7/);
+});
+
+const GOOD_NOTE = `# Di chuyển
+
+- **Kết luận**: chạy 4 px/frame ở 30 fps = 120 px/s.
+- **Vị trí**: Assembly-CSharp.dll, PlayerController.Update
+- **Độ tin cậy**: observed
+- **Phạm vi đã tìm**: PlayerController, PlayerInput
+- **Còn chưa biết**: tốc độ khi bị làm chậm
+`;
+
+test('questions: links to notes, params and obligations must exist; completeness binds from P2', () => {
+  const dir = newGame('qlink');
+  const q = (extra) => write(dir, 'notes/player/questions.yaml', `questions:\n  - { id: player.q1, question: Tốc độ?, evidence: hằng số, ${extra} }\n`);
+  q('status: answered, notes: [notes/player/move.md], params: [player.nope], obligations: [player.fly]');
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /player\.q1: không có ghi chú notes\/player\/move\.md/);
+  assert.match(r.out, /player\.q1: params player\.nope không có/);
+  assert.match(r.out, /player\.q1: không có nghĩa vụ player\.fly/);
+  write(dir, 'notes/player/move.md', '# Di chuyển\n\nChạy nhanh.\n');
+  q('status: answered, notes: [notes/player/move.md], params: [player.speed], obligations: [player.move]');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 0, 'an incomplete note is a warning during P1');
+  assert.match(r.out, /notes\/player\/move\.md: ghi chú thiếu: Kết luận, Vị trí, Độ tin cậy, Phạm vi đã tìm, Còn chưa biết, độ tin cậy observed/);
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 1);
+  write(dir, 'notes/player/move.md', GOOD_NOTE);
+  r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 0, r.out);
+  // headings count as parts too
+  write(dir, 'notes/player/move.md', '## Kết luận\nx\n## Vị trí\nx\n## Độ tin cậy\nderived\n## Phạm vi đã tìm\nx\n## Còn chưa biết\nkhông\n');
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0);
+  // answered without a note; required and open without a reason
+  q('status: answered');
+  r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /player\.q1: đã trả lời nhưng chưa trỏ tới ghi chú nào/);
+  q('status: partial');
+  r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /player\.q1: câu bắt buộc còn partial — trả lời, hoặc ghi openReason và impact/);
+  q('status: partial, openReason: bản build không có hàm này, impact: dùng giá trị đo từ video');
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0);
+  q('status: open, required: false');
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0, 'optional questions may stay open');
+});
+
+test('obligations: source names a note that exists', () => {
+  const dir = newGame('osrc');
+  write(dir, 'spec/obligations/hero.yaml', 'obligations:\n  - { id: hero.run, title: Chạy, cases: [normal], source: notes/hero/run.md }\n');
+  const r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /hero\.run: không có ghi chú notes\/hero\/run\.md \(source\)/);
+  write(dir, 'notes/hero/run.md', GOOD_NOTE);
+  assert.equal(gk(dir, 'validate').code, 0);
+});
+
+test('questions command: progress per area and the required questions that still block', () => {
+  const dir = newGame('qcmd');
+  assert.match(gk(dir, 'questions').out, /Chưa có notes\/<mảng>\/questions\.yaml/);
+  write(dir, 'notes/player/move.md', GOOD_NOTE);
+  write(dir, 'notes/player/questions.yaml', `questions:
+  - { id: player.q1, question: Tốc độ?, evidence: E, status: answered, notes: [notes/player/move.md] }
+  - { id: player.q2, question: Nhảy cao bao nhiêu?, evidence: E, status: partial }
+  - { id: player.q3, question: Hiệu ứng bụi?, evidence: E, status: open, required: false }
+`);
+  write(dir, 'notes/audio/questions.yaml', 'questions:\n  - { id: audio.q1, question: Q, evidence: E, status: open, openReason: thiếu file âm thanh, impact: dùng âm thanh tạm }\n');
+  let r = gk(dir, 'questions');
+  assert.equal(r.code, 0);
+  assert.match(r.out, /player: 1\/3 đã trả lời, 1 một phần, 1 mở — 1 câu bắt buộc chưa xong:/);
+  assert.match(r.out, /player\.q2 \(partial\): Nhảy cao bao nhiêu\?/);
+  assert.doesNotMatch(r.out, /player\.q3/);
+  assert.match(r.out, /✔ audio: 0\/1 đã trả lời/);
+  r = gk(dir, 'questions', '--area', 'player', '--json');
+  const rows = JSON.parse(r.out);
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0].blocking.map((b) => b.id), ['player.q2']);
+});
+
+const NOTE_OK = `- **Kết luận**: x\n- **Vị trí**: PlayerController.Update\n- **Độ tin cậy**: observed\n- **Phạm vi đã tìm**: PlayerController\n- **Còn chưa biết**: không\n`;
+/** A game split into areas hero and audio, committed on main. */
+function splitGame(name) {
+  const dir = newGame(name);
+  write(dir, 're-plan.yaml', `kind: re
+base: main
+shared: [DECISIONS.md, src/contracts/, re-plan.yaml]
+areas:
+  - { id: hero, owns: [notes/hero/, params/hero.json, spec/obligations/hero.yaml], brief: P }
+  - { id: audio, owns: [notes/audio/], brief: A }
+`);
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  return dir;
+}
+const fakeMerge = (dir, branch, message, files) => {
+  sh(dir, 'git', 'checkout', '-qb', branch);
+  for (const [rel, text] of Object.entries(files)) write(dir, rel, text);
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'work');
+  sh(dir, 'git', 'checkout', '-q', 'main');
+  sh(dir, 'git', 'merge', '-q', '--no-ff', '-m', message, branch);
+};
+
+test('gate --area: P2 rules on the files the area owns only; questions done; obligations cite a note', () => {
+  const dir = splitGame('agate');
+  let r = gk(dir, 'gate', '--area', 'hero');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /chưa có câu hỏi nào/);
+  write(dir, 'notes/hero/move.md', NOTE_OK);
+  write(dir, 'notes/hero/questions.yaml', 'questions:\n  - { id: hero.q1, question: Q, evidence: E, status: partial }\n');
+  write(dir, 'params/hero.json', JSON.stringify({ speed: { value: 4, source: 'TODO: tìm hàm' } }));
+  write(dir, 'spec/obligations/hero.yaml', 'obligations:\n  - { id: hero.run, title: Chạy, cases: [normal] }\n');
+  write(dir, 'notes/audio/questions.yaml', 'questions:\n  - { id: audio.q1, question: Q, evidence: E, status: open }\n');
+  r = gk(dir, 'gate', '--area', 'hero');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /source còn TODO/);
+  assert.match(r.out, /hero\.q1 \(partial\)/);
+  assert.match(r.out, /hero\.run: thiếu source/);
+  assert.doesNotMatch(r.out, /audio\.q1/, 'another area does not block this one');
+  assert.doesNotMatch(r.out, /chưa được nạp/, 'loading params into the game is the main agent\'s job');
+  write(dir, 'notes/hero/questions.yaml', 'questions:\n  - { id: hero.q1, question: Q, evidence: E, status: answered, notes: [notes/hero/move.md] }\n');
+  write(dir, 'params/hero.json', JSON.stringify({ speed: { value: 4, source: 'PlayerController.Update', confidence: 'observed' } }));
+  write(dir, 'spec/obligations/hero.yaml', 'obligations:\n  - { id: hero.run, title: Chạy, cases: [normal], source: notes/hero/move.md }\n');
+  r = gk(dir, 'gate', '--area', 'hero');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /chưa merge vào nhánh chính/);
+  assert.equal(gk(dir, 'gate', '--area', 'nope').code, 1);
+});
+
+test('gate P1 of a split game: {auto: areas} needs every area merged and passing; single-game items are hidden', () => {
+  const dir = splitGame('p1split');
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^phase: P0/m, 'phase: P1'));
+  write(dir, 'spec/gameplay-spec.md', '# Spec\n');
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'p1');
+  let r = gk(dir, 'gate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /hero: chưa merge · audio: chưa merge/);
+  assert.doesNotMatch(r.out, /notes\/QUESTIONS\.md/, '{only: single} hidden when re-plan.yaml exists');
+  assert.match(r.out, /✔ Có `spec\/gameplay-spec\.md` \[auto: file:spec\/gameplay-spec\.md\]/);
+  assert.doesNotMatch(gk(dir, 'status').out, /QUESTIONS\.md/);
+  fakeMerge(dir, 're/audio', 'merge: re/audio (mảng)', { 'notes/audio/questions.yaml': 'questions:\n  - { id: audio.q1, question: Q, evidence: E, status: open, openReason: R, impact: I }\n' });
+  fakeMerge(dir, 're/hero', 'merge: re/hero (mảng)', { 'notes/hero/questions.yaml': 'questions:\n  - { id: hero.q1, question: Q, evidence: E, status: open }\n' });
+  r = gk(dir, 'gate');
+  assert.match(r.out, /hero: hero\.q1 \(open\)/);
+  assert.doesNotMatch(r.out, /audio:/);
+  // a game that is not split keeps the QUESTIONS.md item and has no areas item
+  const single = newGame('p1single');
+  write(single, 'game.yaml', read(single, 'game.yaml').replace(/^phase: P0/m, 'phase: P1'));
+  r = gk(single, 'gate');
+  assert.match(r.out, /notes\/QUESTIONS\.md/);
+  assert.doesNotMatch(r.out, /auto: areas/);
+});
+
+test('gate P2: {auto: merged} needs every module merged and its worktree removed', () => {
+  const dir = newGame('p2merged');
+  write(dir, 'module-plan.yaml', 'base: main\nshared: [module-plan.yaml]\nmodules:\n  - { id: a, wave: 1, owns: [src/core/a/], brief: A }\n');
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^phase: P0/m, 'phase: P2'));
+  write(dir, 'gates/P2.md', '- [ ] Mọi module đã merge {auto: merged}\n');
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  let r = gk(dir, 'gate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /a: chưa merge/);
+  fakeMerge(dir, 'mod/a', 'merge: a (đợt 1)', { 'src/core/a/x.ts': 'export const x = 1;\n' });
+  r = gk(dir, 'gate');
+  assert.equal(r.code, 0, r.out);
+});
+
+test('gate: {auto: test} and {auto: parity} share one vitest run when npm test is plain vitest', () => {
+  const dir = newGame('onevitest');
+  // A stand-in vitest: counts its runs and writes a JSON report where every template obligation passes.
+  const names = ['[player.move:normal] a', '[player.move:edge] b', '[obstacle.speed:normal] c', '[obstacle.speed:oracle] d', '[obstacle.spawn:normal] e', '[score.rate:normal] f', '[rules.collision:normal] g', '[run.replay:replay] h'];
+  const report = JSON.stringify({ testResults: [{ name: 'x', assertionResults: names.map((n) => ({ fullName: n, status: 'passed', title: n })) }] });
+  write(dir, 'node_modules/vitest/vitest.mjs', `import fs from 'node:fs';
+fs.appendFileSync('runs.txt', 'x');
+const out = process.argv.find((a) => a.startsWith('--outputFile=')).slice(13);
+fs.mkdirSync(out.replace(/[^/]+$/, ''), { recursive: true });
+fs.writeFileSync(out, ${JSON.stringify(report)});
+`);
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^phase: P0/m, 'phase: P2'));
+  write(dir, 'gates/P2.md', '- [ ] Parity {auto: parity}\n- [ ] Test {auto: test}\n');
+  let r = gk(dir, 'gate');
+  assert.equal(r.code, 0, r.out);
+  assert.equal(read(dir, 'runs.txt'), 'x', 'vitest ran once for both items');
+  // a custom npm test script is run on its own
+  editJson(dir, 'package.json', (p) => {
+    p.scripts.test = 'node -e "process.exit(3)"';
+  });
+  fs.rmSync(path.join(dir, 'runs.txt'));
+  r = gk(dir, 'gate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /✘ Test \[auto: test\]/);
+  assert.match(r.out, /✔ Parity \[auto: parity\]/);
+  assert.equal(read(dir, 'runs.txt'), 'x');
+});
+
+/**
+ * A stand-in vitest for a game: tests come from .gamekit/local/fake-tests.json ({ name, param?: { file, path, expect, raw? } }); a test
+ * passes while its param (raw: the value at path, else its .value) still holds `expect`. Honours -t like vitest, logs every run's arguments to .gamekit/local/runs.txt (both gitignored).
+ */
+function fakeVitest(dir, tests) {
+  write(dir, '.gamekit/local/fake-tests.json', JSON.stringify(tests));
+  write(dir, 'node_modules/vitest/vitest.mjs', `import fs from 'node:fs';
+const args = process.argv.slice(2);
+fs.appendFileSync('.gamekit/local/runs.txt', JSON.stringify(args) + '\\n');
+const t = args.indexOf('-t');
+const only = t >= 0 ? new RegExp(args[t + 1]) : null;
+const value = (s) => { const v = s.path.split('.').reduce((o, k) => o[k], JSON.parse(fs.readFileSync(s.file, 'utf8'))); return s.raw ? v : v.value; };
+const results = JSON.parse(fs.readFileSync('.gamekit/local/fake-tests.json', 'utf8')).map((s) => ({
+  fullName: s.name, title: s.name,
+  status: only && !only.test(s.name) ? 'skipped' : !s.param || value(s.param) === s.param.expect ? 'passed' : 'failed',
+}));
+const out = args.find((a) => a.startsWith('--outputFile='));
+if (out) {
+  const f = out.slice(13);
+  fs.mkdirSync(f.replace(/[^/]+$/, ''), { recursive: true });
+  fs.writeFileSync(f, JSON.stringify({ testResults: [{ name: 'x', assertionResults: results }] }));
+}
+process.exit(results.some((r) => r.status === 'failed') ? 1 : 0);
+`);
+}
+const runs = (dir) => read(dir, '.gamekit/local/runs.txt').trim().split('\n').map((l) => JSON.parse(l));
+
+test('parity scopes: --obligation, --area, --module run and judge only those obligations; --json', () => {
+  const dir = newGame('pscope');
+  write(dir, 'spec/obligations/hero.yaml', 'obligations:\n  - { id: hero.jump, title: Nhảy, cases: [normal] }\n');
+  write(dir, 're-plan.yaml', 'kind: re\nbase: main\nshared: [re-plan.yaml]\nareas:\n  - { id: hero, owns: [notes/hero/, spec/obligations/hero.yaml], buildModule: core-hero, brief: H }\n');
+  write(dir, 'module-plan.yaml', 'base: main\nshared: [module-plan.yaml]\nmodules:\n  - { id: core-hero, wave: 1, owns: [src/core/hero/], brief: H }\n  - { id: core-move, wave: 1, owns: [src/core/move/], obligations: [player.move], brief: M }\n');
+  fakeVitest(dir, [{ name: '[player.move:normal] a' }, { name: '[player.move:edge] b' }, { name: '[hero.jump:normal] c' }]);
+  let r = gk(dir, 'parity');
+  assert.equal(r.code, 1, 'the whole ledger still has open obligations');
+  r = gk(dir, 'parity', '--obligation', 'player.move');
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /obstacle\.speed/);
+  assert.deepEqual(runs(dir).at(-1).slice(-2), ['-t', '\\[(?:player\\.move):'], 'only the tagged tests of the scope run');
+  assert.equal(gk(dir, 'parity', '--area', 'hero').code, 0);
+  r = gk(dir, 'parity', '--module', 'core-hero');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Parity: module core-hero \(mảng hero\)/);
+  assert.equal(gk(dir, 'parity', '--module', 'core-move').code, 0, 'obligations listed on the module');
+  assert.match(gk(dir, 'parity', '--obligation', 'nope').out, /không có nghĩa vụ nope/);
+  r = gk(dir, 'parity', '--obligation', 'player.move,hero.jump', '--json');
+  const json = JSON.parse(r.out);
+  assert.equal(json.ok, true);
+  assert.deepEqual(json.items.map((i) => i.id).sort(), ['hero.jump', 'player.move']);
+  // module obligations must exist in the ledger
+  write(dir, 'module-plan.yaml', read(dir, 'module-plan.yaml').replace('obligations: [player.move]', 'obligations: [player.fly]'));
+  assert.match(gk(dir, 'validate').out, /core-move: không có nghĩa vụ player\.fly/);
+});
+
+test('parity --mutate: oracle tests must go red when the table changes; params-only checks are a warning; files restored', () => {
+  const dir = newGame('mut');
+  const speed = { file: 'params/game.json', path: 'player.speed', expect: 320 };
+  const row0 = { file: 'spec/oracles/obstacle-speed.json', path: 'cases.0.out', expect: 180, raw: true };
+  const tests = [
+    { name: '[player.move:normal] pinned speed', param: speed },
+    { name: '[player.move:edge] edge', param: speed },
+    { name: '[score.rate:normal] expectation read from params' },
+    { name: '[obstacle.speed:normal] n' },
+    { name: '[obstacle.speed:oracle] compares the table', param: row0 },
+  ];
+  fakeVitest(dir, tests);
+  const before = [read(dir, 'params/game.json'), read(dir, 'spec/oracles/obstacle-speed.json')];
+  let r = gk(dir, 'parity', '--mutate', '--obligation', 'player.move,score.rate,obstacle.speed');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /✔ player\.move × player\.speed: đổi số thì test đỏ/);
+  assert.match(r.out, /⚠ score\.rate × score\.perSecond: vẫn closed khi đổi số — test lấy kỳ vọng từ chính params/);
+  assert.match(r.out, /✔ obstacle\.speed × spec\/oracles\/obstacle-speed\.json: đổi bảng thì test đỏ/);
+  // an oracle test that never reads the table is an error
+  fakeVitest(dir, tests.map((t) => (t.param === row0 ? { name: t.name } : t)));
+  r = gk(dir, 'parity', '--mutate', '--obligation', 'obstacle.speed');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /✘ obstacle\.speed × spec\/oracles\/obstacle-speed\.json: vẫn closed khi đổi bảng oracle — test oracle không thật sự so với bảng/);
+  assert.deepEqual([read(dir, 'params/game.json'), read(dir, 'spec/oracles/obstacle-speed.json')], before, 'files restored');
+});
+
+test('integrate --scoped: each merge runs only its module tests, the full suite once; red at the end undoes the round', () => {
+  const dir = newGame('scoped');
+  write(dir, 'module-plan.yaml', `base: main
+shared: [src/contracts/, params/, package.json, game.yaml, module-plan.yaml]
+modules:
+  - { id: a, wave: 1, owns: [src/core/a/], tests: [tests/core/a], obligations: [player.move], brief: A }
+  - { id: b, wave: 1, owns: [src/core/b/], brief: B }
+`);
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  fakeVitest(dir, [{ name: '[player.move:normal] a' }, { name: '[player.move:edge] b' }]);
+  assert.equal(gk(dir, 'fanout', '--wave', '1').code, 0);
+  const wt = (id) => path.join(path.dirname(dir), 'scoped.worktrees', id);
+  for (const id of ['a', 'b']) commitIn(wt(id), { [`src/core/${id}/x.ts`]: 'export const x = 1;\n' });
+  const head = sh(dir, 'git', 'rev-parse', 'HEAD').trim();
+  let r = gk(dir, 'integrate', '--wave', '1', '--scoped', '--test', 'exit 1');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /a: merge xong, test của module xanh/);
+  assert.match(r.out, /đã hoàn tác cả 2 merge/);
+  assert.equal(sh(dir, 'git', 'rev-parse', 'HEAD').trim(), head);
+  const calls = runs(dir);
+  assert.ok(calls.some((c) => c[0] === 'run' && c[1] === 'tests/core/a'), 'module a: its own test path');
+  assert.ok(calls.some((c) => c.includes('-t')), 'module a: parity of its obligations');
+  r = gk(dir, 'integrate', '--wave', '1', '--scoped', '--test', 'exit 0');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Toàn bộ test xanh sau 2 merge/);
+});
+
+test('status: parallel work per plan — done to integrate, running, ready to hand out, capped, blocked, merged', () => {
+  const dir = newGame('pstat');
+  write(dir, 're-plan.yaml', `kind: re
+base: main
+maxParallel: 2
+shared: [re-plan.yaml]
+areas:
+  - { id: a, owns: [notes/a/], brief: A }
+  - { id: b, owns: [notes/b/], brief: B }
+  - { id: c, owns: [notes/c/], brief: C }
+  - { id: d, owns: [notes/d/], dependsOn: [a], brief: D }
+`);
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  let r = gk(dir, 'status');
+  assert.match(r.out, /Việc song song \(re-plan\.yaml, tối đa 2 cùng lúc\) — 0\/4 mảng phân tích đã merge/);
+  assert.match(r.out, /Sẵn sàng, giao được ngay: a, b → `gamekit fanout --plan re --ready`/);
+  assert.match(r.out, /Sẵn sàng nhưng đã đủ 2 việc đang chạy: c/);
+  assert.match(r.out, /Chờ phụ thuộc: d \(chờ a\)/);
+  assert.equal(gk(dir, 'fanout', '--plan', 're', '--ready').code, 0);
+  const wt = (id) => path.join(path.dirname(dir), 'pstat.worktrees', `re-${id}`);
+  commitIn(wt('a'), { 'notes/a/questions.yaml': 'questions: []\n' });
+  write(wt('b'), 'notes/b/wip.md', 'x');
+  r = gk(dir, 'status');
+  assert.match(r.out, /Xong, chờ integrate: a \(1 commit\) → `gamekit integrate --plan re --ready`/);
+  assert.match(r.out, /Đang làm: b/);
+  assert.match(r.out, /Sẵn sàng nhưng đã đủ 2 việc đang chạy: c/);
+  assert.equal(gk(dir, 'integrate', '--plan', 're', '--ready', '--cleanup').code, 0);
+  r = gk(dir, 'status');
+  assert.match(r.out, /1\/4 mảng phân tích đã merge/);
+  assert.match(r.out, /Sẵn sàng, giao được ngay: c → /, 'a merged and its worktree removed: one slot free, c first in order');
+  assert.match(r.out, /Sẵn sàng nhưng đã đủ 2 việc đang chạy: d/);
+  // a broken plan is reported, not a crash
+  write(dir, 're-plan.yaml', 'kind: re\n');
+  assert.match(gk(dir, 'status').out, /kế hoạch không hợp lệ/);
+});
+
+test('recon: inventories the original build, fills what game.yaml still lacks, never scans the game repo itself', () => {
+  const dir = newGame('recon');
+  const orig = path.join(path.dirname(dir), 'original');
+  write(orig, 'Game_Data/Managed/Assembly-CSharp.dll', 'il');
+  write(orig, 'Game_Data/globalgamemanagers', 'UnityFS\0\0\x002021.3.5f1\0rest');
+  write(orig, 'UnityPlayer.dll', 'x');
+  write(orig, 'Game_Data/sharedassets0.assets', 'x');
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('engine: unity', 'engine: unknown'));
+  let r = gk(dir, 'recon', '../original');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Engine: unity \(mono\) 2021\.3\.5f1/);
+  const inv = JSON.parse(read(dir, 'notes/inventory.json'));
+  assert.equal(inv.files.length, 4);
+  assert.equal(inv.totals.byKind.code.files, 2);
+  assert.ok(inv.files.every((f) => f.sha256.length === 64));
+  const y = YAML.parse(read(dir, 'game.yaml'));
+  assert.deepEqual([y.source.engine, y.source.path, y.source.engineVersion], ['unity', '../original', '2021.3.5f1']);
+  assert.equal(gk(dir, 'validate').code, 0);
+  // with source.path filled, no argument is needed; a different engine set by the user is kept, with a warning
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('engine: unity', 'engine: godot'));
+  r = gk(dir, 'recon', '--no-hash');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /game\.yaml ghi engine godot nhưng file trông như unity/);
+  assert.equal(YAML.parse(read(dir, 'game.yaml')).source.engine, 'godot');
+  assert.ok(!('sha256' in JSON.parse(read(dir, 'notes/inventory.json')).files[0]));
+  r = gk(dir, 'recon', '.');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /không quét chính repo này/);
+  write(dir, 'reference/game.swf', 'x'); // gitignored copies inside the repo are fine
+  assert.match(gk(dir, 'recon', 'reference', '--no-write').out, /Engine: flash/);
+});
+
 test('provenance: unlabeled assets fail; reference blocked from P3; placeholder blocked at P5', () => {
   const dir = newGame();
   write(dir, 'assets/hero.png', 'x');
@@ -106,9 +612,11 @@ test('gate: parses items, runs auto checks, advances and records timings', () =>
   assert.equal(gk(dir, 'gate').code, 1);
   write(dir, 'gates/P0.md', read(dir, 'gates/P0.md').replaceAll('- [ ]', '- [x]'));
   const fieldFail = gk(dir, 'gate');
-  assert.equal(fieldFail.code, 1, 'source.path and forbiddenTerms still empty');
+  assert.equal(fieldFail.code, 1, 'source.path, forbiddenTerms and the inventory still missing');
   assert.match(fieldFail.out, /source\.path chưa điền/);
-  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig').replace('forbiddenTerms: []', 'forbiddenTerms: [OldName]'));
+  assert.match(fieldFail.out, /thiếu notes\/inventory\.json/);
+  withInventory(dir); // fills source.path too
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('forbiddenTerms: []', 'forbiddenTerms: [OldName]'));
   assert.equal(gk(dir, 'gate').code, 0);
   assert.equal(gk(dir, 'gate', '--advance').code, 0);
   const y = read(dir, 'game.yaml');
@@ -186,6 +694,130 @@ modules:
   assert.ok(!fs.existsSync(wt('a')), 'worktree removed');
 });
 
+
+/** Commit `files` on the worktree's branch. */
+const commitIn = (wt, files, msg = 'work') => {
+  sh(wt, 'git', 'config', 'user.email', 't@e');
+  for (const [rel, text] of Object.entries(files)) write(wt, rel, text);
+  sh(wt, 'git', 'add', '-A');
+  sh(wt, 'git', 'commit', '-qm', msg);
+};
+
+test('re-plan: fanout --ready opens areas whose dependencies are merged, links local copies, integrate --keep-going', () => {
+  const dir = newGame('rep');
+  write(dir, 're-plan.yaml', `kind: re
+base: main
+shared: [DECISIONS.md, src/contracts/, game.yaml, re-plan.yaml]
+links: [decompiled/]
+units: { time: s }
+areas:
+  - { id: player, owns: [notes/player/, params/player.json], targets: [PlayerController], brief: Nhân vật }
+  - { id: audio, owns: [notes/audio/], brief: Âm thanh }
+  - { id: score, owns: [notes/score/], dependsOn: [player], brief: Điểm }
+`);
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  write(dir, 'decompiled/PlayerController.cs', 'class PlayerController {}'); // gitignored, local only
+  const wt = (id) => path.join(path.dirname(dir), 'rep.worktrees', `re-${id}`);
+
+  assert.equal(gk(dir, 'fanout', '--plan', 're', '--wave', '1').code, 1, 'areas have no waves');
+  const f = gk(dir, 'fanout', '--plan', 're', '--ready');
+  assert.equal(f.code, 0, f.out);
+  assert.ok(fs.existsSync(wt('player')) && fs.existsSync(wt('audio')));
+  assert.ok(!fs.existsSync(wt('score')), 'score waits for player');
+  assert.match(f.out, /score \(player\)/);
+  assert.equal(sh(wt('player'), 'git', 'branch', '--show-current').trim(), 're/player');
+  assert.ok(fs.existsSync(path.join(wt('player'), 'decompiled/PlayerController.cs')), 'local copy linked into the worktree');
+  assert.equal(sh(wt('player'), 'git', 'status', '--porcelain').trim(), '', 'the symlink is not an untracked file');
+  const brief = read(wt('player'), '.gamekit/local/BRIEF.md');
+  for (const want of [/notes\/player\/questions\.yaml/, /PlayerController/, /D-player-n/, /time: s/, /decompiled\//, /re\/player/]) assert.match(brief, want);
+
+  // player edits a shared file: rejected; audio is independent and still merges with --keep-going
+  commitIn(wt('player'), { 'notes/player/questions.yaml': 'questions: []\n', 'DECISIONS.md': '# x\n' });
+  commitIn(wt('audio'), { 'notes/audio/questions.yaml': 'questions:\n  - { id: audio.q1, question: Q, evidence: E, status: open }\n' });
+  const own = gk(wt('player'), 'check-ownership');
+  assert.equal(own.code, 1, 'branch re/player picks re-plan.yaml');
+  assert.match(own.out, /DECISIONS\.md thuộc vùng dùng chung/);
+  let r = gk(dir, 'integrate', '--plan', 're', '--ready', '--keep-going', '--cleanup');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /audio: merge xong/);
+  assert.match(r.out, /1 lỗi: player/);
+  assert.match(sh(dir, 'git', 'log', '-1', '--format=%s').trim(), /^merge: re\/audio \(mảng\)$/);
+  assert.ok(!fs.existsSync(wt('audio')), 'merged worktree removed');
+  assert.ok(fs.existsSync(path.join(dir, 'decompiled/PlayerController.cs')), 'removing the worktree keeps the original files');
+
+  // validate is the default check for areas: a broken questions file is undone
+  sh(wt('player'), 'git', 'reset', '-q', '--hard', 'HEAD~1');
+  commitIn(wt('player'), { 'notes/player/questions.yaml': 'questions:\n  - { id: player.q1, status: nope }\n' });
+  r = gk(dir, 'integrate', '--plan', 're', '--ready');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /player: test đỏ sau khi merge — đã hoàn tác/);
+  commitIn(wt('player'), { 'notes/player/questions.yaml': 'questions:\n  - { id: player.q1, question: Q, evidence: E, status: answered }\n' });
+  r = gk(dir, 'integrate', '--plan', 're', '--ready');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /fanout --plan re --ready/);
+  r = gk(dir, 'fanout', '--plan', 're', '--ready');
+  assert.equal(r.code, 0, r.out);
+  assert.ok(fs.existsSync(wt('score')), 'score opens once player is merged');
+});
+
+test('re-plan: maxParallel caps open worktrees, counting the ones already running', () => {
+  const dir = newGame('cap');
+  write(dir, 're-plan.yaml', `kind: re
+base: main
+maxParallel: 1
+shared: [re-plan.yaml]
+areas:
+  - { id: a, owns: [notes/a/], brief: A }
+  - { id: b, owns: [notes/b/], brief: B }
+`);
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  const wt = (id) => path.join(path.dirname(dir), 'cap.worktrees', `re-${id}`);
+  assert.equal(gk(dir, 'fanout', '--plan', 're', '--ready').code, 0);
+  assert.ok(fs.existsSync(wt('a')) && !fs.existsSync(wt('b')));
+  const again = gk(dir, 'fanout', '--plan', 're', '--ready');
+  assert.match(again.out, /Không có mảng nào sẵn sàng \(đang chạy: a\)/);
+  assert.ok(!fs.existsSync(wt('b')));
+});
+
+test('module-plan --ready: a module starts when its own dependencies merge, not the whole wave; briefs carry the area obligations', () => {
+  const dir = newGame('dag');
+  write(dir, 'module-plan.yaml', `base: main
+maxParallel: 2
+shared: [src/contracts/, params/, package.json, game.yaml, module-plan.yaml, re-plan.yaml]
+modules:
+  - { id: a, wave: 1, owns: [src/core/a/], brief: A }
+  - { id: slow, wave: 1, owns: [src/core/slow/], brief: S }
+  - { id: extra, wave: 1, owns: [src/core/extra/], brief: X }
+  - { id: c, wave: 2, owns: [src/core/c/], dependsOn: [a], brief: C }
+`);
+  write(dir, 're-plan.yaml', 'kind: re\nbase: main\nshared: [re-plan.yaml]\nareas:\n  - { id: hero, owns: [notes/hero/, spec/obligations/hero.yaml], buildModule: c, brief: H }\n');
+  write(dir, 'spec/obligations/hero.yaml', 'obligations:\n  - { id: hero.jump, title: Nhảy cao 3 ô, cases: [normal, edge] }\n');
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  const wt = (id) => path.join(path.dirname(dir), 'dag.worktrees', id);
+  let r = gk(dir, 'fanout', '--wave', '1');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /maxParallel 2 — mở 2, còn extra/);
+  assert.ok(fs.existsSync(wt('a')) && fs.existsSync(wt('slow')) && !fs.existsSync(wt('extra')));
+  commitIn(wt('a'), { 'src/core/a/x.ts': 'export const x = 1;\n' });
+  r = gk(dir, 'integrate', '--ready', '--test', 'exit 0', '--cleanup');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /slow: chưa xong/, 'a running module without commits is skipped, not an error');
+  r = gk(dir, 'fanout', '--ready');
+  assert.equal(r.code, 0, r.out);
+  assert.ok(fs.existsSync(wt('extra')) && !fs.existsSync(wt('c')), 'one free slot (slow still runs): extra comes first in dependency order');
+  commitIn(wt('extra'), { 'src/core/extra/x.ts': 'export const x = 1;\n' });
+  assert.equal(gk(dir, 'integrate', '--ready', '--test', 'exit 0', '--cleanup').code, 0);
+  r = gk(dir, 'fanout', '--ready');
+  assert.equal(r.code, 0, r.out);
+  assert.ok(fs.existsSync(wt('c')), 'c starts although slow (same wave as a) is not merged');
+  const brief = read(wt('c'), '.gamekit/local/BRIEF.md');
+  assert.match(brief, /Đầu vào từ phân tích \(mảng hero\)/);
+  assert.match(brief, /`hero\.jump`: Nhảy cao 3 ô \(case: normal, edge\)/);
+  assert.match(sh(dir, 'git', 'log', '-1', '--format=%s').trim(), /^merge: extra \(đợt 1\)$/, 'module merge commits keep their format');
+});
 
 test('cli args: boolean flags never swallow positionals', () => {
   assert.deepEqual(parseArgs(['provenance', 'add', '--all', 'assets', '--label', 'own']), { _: ['provenance', 'add', 'assets'], all: true, label: 'own' });
@@ -674,7 +1306,7 @@ test('ownership: a new game is the user\'s own — P0 passes without forbiddenTe
   assert.match(read(dir, 'game.yaml'), /ownership: own/);
   assert.match(gk(dir, 'status').out, /game của bạn/);
   tickAll(dir, 'P0');
-  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig'));
+  withInventory(dir);
   const r = gk(dir, 'gate');
   assert.equal(r.code, 0, r.out);
   assert.doesNotMatch(r.out, /forbiddenTerms|clone/);
@@ -685,7 +1317,7 @@ test('ownership: init --third-party requires forbiddenTerms, keeps reskin phase 
   assert.match(read(dir, 'game.yaml'), /ownership: third-party/);
   assert.match(gk(dir, 'status').out, /làm lại game người khác/);
   tickAll(dir, 'P0');
-  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig'));
+  withInventory(dir);
   let r = gk(dir, 'gate');
   assert.equal(r.code, 1);
   assert.match(r.out, /forbiddenTerms chưa điền/);

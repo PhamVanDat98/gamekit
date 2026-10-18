@@ -15,21 +15,31 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   init <tên> --questions --json             In danh sách câu hỏi kèm giải thích (cho agent hỏi người dùng)
   config [--portal p] [--set k=v…] [--questions --json]   Điền thông tin portal còn thiếu, thêm portal
   status | next                             Game đang ở pha nào, việc gì tiếp
-  gate [--advance]                          Kiểm tra cổng của pha hiện tại
-  validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
+  recon [đường dẫn] [--no-hash] [--no-write] [--json]   Nhận diện engine của game gốc từ tên file (thư mục, APK/IPA/ZIP),
+                                            kiểm kê vào notes/inventory.json, điền source.engine/path/engineVersion còn trống
+  gate [--advance]                          Kiểm tra cổng của pha hiện tại (mục auto chạy song song)
+  gate --area <id>                          Cổng của một mảng phân tích (re-plan.yaml): đủ điều kiện để dựng lại chưa
+  validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, re-plan, câu hỏi, asset-manifest
+  questions [--area id] [--json]            Câu hỏi phân tích theo mảng (notes/<mảng>/questions.yaml): tiến độ, câu bắt buộc chưa xong
   parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)
+  parity [--area id | --module id | --obligation a,b] [--json] [--mutate]
+                                            Chỉ chấm (và chỉ chạy test của) nghĩa vụ trong phạm vi; --mutate: đổi từng số params
+                                            mà nghĩa vụ dùng, test phải đỏ — chứng minh test chạm tới số đó
   provenance add <file…> --label <nhãn>     Gắn nguồn gốc asset (reference|generated|own|licensed|placeholder)
   provenance list [--label]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
   release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)
-  fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
-  check-ownership [--module id]             Module chỉ sửa trong thư mục được giao
-  integrate --wave N [--test "cmd"] [--cleanup]   Merge theo phụ thuộc, test sau mỗi lần
+  fanout [--plan build|re] [--wave N | --ready] [--dry-run]   Tạo worktree + brief cho module (module-plan.yaml) hoặc mảng phân tích (re-plan.yaml).
+                                            --ready: mọi đơn vị có phụ thuộc đã merge, tối đa maxParallel
+  check-ownership [--plan] [--module id]    Module/mảng chỉ sửa trong phần được giao (nhận theo nhánh mod/… hoặc re/…)
+  integrate [--plan build|re] [--wave N | --ready] [--keep-going] [--scoped] [--test "cmd"] [--cleanup]
+                                            Merge theo phụ thuộc, test sau mỗi lần (mảng: validate); --keep-going bỏ qua đơn vị lỗi và phụ thuộc của nó;
+                                            --scoped: sau mỗi merge chỉ test + parity của module, cuối lượt chạy toàn bộ một lần
   precommit                                 (git hook) chặn asset gốc, code decompile, asset chưa nhãn
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'ready', 'keep-going', 'mutate', 'scoped', 'no-hash', 'no-write']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -52,8 +62,10 @@ const COMMANDS = {
   config: () => import('./config.mjs').then((m) => m.run),
   status: () => import('./status.mjs').then((m) => m.run),
   next: () => import('./status.mjs').then((m) => m.run),
+  recon: () => import('./recon.mjs').then((m) => m.run),
   gate: () => import('./gate.mjs').then((m) => m.run),
   validate: () => import('./validate.mjs').then((m) => m.run),
+  questions: () => import('./questions.mjs').then((m) => m.run),
   parity: () => import('./parity.mjs').then((m) => m.run),
   provenance: () => import('./provenance.mjs').then((m) => m.run),
   pack: () => import('./pack.mjs').then((m) => m.run),

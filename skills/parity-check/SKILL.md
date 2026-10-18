@@ -19,10 +19,11 @@ Parity không phải cảm giác "chơi thấy giống". Nó là danh sách ngh�
   source: notes/enemy.md
 ```
 
+- Chia mảng song song: mỗi mảng ghi nghĩa vụ vào `spec/obligations/<mảng>.yaml`, id bắt đầu bằng `<mảng>.`; `validate` và `parity` gộp mọi file.
 - Chia theo hành vi, không theo file code. Một nghĩa vụ nên kiểm chứng được bằng vài test.
 - `cases`: `normal` (giá trị điển hình) · `edge` (biên: tường, máu 0, max level, dt lớn) · `invalid` (input sai, save hỏng) · `oracle` (bảng từ game gốc) · `replay` (luồng chơi ghi lại).
 - `required: false` cho thứ có thì tốt (hiệu ứng phụ). Mặc định là bắt buộc.
-- Không làm được hoặc không làm: `status: blocked | out-of-scope`, kèm `decision: D-n` trong `DECISIONS.md`. Chỉ người dùng đặt `approved: true`. Nghĩa vụ bỏ qua được ghi lại, **không bao giờ tính là đã đóng**.
+- Không làm được hoặc không làm: `status: blocked | out-of-scope`, kèm `decision: D-n` trong `DECISIONS.md` (hoặc `D-<mảng>-n` trong `notes/<mảng>/decisions.md`). Chỉ người dùng đặt `approved: true`. Nghĩa vụ bỏ qua được ghi lại, **không bao giờ tính là đã đóng**.
 
 `gamekit validate` kiểm tra schema, id trùng, `params` có tồn tại, file oracle có thật.
 
@@ -47,7 +48,7 @@ it.each(ring.cases)('[enemy.bullet-ring:oracle] lv=$in.level', …)
 Giá trị kỳ vọng lấy từ `params/` hoặc oracle, **không** gõ lại số trong test. Một nghĩa vụ chỉ đóng khi mọi case trong `cases` có ít nhất một test xanh, và không test nào gắn thẻ đó bị đỏ hay bị skip.
 
 ## 4. Chạy và đọc kết quả
-`gamekit parity` chạy vitest và chấm. Gate P2 có mục `{auto: parity}`.
+`gamekit parity` chạy vitest và chấm. Gate P2 có mục `{auto: parity}`. Chỉ một phần: `--obligation a,b`, `--area <mảng>`, `--module <id>` (nghĩa vụ ghi trong `obligations` của module, hoặc của mảng có `buildModule` trỏ tới module) — chỉ chạy test gắn thẻ các nghĩa vụ đó. `--json` cho script khác đọc.
 
 | Trạng thái | Nghĩa | Làm gì |
 | --- | --- | --- |
@@ -58,7 +59,11 @@ Giá trị kỳ vọng lấy từ `params/` hoặc oracle, **không** gõ lại 
 | waived | blocked/out-of-scope theo D-n | chờ người dùng duyệt |
 
 ## 5. Test xanh có thật sự bắt lỗi không?
-Test xanh có thể chỉ đang so một giá trị với chính nó. Với mỗi nghĩa vụ quan trọng, phá thử một lần: đổi một giá trị trong `params/` hoặc một dòng oracle, chạy `gamekit parity`, phải thấy nghĩa vụ đó đỏ. Xong thì hoàn tác. Nếu vẫn xanh, test chưa chạm tới hành vi thật: viết lại test.
+Test xanh có thể chỉ đang so một giá trị với chính nó. `gamekit parity --mutate [--obligation id | --area id]` phá thử thay bạn, chỉ chạy test của nghĩa vụ đang thử, rồi khôi phục file:
+- **Oracle**: nhân mọi `out` trong bảng của nghĩa vụ. Test `oracle` phải đỏ; vẫn xanh (`lọt`) là test không thật sự so với bảng — lỗi, viết lại test.
+- **Params**: nhân từng số nghĩa vụ ghi trong `params`. Test lấy kỳ vọng từ chính `params/` (như mẫu) đổi theo nên vẫn xanh — đó là **cảnh báo** chứ không phải lỗi: test kiểm code dùng đúng số, còn bản thân con số chỉ đứng trên `source` của nó. Số quan trọng thì thêm oracle lấy từ game gốc để có kiểm độc lập.
+
+Vì vậy đừng chỉ dựa vào params cho cơ chế người chơi cảm nhận rõ: mỗi nghĩa vụ quan trọng nên có case `oracle`.
 
 ## 6. Báo cáo
 Báo người dùng: số nghĩa vụ bắt buộc đã đóng / tổng, các nghĩa vụ bỏ qua kèm D-n, các nghĩa vụ chỉ dựa trên `inferred` hoặc `derived`, và những gì **chưa** kiểm chứng. Chỉ báo những lệnh đã thật sự chạy.

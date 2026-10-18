@@ -2,6 +2,7 @@
 
 Mỗi câu: cần bằng chứng gì → trạng thái → kết luận (link ghi chú). Trạng thái: `mở` · `một phần` · `đã trả lời`.
 Câu chưa xong khi đóng P1: ghi lý do và ảnh hưởng tới bản port. Xem skill re-notes.
+Chia phân tích thành mảng chạy song song (`re-plan.yaml`): mỗi mảng dùng `notes/<mảng>/questions.yaml` thay cho bảng này (mẫu: `notes/questions.example.yaml`).
 
 | # | Câu hỏi | Bằng chứng cần | Trạng thái | Kết luận / ghi chú |
 | --- | --- | --- | --- | --- |

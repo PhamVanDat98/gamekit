@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gamekit/questions.schema.json",
+  "title": "notes/<mảng>/questions.yaml — câu hỏi phân tích game gốc của một mảng",
+  "type": "object",
+  "required": ["questions"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "question", "evidence", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9._-]*$", "description": "<mảng>.<tên>, vd player.q1" },
+          "question": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "string", "minLength": 1, "description": "Loại bằng chứng cần: hằng số + hàm, bảng data, đo video…" },
+          "required": { "type": "boolean", "default": true },
+          "status": { "enum": ["open", "partial", "answered"] },
+          "notes": { "type": "array", "items": { "type": "string" }, "description": "Ghi chú trả lời câu này, vd notes/player/movement.md" },
+          "params": { "type": "array", "items": { "type": "string" }, "description": "Khoá params câu này đưa ra, vd player.speed" },
+          "obligations": { "type": "array", "items": { "type": "string" }, "description": "Nghĩa vụ parity dựa trên câu này" },
+          "openReason": { "type": ["string", "null"], "description": "Vì sao còn mở khi đóng mảng" },
+          "impact": { "type": ["string", "null"], "description": "Ảnh hưởng tới bản port nếu còn mở" }
+        }
+      }
+    }
+  }
+}

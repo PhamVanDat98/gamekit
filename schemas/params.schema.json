@@ -31,7 +31,7 @@
           "properties": {
             "original": {},
             "reason": { "type": "string", "minLength": 1 },
-            "decision": { "type": "string", "pattern": "^D-\\d+$", "description": "Mã quyết định trong DECISIONS.md, vd D-3" },
+            "decision": { "type": "string", "pattern": "^D-([a-z0-9][a-z0-9-]*-)?\\d+$", "description": "Mã quyết định trong DECISIONS.md, vd D-3, hoặc D-<mảng>-n của một mảng (D-player-2)" },
             "approved": { "type": "boolean" }
           }
         }
