@@ -768,10 +768,23 @@ test('unity scan: Inspector values beat code defaults, prefab overrides in scene
   assert.deepEqual(st, {
     'Assets/Editor/Tool.cs': 'skip',
     'Assets/Plugins/Demigiant/DOTweenStub.cs': 'skip',
+    'Assets/Scripts/Enemy.cs': 'todo',
+    'Assets/Scripts/GameManager.cs': 'todo',
     'Assets/Scripts/LevelData.cs': 'todo',
     'Assets/Scripts/PlayerController.cs': 'todo',
     'Assets/Scripts/Spawner.cs': 'todo',
   });
+  // Port order: dependencies first; scripts that use each other share a tier.
+  assert.deepEqual(map.scripts.map((s) => [s.script.replace(/^.*\//, ''), s.tier]), [
+    ['LevelData.cs', 1],
+    ['PlayerController.cs', 1],
+    ['GameManager.cs', 2],
+    ['Spawner.cs', 2],
+    ['Enemy.cs', 3],
+    ['Tool.cs', undefined],
+    ['DOTweenStub.cs', undefined],
+  ]);
+  assert.match(report, /2\. `GameManager` \(vòng\), `Spawner` \(vòng\)/);
   const game = YAML.parse(read(dir, 'game.yaml'));
   assert.equal(game.source.engineVersion, '2022.3.10f1');
   assert.equal(game.source.path, UNITY_FIXTURE);
@@ -819,20 +832,22 @@ test('gate: {engine: …} items only for that engine; port-map needs a scan at P
   assert.equal(portMapStatus(dir, { strict: false }).ok, true);
   let s = portMapStatus(dir, { strict: true });
   assert.equal(s.ok, false);
-  assert.match(s.detail, /3 script chưa xong/);
+  assert.match(s.detail, /5 script chưa xong/);
   const map = YAML.parse(read(dir, 'spec/port-map.yaml'));
   for (const e of map.scripts) if (e.status === 'todo') Object.assign(e, { status: 'done', target: ['src/core/world.ts'] });
-  map.scripts[0].note = '';
+  const tool = map.scripts.find((e) => e.script === 'Assets/Editor/Tool.cs');
+  const player = map.scripts.find((e) => e.script === 'Assets/Scripts/PlayerController.cs');
+  tool.note = '';
   write(dir, 'spec/port-map.yaml', YAML.stringify(map));
   s = portMapStatus(dir, { strict: true });
   assert.match(s.detail, /skip thiếu note/);
   assert.equal(gk(dir, 'validate').code, 1, 'validate: skip needs a note');
-  map.scripts[0].note = 'editor';
-  map.scripts[2].target = ['src/core/nope.ts'];
+  tool.note = 'editor';
+  player.target = ['src/core/nope.ts'];
   write(dir, 'spec/port-map.yaml', YAML.stringify(map));
   assert.match(portMapStatus(dir, { strict: true }).detail, /nope\.ts không có/);
   assert.match(gk(dir, 'validate').out, /target src\/core\/nope\.ts không có/);
-  map.scripts[2].target = ['src/core/world.ts'];
+  player.target = ['src/core/world.ts'];
   write(dir, 'spec/port-map.yaml', YAML.stringify(map));
   assert.deepEqual(portMapStatus(dir, { strict: true }), { ok: true, detail: '' });
 });
@@ -844,4 +859,92 @@ test('init: Unity games get the Unity semantics helpers; other engines do not', 
   assert.equal(gk(parent, 'init', 'gd', '--engine', 'godot', '--no-install', '--no-git').code, 0);
   assert.ok(!fs.existsSync(path.join(parent, 'gd', 'src/core/unity')));
   assert.doesNotMatch(gk(path.join(parent, 'gd'), 'status').out, /engine-unity/);
+});
+
+test('unity params: Inspector values into params/ with source; drift after a change is reported, --force takes Unity', () => {
+  const dir = newGame('uparams');
+  assert.match(gk(dir, 'unity', 'params', 'Spawner').out, /unity scan/);
+  gk(dir, 'unity', 'scan', '--src', UNITY_FIXTURE);
+  let r = gk(dir, 'unity', 'params', 'Spawner', 'PlayerController.speed');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /thiếu unit/);
+  let p = JSON.parse(read(dir, 'params/game.json'));
+  assert.deepEqual(p.spawner.interval, { value: 1.5, source: 'Assets/Scenes/Main.unity › World/Spawner › Spawner.interval · code mặc định 2f', confidence: 'observed' });
+  // one value per prefab/scene instance, never one picked at random
+  assert.equal(p.playerController.player.speed.value, 8);
+  assert.equal(p.playerController.mainPlayer.speed.value, 10);
+  assert.equal(p.player.speed.value, 320, 'existing params untouched');
+  assert.equal(gk(dir, 'validate').code, 0);
+
+  assert.equal(gk(dir, 'unity', 'params', 'LevelData', '--as', 'level.one').code, 0);
+  assert.equal(JSON.parse(read(dir, 'params/game.json')).level.one.targetScore.value, 250);
+  assert.match(gk(dir, 'unity', 'params', 'PlayerController', '--as', 'x').out, /--as chỉ dùng/);
+  r = gk(dir, 'unity', 'params', 'Nope');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /Có: LevelData, PlayerController, Spawner/);
+
+  assert.equal(gk(dir, 'unity', 'params', '--check').code, 0);
+  editJson(dir, 'params/game.json', (d) => (d.spawner.interval.value = 3));
+  r = gk(dir, 'unity', 'params', '--check');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /spawner\.interval = 3, project Unity hiện là 1\.5/);
+  assert.match(gk(dir, 'unity', 'scan').out, /spawner\.interval = 3, project Unity giờ là 1\.5/, 'a re-scan warns about drift');
+  r = gk(dir, 'unity', 'params', 'Spawner');
+  assert.match(r.out, /giữ nguyên; --force/);
+  assert.equal(JSON.parse(read(dir, 'params/game.json')).spawner.interval.value, 3);
+  assert.equal(gk(dir, 'unity', 'params', 'Spawner', '--force').code, 0);
+  assert.equal(JSON.parse(read(dir, 'params/game.json')).spawner.interval.value, 1.5);
+  // a deliberate deviation is not drift
+  editJson(dir, 'params/game.json', (d) => Object.assign(d.spawner.interval, { value: 2, deviation: { original: 1.5, reason: 'web', decision: 'D-1', approved: false } }));
+  assert.equal(gk(dir, 'unity', 'params', '--check').code, 0);
+});
+
+test('module plan with Unity scripts: brief lists each script, integrate marks them done in the port map', () => {
+  const dir = newGame('uplan');
+  gk(dir, 'unity', 'scan', '--src', UNITY_FIXTURE);
+  gk(dir, 'unity', 'params', 'Spawner');
+  write(dir, 'module-plan.yaml', `base: main
+shared: [src/contracts/, params/, package.json, game.yaml, module-plan.yaml, spec/]
+modules:
+  - { id: data, wave: 1, owns: [src/core/data/], brief: D, scripts: [Assets/Scripts/LevelData.cs] }
+  - { id: spawn, wave: 1, owns: [src/core/spawn/], brief: S, scripts: [Assets/Scripts/Spawner.cs, Assets/Scripts/GameManager.cs] }
+  - { id: other, wave: 2, owns: [src/core/other/], brief: O, scripts: [Assets/Scripts/Nope.cs, Assets/Scripts/LevelData.cs] }
+`);
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /Nope\.cs không có trong spec\/port-map\.yaml/);
+  assert.match(r.out, /LevelData\.cs giao cho cả data và other/);
+  write(dir, 'module-plan.yaml', read(dir, 'module-plan.yaml').replace(/\n  - \{ id: other.*\n/, '\n'));
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /script todo chưa giao module nào: .*Enemy\.cs/);
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  assert.equal(gk(dir, 'fanout', '--wave', '1').code, 0);
+  const wt = (id) => path.join(path.dirname(dir), 'uplan.worktrees', id);
+  const brief = read(wt('spawn'), '.gamekit/local/BRIEF.md');
+  assert.match(brief, /### Assets\/Scripts\/Spawner\.cs/);
+  assert.ok(brief.includes(`Mã gốc: \`${path.join(UNITY_FIXTURE, 'Assets/Scripts/Spawner.cs')}\``));
+  assert.match(brief, /random-range\*\* dòng 16/);
+  assert.match(brief, /Inspector ghi đè: `interval` code 2f → game chạy 1\.5/);
+  assert.match(brief, /Params sẵn có: `PARAMS\.spawner\.interval`/);
+  assert.match(brief, /phụ thuộc vòng với Assets\/Scripts\/GameManager\.cs/);
+  assert.match(brief, /pitfalls\.md/);
+  for (const id of ['data', 'spawn']) {
+    sh(wt(id), 'git', 'config', 'user.email', 't@e');
+    write(wt(id), `src/core/${id}/x.ts`, 'export const x = 1;\n');
+    sh(wt(id), 'git', 'add', '-A');
+    sh(wt(id), 'git', 'commit', '-qm', id);
+  }
+  r = gk(dir, 'integrate', '--wave', '1', '--test', 'exit 0');
+  assert.equal(r.code, 0, r.out);
+  const map = YAML.parse(read(dir, 'spec/port-map.yaml'));
+  const st = Object.fromEntries(map.scripts.map((e) => [e.script.replace(/^.*\//, ''), [e.status, e.target]]));
+  assert.deepEqual(st['Spawner.cs'], ['done', ['src/core/spawn']]);
+  assert.deepEqual(st['GameManager.cs'], ['done', ['src/core/spawn']]);
+  assert.deepEqual(st['LevelData.cs'], ['done', ['src/core/data']]);
+  assert.deepEqual(st['Enemy.cs'], ['todo', []]);
+  assert.match(read(dir, 'spec/port-map.yaml'), /^# Sinh bởi gamekit unity scan/, 'header comment kept');
+  assert.equal(sh(dir, 'git', 'status', '--porcelain').trim(), '', 'port-map change committed');
+  assert.equal(gk(dir, 'validate').code, 0);
 });

@@ -20,6 +20,7 @@ Chạy song song chỉ an toàn khi **contract được chốt trước**. Agent
    - `shared`: `src/contracts/`, `params/`, `package.json`, `package-lock.json`, `game.yaml`, `module-plan.yaml` và mọi file dùng chung khác — chỉ agent chính sửa.
    - Mỗi module: `id`, `wave`, `owns` (thư mục, mỗi file một chủ), `dependsOn` (chỉ module ở đợt trước), `contracts`, `tests`, `brief` (trích spec liên quan + tiêu chí parity cụ thể).
    - Đợt điển hình: 1 = các `core/*` + `view/ui` trên state giả + asset; 2 = `view/scene`, `view/fx`, input; 3 = tích hợp.
+   - Game Unity có `spec/port-map.yaml`: mỗi module thêm `scripts:` (script gốc nó port). Chia theo `tier`: script tầng 1 vào đợt 1…; script phụ thuộc vòng chung một module. Brief của module được bổ sung tự động chi tiết từng script; `integrate` đánh dấu chúng `done`.
    - `maxParallel`: 3–5.
 6. `gamekit validate` sạch (kiểm tra trùng sở hữu, phụ thuộc sai đợt, đụng vùng shared) → commit lên `main`.
 7. `gamekit fanout --wave 1`: tạo worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>`, viết `.gamekit/local/BRIEF.md`, symlink `node_modules`.

@@ -14,6 +14,7 @@ modules:
     owns: [src/core/player/, tests/core/player/]
     contracts: [src/contracts/world.ts, src/contracts/input.ts]
     tests: [tests/core/player]
+    # scripts: [Assets/Scripts/PlayerController.cs]   # game Unity: script gốc module này port (spec/port-map.yaml)
     brief: >
       Di chuyển nhân vật theo spec mục 2.1: tốc độ player.speed, giới hạn trong world.width.
       Test parity: sau 1 giây giữ phải, x tăng đúng player.speed trong sai số tolerance.

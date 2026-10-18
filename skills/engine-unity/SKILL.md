@@ -21,11 +21,11 @@ GameKit xử lý từng điểm: (1) `gamekit unity scan` đọc giá trị seri
    - `notes/unity/REPORT.md` — settings, scene, camera/CanvasScaler, **Inspector ghi đè**, script và bẫy từng dòng, Animator, animation event, PPU, input axes.
    - `notes/unity/params-draft.json` — giá trị serialized ở dạng params, `source` = `file › object › Class.field`.
    - `notes/unity/data/*.json` — đầy đủ: mọi component, PrefabInstance và override, sprite rect/pivot, clip.
-   - `spec/port-map.yaml` — mỗi script một dòng `todo` (Editor, thư viện: `skip` sẵn).
+   - `spec/port-map.yaml` — mỗi script một dòng `todo` (Editor, thư viện: `skip` sẵn), xếp theo **tầng** phụ thuộc (`tier`, `dependsOn`); REPORT có mục "Thứ tự port".
    Scan báo "dạng nhị phân" → trong Unity: Project Settings › Editor › Asset Serialization = **Force Text**, rồi quét lại. Quét lại bất cứ khi nào project Unity đổi (giữ nguyên status/target/note đã điền).
 3. Đọc **hết** REPORT.md. Chỗ chưa rõ → `notes/QUESTIONS.md`.
-4. **Params từ params-draft.json**, không từ code. Chép mục cần dùng sang `params/*.json`, điền `unit` (world unit, s, độ, unit/s…), giữ `source` và `confidence: observed`. Một class có nhiều bản (`PlayerController@…`) nghĩa là mỗi prefab/scene một giá trị khác — giữ đủ, đừng chọn đại một.
-5. AnimationCurve: chép nguyên object `{ m_Curve, m_PreInfinity, m_PostInfinity }` làm `value`; core gọi `evaluateCurve`.
+4. **Params từ inspector, không từ code, không gõ tay:** `gamekit unity params <Class | Class.field …>` (hoặc `--all`) chép giá trị từ `params-draft.json` vào `params/game.json` kèm `source`, `confidence: observed`; rồi điền `unit` (world unit, s, độ, unit/s…). Class có nhiều bản (mỗi prefab/scene một giá trị) ra nhóm con `playerController.player`, `playerController.mainPlayer` — giữ đủ, đừng chọn đại một. `--as nhóm.con` đặt tên khác. AnimationCurve được chép nguyên object; core gọi `evaluateCurve`.
+5. Project Unity đổi → `gamekit unity scan` lại; scan và `gamekit unity params --check` báo params nào lệch giá trị Unity mới (`--force` để lấy giá trị Unity; cố ý khác thì ghi `deviation`).
 6. `spec/gameplay-spec.md` + `spec/obligations.yaml`: mỗi script gameplay ít nhất một nghĩa vụ (skill **parity-check**). Animation event và transition có điều kiện cũng là hành vi.
 7. Oracle `observed` từ Unity (mục dưới) cho các cơ chế có số liệu: di chuyển, nhảy, sinh quái, điểm.
 
@@ -51,7 +51,11 @@ GameKit xử lý từng điểm: (1) `gamekit unity scan` đọc giá trị seri
 
 **Ngữ nghĩa Unity có sẵn** (`src/core/unity/`, có test): `Mathf.round/sign/toInt/intDiv/repeat/pingPong/deltaAngle/moveTowards/smoothDamp/approximately/f32`, `UnityRandom.rangeInt/rangeFloat` (trên `Rng` có seed), `evaluateCurve`, `Scheduler` (`start(function*…)`, `wait(s)`, `until(fn)`, `after`, `every`). Dùng chúng thay vì `Math.*`; đừng viết lại.
 
-**Vòng làm một script**
+**Thứ tự.** Làm theo `tier` trong port-map: tầng 1 trước (không phụ thuộc ai), cùng tầng làm song song. Script phụ thuộc vòng (cùng tầng, REPORT ghi "vòng") port cùng nhau, trong một module.
+
+**Song song (game ≥ ~10 script gameplay).** Skill **module-plan**: mỗi module có `scripts:` (đường dẫn trong port-map), đợt theo tầng. `fanout` tự đưa vào `BRIEF.md` của từng module: đường dẫn mã gốc, class, Unity message, bẫy theo dòng, giá trị inspector ghi đè, `PARAMS.…` sẵn có. `integrate` merge xong thì tự đánh dấu các script đó `done` (target = thư mục module) và commit port-map. `validate` báo script giao trùng, script chưa giao, phụ thuộc giữa module chưa khai `dependsOn`.
+
+**Vòng làm một script** (khi làm tuần tự)
 1. `spec/port-map.yaml`: đặt `status: doing`.
 2. Đọc script + mục của nó trong REPORT (cột Bẫy chỉ dòng) + `references/pitfalls.md` cho từng bẫy.
 3. Viết test trước, giá trị kỳ vọng từ params/oracle, gắn thẻ `[id:case]`.

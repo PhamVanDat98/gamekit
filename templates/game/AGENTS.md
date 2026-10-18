@@ -14,7 +14,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 6. **Mọi text hiển thị đi qua `t()`** và `Language/en.json` (+ các ngôn ngữ khác), không viết cứng trong `src/`.
 
 ## Game gốc là Unity
-Có source project: `npm run gk -- unity scan` trước khi đọc code, đọc hết `notes/unity/REPORT.md`. Số liệu lấy từ giá trị inspector (`notes/unity/params-draft.json`), **không** từ giá trị mặc định trong code C#. Mỗi script gốc là một dòng trong `spec/port-map.yaml` (`done` + `target` hoặc `skip` + `note`). Port C# thì dùng `src/core/unity/` (Mathf.Round, Random.Range, AnimationCurve, coroutine… đúng ngữ nghĩa Unity), core giữ toạ độ Unity (y lên, world unit), `src/view/unity-space.ts` đổi sang pixel. Chi tiết: skill `engine-unity`.
+Có source project: `npm run gk -- unity scan` trước khi đọc code, đọc hết `notes/unity/REPORT.md`. Số liệu lấy từ giá trị inspector (`npm run gk -- unity params <Class>` chép vào `params/game.json`), **không** từ giá trị mặc định trong code C#. Port theo `tier` trong port-map (tầng 1 trước). Mỗi script gốc là một dòng trong `spec/port-map.yaml` (`done` + `target` hoặc `skip` + `note`). Port C# thì dùng `src/core/unity/` (Mathf.Round, Random.Range, AnimationCurve, coroutine… đúng ngữ nghĩa Unity), core giữ toạ độ Unity (y lên, world unit), `src/view/unity-space.ts` đổi sang pixel. Chi tiết: skill `engine-unity`.
 
 ## Cấu trúc
 - `src/core/` logic thuần, deterministic: không DOM, không thư viện render, thời gian từ fixed step, ngẫu nhiên từ `Rng` có seed. **Viết test trước** (TDD).
@@ -31,6 +31,7 @@ Có source project: `npm run gk -- unity scan` trước khi đọc code, đọc 
 | Kiểm tra dữ liệu | `npm run gk -- validate` |
 | Test / typecheck / lint | `npm test` · `npm run typecheck` · `npm run lint` |
 | Quét project Unity gốc | `npm run gk -- unity scan [--src <project>]` → `notes/unity/`, `spec/port-map.yaml` |
+| Số liệu từ inspector Unity | `npm run gk -- unity params <Class…>` · `--check` (params còn khớp Unity?) |
 | Parity với game gốc | `npm run gk -- parity` (nghĩa vụ trong `spec/obligations.yaml`, test gắn thẻ `[id:case]`) |
 | Kiểm tra cổng, sang pha sau | `npm run gk -- gate` · `npm run gk -- gate --advance` |
 | Dựng song song | `npm run gk -- fanout --wave N` → subagent làm theo `.gamekit/local/BRIEF.md` → `npm run gk -- integrate --wave N` |

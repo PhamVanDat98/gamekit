@@ -7,6 +7,7 @@ import { log, GkError, Problems } from './lib/log.mjs';
 import { requireGameRoot, loadGame } from './lib/game.mjs';
 import { git, isClean, currentBranch, branchExists } from './lib/git.mjs';
 import { loadModulePlan, checkModulePlan, pathUnder } from './validate.mjs';
+import { markPortMapDone, scriptsBrief } from './unity.mjs';
 
 export const branchOf = (id) => `mod/${id}`;
 const mergeMessage = (id, wave) => `merge: ${id} (đợt ${wave})`;
@@ -54,7 +55,7 @@ export function topo(mods) {
   return out;
 }
 
-export function briefFor(plan, m, game) {
+export function briefFor(plan, m, game, root) {
   const shared = plan.shared.map((s) => `- \`${s}\``).join('\n');
   return `# Brief: ${m.id} (đợt ${m.wave}) — ${game.title}
 
@@ -70,7 +71,7 @@ Cần đổi contract, params hay package.json → dừng lại, ghi rõ đề x
 ## Contract dùng
 ${(m.contracts ?? ['contracts/']).map((c) => `- \`${c}\``).join('\n')}
 
-## Phụ thuộc
+${m.scripts?.length && root ? scriptsBrief(root, game, m.scripts) : ''}## Phụ thuộc
 ${(m.dependsOn ?? []).length ? m.dependsOn.map((d) => `- ${d} (đã merge vào ${plan.base})`).join('\n') : '- Không'}
 
 ## Xong khi
@@ -110,7 +111,7 @@ export async function fanout(args) {
     }
     const local = path.join(wt, '.gamekit', 'local');
     fs.mkdirSync(local, { recursive: true });
-    fs.writeFileSync(path.join(local, 'BRIEF.md'), briefFor(plan, m, game));
+    fs.writeFileSync(path.join(local, 'BRIEF.md'), briefFor(plan, m, game, root));
     // Share the machine-local plugin pointer and installed dependencies with the worktree.
     const cfg = path.join(root, '.gamekit', 'local', 'config.json');
     if (exists(cfg)) fs.copyFileSync(cfg, path.join(local, 'config.json'));
@@ -215,6 +216,13 @@ export async function integrate(args) {
     }
     merged++;
     log.ok(`${m.id}: merge xong, test xanh`);
+    const done = markPortMapDone(root, m.scripts, m.owns);
+    if (done.length) {
+      git(root, ['add', 'spec/port-map.yaml']);
+      const id = git(root, ['config', 'user.email'], { allowFail: true }) ? [] : ['-c', 'user.name=GameKit', '-c', 'user.email=gamekit@localhost'];
+      git(root, [...id, 'commit', '-q', '--no-verify', '-m', `chore: port-map — ${m.id} xong ${done.length} script`]);
+      log.ok(`${m.id}: port-map đánh dấu done ${done.join(', ')}`);
+    }
   }
   if (args.cleanup && !args['dry-run']) {
     for (const m of mods) {

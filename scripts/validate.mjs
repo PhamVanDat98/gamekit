@@ -344,7 +344,28 @@ export function checkModulePlan(plan) {
 
 function validateModulePlan(root, pr) {
   const plan = loadModulePlan(root);
-  if (plan) pr.merge(checkModulePlan(plan));
+  if (!plan) return;
+  const own = checkModulePlan(plan);
+  pr.merge(own);
+  if (!own.ok || !plan.modules.some((m) => m.scripts?.length)) return;
+  // Original scripts handed to modules: each exists in the port map, has one owner, and its dependencies come first.
+  const where = 'module-plan.yaml';
+  const f = path.join(root, 'spec', 'port-map.yaml');
+  const map = exists(f) ? readYaml(f) : null;
+  if (!map) return pr.error(where, 'module có `scripts` nhưng chưa có spec/port-map.yaml — chạy `gamekit unity scan`');
+  const entries = new Map((map.scripts ?? []).map((e) => [e.script, e]));
+  const ownerOf = new Map();
+  for (const m of plan.modules) for (const s of m.scripts ?? []) {
+    if (!entries.has(s)) pr.error(where, `${m.id}: script ${s} không có trong spec/port-map.yaml`);
+    if (ownerOf.has(s)) pr.error(where, `${s} giao cho cả ${ownerOf.get(s).id} và ${m.id}`);
+    ownerOf.set(s, m);
+  }
+  for (const m of plan.modules) for (const s of m.scripts ?? []) for (const d of entries.get(s)?.dependsOn ?? []) {
+    const o = ownerOf.get(d);
+    if (o && o !== m && !(m.dependsOn ?? []).includes(o.id)) pr.warn(where, `${m.id}: ${s} dùng ${d} của ${o.id} — nên thêm ${o.id} vào dependsOn (đợt trước), hoặc chốt contract trước khi fanout`);
+  }
+  const left = [...entries.values()].filter((e) => e.status === 'todo' && !ownerOf.has(e.script)).map((e) => e.script);
+  if (left.length) pr.warn(where, `${left.length} script todo chưa giao module nào: ${left.slice(0, 5).join(', ')}${left.length > 5 ? '…' : ''}`);
 }
 
 // ---------- asset-manifest.json ----------

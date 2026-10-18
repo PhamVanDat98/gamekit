@@ -54,6 +54,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | `validate [--stage Px]` | Schema `game.yaml`, `params/*.json` (mọi giá trị có `source`; `confidence` = observed/derived/inferred, inferred cần `tolerance` từ P2), `spec/obligations.yaml`, `spec/oracles/*.json`, provenance, `module-plan.yaml`, `asset-manifest.json` |
 | `parity [--report file.json]` | Chạy vitest, đóng từng nghĩa vụ trong `spec/obligations.yaml` bằng test gắn thẻ `[id:case]`. Test đỏ, skip/todo, thiếu case hay thẻ lạ đều tính là chưa đạt |
 | `unity scan [--src <project>]` | Quét project Unity có source: settings (Fixed Timestep, gravity, layer…), scene, script + bẫy khi sang JS theo từng dòng, **giá trị inspector khác mặc định trong code**, override prefab trong scene, Animator, animation event, PPU → `notes/unity/REPORT.md`, `notes/unity/params-draft.json`, `notes/unity/data/`, `spec/port-map.yaml` |
+| `unity params <Class…> [--all] [--check]` | Chép giá trị inspector từ `params-draft.json` vào `params/game.json` (giữ source, mỗi prefab/scene một nhóm con); `--check` báo params lệch project Unity sau lần quét mới |
 | `provenance add <file…> --label …` | Nhãn `reference / generated / own / licensed / placeholder` |
 | `pack [--portal] [--all] [--version V] [--compress] [--zip]` | `builds/<YYMMDDNN>/<portal>/{index.html, preview.html, version.txt, <v>/…}` + `builds/<v>/manifest.json` (+ zip) |
 | `release-check [--version V] [--portal p]` | Mặc định bản mới nhất. Kiểm bố cục az-v1, footer bản quyền, chặn asset reference/placeholder, tên game gốc, link ngoài, đường dẫn tuyệt đối, vượt ngân sách tải |
@@ -89,8 +90,9 @@ Port từ source Unity hay sai vì số game chạy nằm trong scene/prefab (kh
 
 ```bash
 npm run gk -- unity scan --src ~/UnityProjects/MyGame   # cần Asset Serialization = Force Text
-# đọc notes/unity/REPORT.md → params/ từ notes/unity/params-draft.json
-# P2: từng script trong spec/port-map.yaml: todo → done (+ target) / skip (+ note); cổng P2 chặn nếu còn sót
+npm run gk -- unity params PlayerController Spawner     # số liệu inspector → params/game.json, rồi điền unit
+# P2: port theo tầng trong spec/port-map.yaml (todo → done + target / skip + note); cổng P2 chặn nếu còn sót
+# game lớn: module-plan.yaml có scripts: → fanout (brief có sẵn chi tiết từng script) → integrate (tự đánh dấu done)
 ```
 
 Game `--engine unity` có thêm `src/core/unity/` (Mathf, Random.Range, AnimationCurve, Scheduler cho coroutine/Invoke — có test) và `src/view/unity-space.ts`. Oracle thật từ Unity Editor: `skills/engine-unity/references/GameKitRecorder.cs`. Game Unity tạo trước bản này: chép `templates/engines/unity/` vào game, thêm hai mục `{engine: unity}` từ `templates/game/gates/P1.md`, `P2.md`.

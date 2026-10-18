@@ -3,26 +3,89 @@
   "$id": "gamekit/port-map.schema.json",
   "title": "spec/port-map.yaml — mỗi script của project gốc đã chuyển sang đâu",
   "type": "object",
-  "required": ["scripts"],
+  "required": [
+    "scripts"
+  ],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
-    "source": { "type": ["string", "null"], "description": "Project gốc đã quét" },
+    "$schema": {
+      "type": "string"
+    },
+    "source": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Project gốc đã quét"
+    },
     "scripts": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["script", "status"],
+        "required": [
+          "script",
+          "status"
+        ],
         "additionalProperties": false,
         "properties": {
-          "script": { "type": "string", "minLength": 1, "description": "Đường dẫn script trong project gốc" },
-          "classes": { "type": "array", "items": { "type": "string" } },
-          "kind": { "type": "string", "description": "MonoBehaviour, ScriptableObject, plain, Editor" },
-          "usedIn": { "type": "integer", "minimum": 0, "description": "Số scene/prefab/asset dùng script này" },
-          "pitfalls": { "type": "array", "items": { "type": "string" }, "description": "Bẫy khi chuyển sang JS (skill engine-unity)" },
-          "status": { "enum": ["todo", "doing", "done", "skip"], "description": "done cần target; skip cần note" },
-          "target": { "type": "array", "items": { "type": "string" }, "description": "File TS chứa logic tương ứng (đường dẫn trong game)" },
-          "note": { "type": "string" }
+          "script": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Đường dẫn script trong project gốc"
+          },
+          "classes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "kind": {
+            "type": "string",
+            "description": "MonoBehaviour, ScriptableObject, plain, Editor"
+          },
+          "usedIn": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Số scene/prefab/asset dùng script này"
+          },
+          "pitfalls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Bẫy khi chuyển sang JS (skill engine-unity)"
+          },
+          "tier": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Thứ tự port: tầng 1 không phụ thuộc script gameplay nào; cùng tầng làm song song được"
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Script gameplay mà script này dùng tới"
+          },
+          "status": {
+            "enum": [
+              "todo",
+              "doing",
+              "done",
+              "skip"
+            ],
+            "description": "done cần target; skip cần note"
+          },
+          "target": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "File TS chứa logic tương ứng (đường dẫn trong game)"
+          },
+          "note": {
+            "type": "string"
+          }
         }
       }
     }

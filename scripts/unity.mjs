@@ -4,7 +4,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
-import { exists, readYaml, walk, writeJson, writeYaml } from './lib/io.mjs';
+import { fileURLToPath } from 'node:url';
+import { exists, readJson, readYaml, readYamlDoc, walk, writeJson, writeYaml, writeYamlDoc } from './lib/io.mjs';
 import { log, GkError } from './lib/log.mjs';
 import { requireGameRoot, loadGame, updateGame, nowIso } from './lib/game.mjs';
 import { check } from './lib/schema.mjs';
@@ -12,6 +13,7 @@ import { isCurve, isUnityText, monoFields, parseUnityYaml, plainValue, refOf } f
 import { classKind, scanCsharp } from './lib/csharp.mjs';
 
 export const PORT_MAP_FILE = 'spec/port-map.yaml';
+const PITFALLS_DOC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'engine-unity', 'references', 'pitfalls.md');
 export const UNITY_NOTES = 'notes/unity';
 
 const MAX_FILE = 64 * 1024 * 1024;
@@ -307,6 +309,17 @@ export function scanUnityProject(src) {
     for (const c of r.classes) if (!classIndex.has(c.name)) classIndex.set(c.name, { script: rec, cls: c });
   }
   const byName = new Map([...classIndex].map(([n, v]) => [n, v.cls]));
+  for (const s of scripts) {
+    const own = new Set(s.classes.map((c) => c.name));
+    const deps = new Set();
+    for (const id of s.identifiers) {
+      const d = classIndex.get(id)?.script;
+      if (d && d !== s && !own.has(id) && !d.editor && !d.thirdParty) deps.add(d.path);
+    }
+    s.dependsOn = [...deps].sort();
+    delete s.identifiers;
+  }
+  assignTiers(scripts.filter((s) => !s.editor && !s.thirdParty));
   for (const s of scripts) for (const c of s.classes) c.unityKind = classKind(c.name, byName);
 
   // Serialized files.
@@ -395,6 +408,56 @@ export function scanUnityProject(src) {
   }
 
   return { settings, scripts: scripts.map((s) => ({ ...s, usedIn: [...s.usedIn].sort() })), serialized, animators, clips, textures: ctx.textures, overrides, inspectorOnly, instancesOf, classIndex, audio: files.filter((f) => AUDIO_EXT.test(f)), warnings };
+}
+
+/**
+ * Port order: tier 1 depends on no other gameplay script, tier n only on tiers < n. Scripts that depend on
+ * each other (a cycle) share a tier and should be ported together. Same tier = can be built in parallel.
+ */
+export function assignTiers(scripts) {
+  const byPath = new Map(scripts.map((s) => [s.path, s]));
+  // Tarjan: strongly connected components, so cycles collapse into one node.
+  let index = 0;
+  const idx = new Map();
+  const low = new Map();
+  const stack = [];
+  const onStack = new Set();
+  const comp = new Map();
+  const comps = [];
+  const visit = (v) => {
+    idx.set(v, index);
+    low.set(v, index++);
+    stack.push(v);
+    onStack.add(v);
+    for (const w of byPath.get(v).dependsOn.filter((d) => byPath.has(d))) {
+      if (!idx.has(w)) {
+        visit(w);
+        low.set(v, Math.min(low.get(v), low.get(w)));
+      } else if (onStack.has(w)) low.set(v, Math.min(low.get(v), idx.get(w)));
+    }
+    if (low.get(v) === idx.get(v)) {
+      const c = [];
+      let w;
+      do {
+        w = stack.pop();
+        onStack.delete(w);
+        comp.set(w, comps.length);
+        c.push(w);
+      } while (w !== v);
+      comps.push(c);
+    }
+  };
+  for (const p of [...byPath.keys()].sort()) if (!idx.has(p)) visit(p);
+  // Tarjan emits components dependencies-first, so one pass in order is enough.
+  const tierOf = comps.map(() => 1);
+  comps.forEach((c, i) => {
+    for (const v of c) for (const d of byPath.get(v).dependsOn) if (byPath.has(d) && comp.get(d) !== i) tierOf[i] = Math.max(tierOf[i], tierOf[comp.get(d)] + 1);
+  });
+  for (const [p, s] of byPath) {
+    s.tier = tierOf[comp.get(p)];
+    const c = comps[comp.get(p)];
+    if (c.length > 1) s.cycleWith = c.filter((x) => x !== p).sort();
+  }
 }
 
 /** Values from the Inspector in params format, so params/ take the numbers the game really runs with. */
@@ -499,6 +562,20 @@ export function renderReport(scan, { src, game }) {
   }
   L.push('');
 
+  const tiers = new Map();
+  for (const x of gameplay) {
+    if (!tiers.has(x.tier)) tiers.set(x.tier, []);
+    tiers.get(x.tier).push(x);
+  }
+  if (tiers.size) {
+    L.push('## Thứ tự port', '', 'Tầng 1 không phụ thuộc script gameplay nào khác; tầng n chỉ dùng các tầng trước. Cùng tầng làm song song được (một đợt `fanout`). Script phụ thuộc vòng nằm cùng tầng — port cùng nhau.', '');
+    for (const t of [...tiers.keys()].sort((a, b) => a - b)) {
+      const names = tiers.get(t).map((x) => `\`${path.basename(x.path, '.cs')}\`${x.cycleWith ? ' (vòng)' : ''}`);
+      L.push(`${t}. ${names.join(', ')}`);
+    }
+    L.push('');
+  }
+
   const byPit = new Map();
   for (const x of gameplay) for (const p of x.pitfalls) {
     if (!byPit.has(p.id)) byPit.set(p.id, { msg: p.msg, where: [] });
@@ -554,13 +631,95 @@ export function mergePortMap(existing, scan, src) {
       kind: [...new Set(x.classes.map((c) => c.unityKind))].join(',') || 'none',
       usedIn: x.usedIn.length,
       pitfalls: x.pitfalls.map((p) => p.id),
+      ...(x.tier ? { tier: x.tier, dependsOn: x.dependsOn } : {}),
       status: prev?.status ?? (auto ? 'skip' : 'todo'),
       target: prev?.target ?? [],
       note: prev?.note ?? auto ?? '',
     };
   });
+  // Port order: by tier, then path; editor/library scripts (no tier) last.
+  scripts.sort((a, b) => (a.tier ?? Infinity) - (b.tier ?? Infinity) || a.script.localeCompare(b.script));
   const gone = [...old.values()];
   return { map: { source: src, scripts: [...scripts, ...gone.map((g) => ({ ...g, note: g.note || 'không còn trong project Unity' }))] }, gone };
+}
+
+export function loadPortMap(root) {
+  const f = path.join(root, PORT_MAP_FILE);
+  return exists(f) ? readYaml(f) : null;
+}
+
+/** Params whose source is one of these classes' fields: `path.in.params` → source. */
+function paramsOfClasses(root, classes) {
+  const out = [];
+  for (const f of walk(path.join(root, 'params')).filter((x) => x.endsWith('.json'))) {
+    const visit = (node, keys) => {
+      if (!node || typeof node !== 'object') return;
+      if ('value' in node && 'source' in node) {
+        if (classes.some((c) => node.source.includes(`› ${c}.`))) out.push({ file: f, key: keys.join('.'), value: node.value });
+        return;
+      }
+      for (const [k, v] of Object.entries(node)) if (k !== '$schema') visit(v, [...keys, k]);
+    };
+    try {
+      visit(readJson(path.join(root, 'params', f)), []);
+    } catch {
+      // validate reports broken params files
+    }
+  }
+  return out;
+}
+
+/** BRIEF.md section for a module that ports these original scripts: where to read them and what goes wrong. */
+export function scriptsBrief(root, game, scripts) {
+  const data = path.join(root, UNITY_NOTES, 'data');
+  const info = exists(path.join(data, 'scripts.json')) ? new Map(readJson(path.join(data, 'scripts.json')).map((s) => [s.path, s])) : new Map();
+  const ov = exists(path.join(data, 'overrides.json')) ? readJson(path.join(data, 'overrides.json')) : { overrides: [], inspectorOnly: [] };
+  const src = game.source?.path ? path.resolve(root, game.source.path) : null;
+  const L = ['## Script gốc cần port', ''];
+  L.push(`Đọc từng script gốc, port theo thứ tự dưới đây (theo tầng phụ thuộc). Logic vào \`src/core/\`, hiển thị vào \`src/view/\`; Mathf, Random.Range, AnimationCurve, coroutine/Invoke dùng \`src/core/unity/\`; toạ độ giữ đơn vị Unity (y lên). Bảng bẫy và cách port đúng: \`${PITFALLS_DOC}\`.`, '');
+  const ordered = [...scripts].sort((a, b) => (info.get(a)?.tier ?? 99) - (info.get(b)?.tier ?? 99) || a.localeCompare(b));
+  for (const s of ordered) {
+    const x = info.get(s);
+    L.push(`### ${s}`, '');
+    if (src) L.push(`- Mã gốc: \`${path.join(src, s)}\``);
+    if (!x) {
+      L.push('- (không có trong notes/unity/data/scripts.json — chạy lại `gamekit unity scan`)', '');
+      continue;
+    }
+    const classes = x.classes.map((c) => c.name);
+    L.push(`- Class: ${x.classes.map((c) => `${c.name} (${c.unityKind ?? c.kind})`).join(', ') || '—'} · Unity message: ${x.messages.join(', ') || '—'}${x.tier ? ` · tầng ${x.tier}` : ''}`);
+    if (x.dependsOn?.length) L.push(`- Dùng tới: ${x.dependsOn.map((d) => `\`${d}\``).join(', ')}${x.cycleWith ? ` (phụ thuộc vòng với ${x.cycleWith.join(', ')} — port cùng nhau)` : ''}`);
+    for (const p of x.pitfalls) L.push(`- ⚠ **${p.id}** dòng ${p.lines.join(', ')}: ${p.msg}`);
+    const mine = (list) => list.filter((o) => classes.includes(o.class));
+    for (const o of mine(ov.overrides)) L.push(`- Inspector ghi đè: \`${o.field}\` code ${o.code} → game chạy ${o.values.map((v) => `${JSON.stringify(v.value)} (${v.where})`).join('; ')}`);
+    for (const o of mine(ov.inspectorOnly)) L.push(`- Chỉ có trong inspector: \`${o.field}\` = ${o.values.map((v) => `${JSON.stringify(v.value)} (${v.where})`).join('; ')}`);
+    const ps = paramsOfClasses(root, classes);
+    if (ps.length) L.push(`- Params sẵn có: ${ps.map((p) => (p.file === 'game.json' ? `\`PARAMS.${p.key}\`` : `\`params/${p.file}:${p.key}\``)).join(', ')}`);
+    else if (mine(ov.overrides).length || mine(ov.inspectorOnly).length) L.push('- Chưa có params cho class này: báo agent chính chạy `gamekit unity params <Class>` (params/ là vùng dùng chung).');
+    L.push('');
+  }
+  L.push('Không sửa `spec/port-map.yaml` — integrate tự đánh dấu các script này `done`. Script nào không port (thuần hình ảnh, đã thay bằng thứ khác): ghi lý do trong phần trả lời.', '');
+  return L.join('\n');
+}
+
+/** After a module merged: its scripts become done, targets = the folders it owns that now exist. */
+export function markPortMapDone(root, scripts, owns) {
+  const f = path.join(root, PORT_MAP_FILE);
+  if (!exists(f) || !scripts?.length) return [];
+  const doc = readYamlDoc(f);
+  const list = doc.get('scripts');
+  const targets = owns.map((o) => o.replace(/\/+$/, '')).filter((o) => exists(path.join(root, o)));
+  const changed = [];
+  if (!targets.length) return changed;
+  for (const item of list?.items ?? []) {
+    const s = item.get('script');
+    if (!scripts.includes(s) || ['done', 'skip'].includes(item.get('status'))) continue;
+    item.set('status', 'done');
+    item.set('target', doc.createNode(targets));
+    changed.push(s);
+  }
+  if (changed.length) writeYamlDoc(f, doc);
+  return changed;
 }
 
 /** Gate check: P1 needs the scan done; from P2 every script is done (with targets) or skipped (with a reason). */
@@ -593,9 +752,125 @@ export function portMapStatus(root, { strict }) {
   return { ok: open.length === 0, detail: open.length ? `${open.length} script chưa xong: ${open.slice(0, 5).join(', ')}${open.length > 5 ? '…' : ''}` : '' };
 }
 
+const lowerFirst = (s) => s.charAt(0).toLowerCase() + s.slice(1);
+const camel = (s) => lowerFirst(s.replace(/\.[a-z]+$/i, '').split(/[^A-Za-z0-9]+/).filter(Boolean).map((w, i) => (i ? w[0].toUpperCase() + w.slice(1) : w)).join(''));
+/** `file › object › Class.field (…) · code …` → `file › object › Class.field`, the part that identifies the value. */
+export const sourceKey = (src) => String(src ?? '').split(' · ')[0].replace(/ \(\d+ chỗ cùng giá trị\)$/, '').trim();
+
+/** Draft key → params path: `Spawner` → spawner; `PlayerController@Scenes/Main › Player (…)` → playerController.mainPlayer. */
+export function draftGroupPath(key) {
+  const [cls, label] = key.split('@');
+  if (!label) return [lowerFirst(cls)];
+  const [file, object = ''] = label.replace(/\s*\(.*\)\s*$/, '').split(' › ');
+  const base = file.split('/').pop();
+  const last = object.split('/').pop();
+  return [lowerFirst(cls), camel(base === last || !last ? base : `${base} ${last}`) || 'instance'];
+}
+
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * gamekit unity params <Class|Class.field|draft key…> [--all] [--file params/game.json] [--as group.path] [--force] [--check]
+ * Copies Inspector values from notes/unity/params-draft.json into params/, keeping source and confidence.
+ */
+export function importParams(root, selectors, { all, file = 'params/game.json', as, force, check } = {}) {
+  const draftFile = path.join(root, UNITY_NOTES, 'params-draft.json');
+  if (!exists(draftFile)) throw new GkError('Chưa có notes/unity/params-draft.json — chạy `gamekit unity scan` trước.');
+  const draft = JSON.parse(fs.readFileSync(draftFile, 'utf8'));
+  delete draft.$comment;
+  const target = path.join(root, file);
+  const data = exists(target) ? JSON.parse(fs.readFileSync(target, 'utf8')) : { $schema: '../.gamekit/schemas/params.schema.json' };
+  const out = { added: [], updated: [], same: [], drift: [], noUnit: [], skipped: [] };
+
+  if (check) {
+    // Every param that came from the Inspector: is it still what the Unity project holds?
+    const latest = new Map();
+    for (const group of Object.values(draft)) for (const p of Object.values(group)) latest.set(sourceKey(p.source), p.value);
+    for (const f of walk(path.join(root, 'params')).filter((x) => x.endsWith('.json'))) {
+      const visit = (node, keys) => {
+        if (!node || typeof node !== 'object') return;
+        if ('value' in node && 'source' in node) {
+          const k = sourceKey(node.source);
+          if (latest.has(k) && !same(latest.get(k), node.value) && !node.deviation) out.drift.push({ key: `params/${f}:${keys.join('.')}`, value: node.value, unity: latest.get(k) });
+          return;
+        }
+        for (const [k, v] of Object.entries(node)) if (k !== '$schema') visit(v, [...keys, k]);
+      };
+      visit(JSON.parse(fs.readFileSync(path.join(root, 'params', f), 'utf8')), []);
+    }
+    return out;
+  }
+
+  const picks = []; // [draftKey, field|null]
+  if (all) for (const k of Object.keys(draft)) picks.push([k, null]);
+  for (const sel of selectors) {
+    if (draft[sel]) {
+      picks.push([sel, null]);
+      continue;
+    }
+    const [cls, field] = sel.split(/\.(?=[^.]+$)/);
+    const keys = Object.keys(draft).filter((k) => k === sel || k.split('@')[0] === sel);
+    const fieldKeys = field ? Object.keys(draft).filter((k) => k.split('@')[0] === cls && field in draft[k]) : [];
+    if (keys.length) for (const k of keys) picks.push([k, null]);
+    else if (fieldKeys.length) for (const k of fieldKeys) picks.push([k, field]);
+    else throw new GkError(`params-draft.json không có "${sel}". Có: ${[...new Set(Object.keys(draft).map((k) => k.split('@')[0]))].join(', ')}`);
+  }
+  if (as && new Set(picks.map((p) => p[0])).size > 1) throw new GkError('--as chỉ dùng khi chọn đúng một nhóm (một class có một bản, hoặc một khoá draft)');
+
+  for (const [key, only] of picks) {
+    const group = as ? String(as).split('.') : draftGroupPath(key);
+    let node = data;
+    for (const g of group) {
+      if (node[g] && typeof node[g] === 'object' && 'value' in node[g]) throw new GkError(`${file}: ${group.join('.')} đã là một giá trị, không phải nhóm`);
+      node = node[g] ??= {};
+    }
+    for (const [field, p] of Object.entries(draft[key])) {
+      if (only && field !== only) continue;
+      const at = `${group.join('.')}.${field}`;
+      if (field === 'value') {
+        out.skipped.push(`${at} (tên "value" trùng khoá của params — chép tay với tên khác)`);
+        continue;
+      }
+      const next = { value: p.value, ...(p.unit && p.unit !== 'TODO' ? { unit: p.unit } : {}), source: p.source, confidence: p.confidence ?? 'observed' };
+      const cur = node[field];
+      if (!cur) {
+        node[field] = next;
+        out.added.push(at);
+      } else if (same(cur.value, next.value)) out.same.push(at);
+      else if (force && !cur.deviation) {
+        node[field] = { ...cur, value: next.value, source: next.source, confidence: next.confidence };
+        out.updated.push(at);
+      } else out.drift.push({ key: `${file}:${at}`, value: cur.value, unity: next.value });
+      if (!node[field].unit) out.noUnit.push(at);
+    }
+  }
+  if (out.added.length || out.updated.length) writeJson(target, data);
+  return out;
+}
+
 export async function run(args) {
   const sub = args._[0];
-  if (sub !== 'scan') throw new GkError('Dùng: gamekit unity scan [--src <thư mục project Unity>]');
+  if (sub === 'params') {
+    const root = requireGameRoot(args.cwd);
+    const file = String(args.file ?? 'params/game.json');
+    if (!args.all && !args.check && args._.length < 2) throw new GkError('Dùng: gamekit unity params <Class | Class.field | khoá trong params-draft.json …> [--all] [--file params/game.json] [--as nhóm] [--force] | --check');
+    const r = importParams(root, args._.slice(1).map(String), { all: args.all, file, as: args.as, force: args.force, check: args.check });
+    if (args.check) {
+      for (const d of r.drift) log.warn(`${d.key} = ${JSON.stringify(d.value)}, project Unity hiện là ${JSON.stringify(d.unity)}`);
+      if (r.drift.length) log.fail(`${r.drift.length} giá trị lệch với project Unity (quét lần gần nhất). Cập nhật: gamekit unity params <…> --force, hoặc ghi deviation nếu cố ý khác.`);
+      else log.ok('params khớp giá trị inspector của lần quét gần nhất');
+      return r.drift.length ? 1 : 0;
+    }
+    if (r.added.length) log.ok(`Thêm ${r.added.length} giá trị vào ${file}: ${r.added.join(', ')}`);
+    if (r.updated.length) log.ok(`Cập nhật ${r.updated.length} giá trị theo project Unity: ${r.updated.join(', ')}`);
+    if (r.same.length) log.dim(`${r.same.length} giá trị đã có, giống project Unity`);
+    for (const d of r.drift) log.warn(`${d.key} = ${JSON.stringify(d.value)} nhưng project Unity là ${JSON.stringify(d.unity)} — giữ nguyên; --force để lấy giá trị Unity`);
+    for (const s of r.skipped) log.warn(`Bỏ qua ${s}`);
+    if (r.noUnit.length) log.info(`Còn thiếu unit (world unit, s, độ, unit/s…): ${r.noUnit.join(', ')}`);
+    if (file !== 'params/game.json' && r.added.length) log.info(`Nhớ đọc ${file} trong src/core/params.ts (mặc định chỉ đọc params/game.json).`);
+    return 0;
+  }
+  if (sub !== 'scan') throw new GkError('Dùng: gamekit unity scan [--src <thư mục project Unity>] | gamekit unity params <Class…> [--all] [--check]');
   const root = requireGameRoot(args.cwd);
   const game = loadGame(root);
   const given = args.src ?? game.source?.path;
@@ -613,6 +888,7 @@ export async function run(args) {
   writeJson(path.join(notes, 'data', 'scripts.json'), scan.scripts);
   writeJson(path.join(notes, 'data', 'serialized.json'), scan.serialized);
   writeJson(path.join(notes, 'data', 'animation.json'), { animators: scan.animators, clips: scan.clips });
+  writeJson(path.join(notes, 'data', 'overrides.json'), { overrides: scan.overrides, inspectorOnly: scan.inspectorOnly });
   writeJson(path.join(notes, 'data', 'sprites.json'), { textures: scan.textures, audio: scan.audio });
   writeJson(path.join(notes, 'params-draft.json'), { $comment: 'Sinh bởi gamekit unity scan: giá trị inspector theo dạng params. Chép mục cần dùng sang params/*.json, điền unit; đừng sửa file này.', ...paramsDraft(scan) });
   fs.writeFileSync(path.join(notes, 'REPORT.md'), renderReport(scan, { src: String(given), game }) + '\n');
@@ -634,6 +910,10 @@ export async function run(args) {
   if (scan.overrides.length) log.warn(`${scan.overrides.length} field có giá trị inspector khác giá trị trong code — params phải lấy giá trị inspector (bảng trong REPORT.md)`);
   for (const w of scan.warnings) log.warn(w);
   for (const g of gone) log.warn(`${g.script}: có trong port-map nhưng không còn trong project`);
+  if (exists(path.join(root, 'params'))) {
+    const drift = importParams(root, [], { check: true }).drift;
+    for (const d of drift) log.warn(`${d.key} = ${JSON.stringify(d.value)}, project Unity giờ là ${JSON.stringify(d.unity)} — gamekit unity params --check`);
+  }
   log.info(`Đã ghi ${UNITY_NOTES}/REPORT.md, ${UNITY_NOTES}/params-draft.json, ${UNITY_NOTES}/data/, ${PORT_MAP_FILE}. Đọc REPORT.md trước khi port.`);
   return 0;
 }

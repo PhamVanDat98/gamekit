@@ -127,7 +127,9 @@ export function scanCsharp(src) {
     lines.forEach((l, i) => p.re.test(l) && hit.push(i + 1));
     if (hit.length) pitfalls.push({ id: p.id, msg: p.msg, lines: hit });
   }
-  return { classes, messages, pitfalls };
+  // Type names used anywhere in the file: the scan turns them into dependencies between scripts.
+  const identifiers = [...new Set(code.match(/\b[A-Z_][A-Za-z0-9_]*\b/g) ?? [])];
+  return { classes, messages, pitfalls, identifiers };
 }
 
 /** MonoBehaviour / ScriptableObject / plain, following base names declared in the same project. */

@@ -10,10 +10,10 @@ GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, 
 ## Gọi CLI
 - Trong thư mục game: `npm run gk -- <lệnh>` (shim `scripts/gk.mjs` trỏ tới plugin).
 - Từ Claude Code ở bất kỳ đâu: `node "${CLAUDE_PLUGIN_ROOT}/scripts/gamekit.mjs" <lệnh>`.
-- Lệnh: `init`, `config`, `status`, `gate [--advance]`, `validate`, `parity`, `unity scan`, `provenance add|list`, `pack`, `release-check`, `fanout`, `check-ownership`, `integrate`. `gamekit help` để xem đủ.
+- Lệnh: `init`, `config`, `status`, `gate [--advance]`, `validate`, `parity`, `unity scan`, `unity params`, `provenance add|list`, `pack`, `release-check`, `fanout`, `check-ownership`, `integrate`. `gamekit help` để xem đủ.
 
 ## Game gốc là Unity
-Dùng skill **engine-unity** từ P1. Có source project: `gamekit unity scan` trước khi đọc code — số liệu lấy từ giá trị inspector (`notes/unity/params-draft.json`), không từ mặc định trong code; mỗi script được theo dõi trong `spec/port-map.yaml` tới khi `done`/`skip`; core dùng `src/core/unity/` (Mathf, Random.Range, AnimationCurve, coroutine đúng ngữ nghĩa Unity).
+Dùng skill **engine-unity** từ P1. Có source project: `gamekit unity scan` trước khi đọc code — số liệu lấy từ giá trị inspector bằng `gamekit unity params <Class>`, không từ mặc định trong code; port theo tầng phụ thuộc trong port-map; mỗi script được theo dõi trong `spec/port-map.yaml` tới khi `done`/`skip`; core dùng `src/core/unity/` (Mathf, Random.Range, AnimationCurve, coroutine đúng ngữ nghĩa Unity).
 
 ## Tạo game mới (agent)
 1. `gamekit init <tên> --questions --json` → danh sách câu hỏi (label, description, example, default, required). Không có TTY thì init không tự hỏi.

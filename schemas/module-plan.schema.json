@@ -27,7 +27,8 @@
           "dependsOn": { "type": "array", "items": { "type": "string" } },
           "brief": { "type": "string", "minLength": 1, "description": "Việc cần làm, trích spec liên quan" },
           "contracts": { "type": "array", "items": { "type": "string" }, "description": "File contract module này dùng" },
-          "tests": { "type": "array", "items": { "type": "string" }, "description": "Đường dẫn test phải xanh" }
+          "tests": { "type": "array", "items": { "type": "string" }, "description": "Đường dẫn test phải xanh" },
+          "scripts": { "type": "array", "items": { "type": "string" }, "description": "Script gốc module này port (đường dẫn như trong spec/port-map.yaml). fanout đưa chi tiết từng script vào BRIEF.md; integrate đánh dấu done" }
         }
       }
     }

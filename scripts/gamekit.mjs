@@ -19,7 +19,9 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
   parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)
   unity scan [--src <project>]              Quét project Unity (có source): settings, script, giá trị inspector, animator
-                                            → notes/unity/REPORT.md, notes/unity/params-draft.json, spec/port-map.yaml
+                                            → notes/unity/REPORT.md, notes/unity/params-draft.json, spec/port-map.yaml (thứ tự port theo tầng)
+  unity params <Class|Class.field…> [--all] [--file f] [--as nhóm] [--force]   Chép giá trị inspector từ params-draft.json vào params/
+  unity params --check                      params còn khớp project Unity (lần quét gần nhất)?
   provenance add <file…> --label <nhãn>     Gắn nguồn gốc asset (reference|generated|own|licensed|placeholder)
   provenance list [--label]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
@@ -31,7 +33,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'force', 'check']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
