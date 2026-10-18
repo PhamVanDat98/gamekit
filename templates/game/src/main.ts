@@ -12,6 +12,8 @@ import { installWebGuard } from './platform/web-guard';
 
 const FIXED_HZ = 60;
 const MS = 1000;
+/** After game over, taps are ignored this long so a tap meant for the dying round never restarts it and opens an ad. */
+const RESTART_DELAY_MS = 600;
 
 /** The portal shell page has no game markup (npm run dev's index.html does): create it when missing. */
 function ensureStage(): { stage: HTMLElement; canvas: HTMLCanvasElement } {
@@ -53,9 +55,15 @@ async function main(): Promise<void> {
   let world = createWorld(PARAMS, Date.now() >>> 0);
   let state: 'ready' | 'playing' | 'over' = 'ready';
   let round = 0;
+  let overAt = 0;
+  // Paused (ad, menu, hidden tab, blur): keyup/pointerup may never arrive, so nothing stays held.
+  bus.subscribe((s) => {
+    if (s.paused) input.clear();
+  });
 
   const start = async () => {
     if (state === 'playing' || bus.has('ad') || bus.has('menu')) return;
+    if (state === 'over' && performance.now() - overAt < RESTART_DELAY_MS) return;
     if (state === 'over') {
       // Ads only between rounds, never while the player is acting.
       await platform.interstitial('round_end');
@@ -86,6 +94,7 @@ async function main(): Promise<void> {
         for (const e of events) {
           if (e.type === 'gameOver') {
             state = 'over';
+            overAt = performance.now();
             platform.gameplayStop();
             platform.track('level_fail', { round, score: e.score });
             void platform.submitScore('main', e.score);
