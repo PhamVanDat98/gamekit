@@ -13,9 +13,9 @@ GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, 
 - Lệnh: `init`, `config`, `status`, `gate [--advance]`, `validate`, `parity`, `provenance add|list`, `pack`, `release-check`, `fanout`, `check-ownership`, `integrate`. `gamekit help` để xem đủ.
 
 ## Tạo game mới (agent)
-1. `gamekit init <tên> --questions --json` → danh sách câu hỏi (label, description, example, default, required). Không có TTY thì init không tự hỏi.
+1. `gamekit init <tên> --questions` → JSON danh sách câu hỏi (label, description, example, default, required). Không có TTY thì init không tự hỏi.
 2. Hỏi người dùng **từng câu, kèm `description`** (trong Claude Code dùng AskUserQuestion). Câu của portal (`azgames.gameCode`, …) chỉ hỏi cho portal đã chọn trong câu `portals`.
-3. `gamekit init <tên> --set title=… --set portals=azgames --set azgames.gameCode=… …`. Câu bắt buộc chưa biết thì bỏ qua: game vẫn tạo, `status` liệt kê còn thiếu, `pack` portal đó sẽ dừng.
+3. `gamekit init <tên> --set title=… --set portals=azgames --set azgames.gameCode=… …`. Câu bắt buộc chưa biết thì bỏ qua: game vẫn tạo, `status` liệt kê còn thiếu; `pack` vẫn đóng gói portal đã đủ thông tin, bỏ qua portal thiếu và thoát mã 1.
 4. Bổ sung sau: `gamekit config --portal <id> [--set k=v …]` (cũng dùng để thêm portal mới; checklist của portal được chép vào `gates/P4.md`).
 
 ## Pipeline 6 pha

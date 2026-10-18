@@ -10,7 +10,7 @@
 | Asset | Tên, định dạng (WebP, KTX2/Basis, glTF + Meshopt/Draco, AAC/MP3), độ phân giải, atlas, spec trong `asset-manifest.json` | `validate` (kích thước, alpha PNG) |
 | Ngân sách hiệu năng | `budget` trong game.yaml (khởi điểm: tải đầu < 10MB, vào game < 5s, 60fps desktop, 30fps mobile) | `release-check` (tải đầu) |
 | Portal và iframe | Đường dẫn tương đối, không link ngoài, chặn cuộn trang bởi phím, focus, pause khi ẩn tab, bàn phím + cảm ứng | `src/platform/web-guard.ts` + `release-check` |
-| Chơi được khi tắt tiếng | Mọi thông tin gameplay có tín hiệu hình ảnh, không chỉ dựa vào màu | Checklist cổng P3 |
+| Chơi được khi tắt tiếng (`third-party`) | Mọi thông tin gameplay có tín hiệu hình ảnh, không chỉ dựa vào màu. Game `own` giữ như bản gốc | Checklist cổng P3 `{only: third-party}` |
 | Git | Conventional Commits; `reference/`, `decompiled/` gitignored | Pre-commit hook (`gamekit precommit`) |
 | Version và build | Semver; build id = version + commit, số build `YYMMDDNN`; build hash trong `builds/<v>/manifest.json` | `pack` |
 | Event analytics | Một bộ tên chung (`src/platform/events.ts`) | Type + `createPlatform` bỏ tên lạ |

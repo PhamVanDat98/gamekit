@@ -8,8 +8,8 @@ GameKit là plugin cho Claude Code giúp **chuyển game di động (Unity, Coco
 
 | Đã chạy | Chưa có |
 | --- | --- |
-| Tạo project game web, theo dõi 6 pha, chấm cổng | Hướng dẫn riêng cho AI ở P0 (nhận diện, đánh giá), P1 (phân tích game gốc), P3 (chuyển sang web) — AI tự làm theo checklist, chất lượng chưa đều |
-| Hướng dẫn cho AI ở P2 (dựng lại, test đối chiếu với game gốc), P4 (SDK portal), P5 (đóng gói) | Quảng cáo, leaderboard thật trên azgames |
+| Tạo project game web, theo dõi 6 pha, chấm cổng | Hướng dẫn riêng cho AI ở P0 (nhận diện, đánh giá), P3 (chuyển sang web), và phần P1 theo từng engine — AI tự làm theo checklist, chất lượng chưa đều |
+| Hướng dẫn cho AI ở P1 (ghi chú phân tích game gốc), P2 (dựng lại, test đối chiếu với game gốc), P4 (SDK portal), P5 (đóng gói) | Quảng cáo, leaderboard thật trên azgames |
 | Đóng gói cho azgames và bản chạy thử ở máy (`dev-mock`), kiểm tra trước khi phát hành | Game 3D: chưa thử với game thật |
 
 ## Cần có
@@ -67,11 +67,13 @@ Lúc nào cũng có thể gõ `/gamekit:status` (đang ở đâu, còn gì) ho�
 
 ```bash
 npm run dev                          # chơi thử trong trình duyệt, có portal giả
-npm run gk -- pack --all --zip       # đóng gói vào builds/<số phiên bản>/
+npm run gk -- pack --all --zip       # đóng gói mọi portal vào builds/<số phiên bản>/
 npm run gk -- release-check          # kiểm tra trước khi phát hành
 ```
 
-Gói `azgames` có khóa tên miền, chỉ chạy trên azgames.io. Muốn chạy thử gói ở máy, mở gói `dev-mock` nằm cùng thư mục: `npm run preview` rồi vào địa chỉ nó in ra. Không có mã game và token azgames thì vẫn thử được hết, chỉ không đóng gói được cho azgames.
+Gói `azgames` có khóa tên miền, chỉ chạy trên azgames.io. Muốn chạy thử gói ở máy, mở gói `dev-mock` nằm cùng thư mục: `npm run preview` rồi vào địa chỉ nó in ra.
+
+Chưa có mã game và token azgames thì vẫn thử được hết, chỉ chưa ra gói azgames: `npm run gk -- pack --portal dev-mock`. Còn `pack --all` vẫn đóng gói `dev-mock`, liệt kê thông tin azgames còn thiếu và kết thúc báo lỗi — bình thường, điền sau bằng `npm run gk -- config --portal azgames`.
 
 ## Đã biết
 

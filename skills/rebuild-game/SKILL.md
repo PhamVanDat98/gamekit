@@ -8,7 +8,7 @@ description: Dùng ở pha P2 khi dựng lại một game bằng JS/TS từ spec
 Mục tiêu cổng P2: chơi được trọn vẹn (`own`: với asset gốc nhãn `own`; `third-party`: với placeholder), test parity xanh, không còn source TODO.
 
 ## 1. Có project chưa?
-- Chưa có `game.yaml`: `gamekit init <ten-game> --title "<Tên>" --engine <engine gốc> --dir <thư mục cha>`. Mặc định là game của người dùng (`own`): giữ tên gốc được. Làm lại game người khác: thêm `--third-party`, đặt tên mới và điền `release.forbiddenTerms` bằng tên/thương hiệu game gốc.
+- Chưa có `game.yaml`: tạo theo mục **Tạo game mới** của skill using-gamekit (`init --questions`, hỏi người dùng từng câu, rồi `init <ten-game> --set …`). Mặc định là game của người dùng (`own`): giữ tên gốc được. Làm lại game người khác: thêm `--third-party`, đặt tên mới và điền `release.forbiddenTerms` bằng tên/thương hiệu game gốc.
 - `own` có source gốc (C#…): đọc thẳng code để lấy logic và số; vẫn viết test trước, viết lại cho hợp `core/`/`view/`, không dịch máy từng dòng.
 - Đã có (đi từ P0/P1): kiểm tra `gamekit status` báo P2.
 

@@ -2,7 +2,7 @@
 
 Plugin skill + script cho dây chuyền **port game từ engine bất kỳ sang web game JS/TS, reskin và phát hành lên portal**. Dùng được trên Claude Code (plugin) và Codex (skill + AGENTS.md).
 
-Bản này là **dự án con 1 — khung plugin**: trạng thái `game.yaml`, pipeline 6 pha có cổng, template game, interface platform + `dev-mock`, script validate / provenance / pack / release-check, dựng song song bằng worktree (fanout / integrate / check-ownership), tích hợp IDE.
+Bản 0.2.0 (dùng thử) có: trạng thái `game.yaml`, pipeline 6 pha có cổng, template game, interface platform + `dev-mock`, parity theo nghĩa vụ, đóng gói AZGAMES (`builds/<v>/`), script validate / provenance / pack / release-check, dựng song song bằng worktree (fanout / integrate / check-ownership), tích hợp IDE, 9 skill (P1 re-notes, P2, P4, P5). Các skill khác mà `status` gợi ý chưa có — xem **Lộ trình**.
 
 **Game của ai.** Mặc định GameKit coi game là **của bạn** (`source.ownership: own`): giữ nguyên hình, âm thanh, tên; asset gốc gắn nhãn `own` và được phát hành; P3 là chuyển sang web (điều khiển, bố cục, nén asset). Làm lại game của người khác thì `init … --third-party`: asset gốc chỉ là tư liệu, bắt buộc reskin, chặn tên gốc. Mục cổng chỉ áp cho một loại game ghi `{only: own}` / `{only: third-party}`.
 
@@ -37,7 +37,7 @@ npm run gk -- status        # pha hiện tại, việc còn mở, skill tiếp t
 npm test                    # parity + replay + platform
 npm run gk -- parity        # mọi nghĩa vụ trong spec/obligations.yaml đã có test xanh?
 npm run gk -- gate          # kiểm tra cổng; --advance để sang pha sau
-npm run gk -- pack --all --zip
+npm run gk -- pack --all --zip   # chưa điền thông tin azgames: chỉ ra dev-mock, báo thiếu, thoát mã 1
 npm run gk -- release-check
 ```
 
@@ -47,14 +47,14 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 
 | Lệnh | Việc |
 | --- | --- |
-| `init <tên>` | Tạo game từ `templates/game`, git init, cài hook, cài dependency. Hỏi thông tin (TTY) hoặc `--set k=v`; `--questions --json` in câu hỏi cho agent; `--third-party` khi làm lại game người khác |
+| `init <tên>` | Tạo game từ `templates/game`, git init, cài hook, cài dependency. Hỏi thông tin (TTY) hoặc `--set k=v`; `--questions` in câu hỏi (JSON) cho agent; `--third-party` khi làm lại game người khác |
 | `config [--portal p] [--set k=v]` | Điền thông tin portal còn thiếu hoặc thêm portal (chép checklist vào `gates/P4.md`) |
 | `status` / `next` | Pha, thời gian ở pha (cảnh báo vượt dự kiến), việc còn mở, skill tiếp theo |
 | `gate [--advance]` | Chấm `gates/<pha>.md`: mục `{auto: …}` chạy script, mục `(bạn)` chỉ người dùng tick |
 | `validate [--stage Px]` | Schema `game.yaml`, `params/*.json` (mọi giá trị có `source`; `confidence` = observed/derived/inferred, inferred cần `tolerance` từ P2), `spec/obligations.yaml`, `spec/oracles/*.json`, provenance, `module-plan.yaml`, `asset-manifest.json` |
 | `parity [--report file.json]` | Chạy vitest, đóng từng nghĩa vụ trong `spec/obligations.yaml` bằng test gắn thẻ `[id:case]`. Test đỏ, skip/todo, thiếu case hay thẻ lạ đều tính là chưa đạt |
 | `provenance add <file…> --label …` | Nhãn `reference / generated / own / licensed / placeholder` |
-| `pack [--portal] [--all] [--version V] [--compress] [--zip]` | `builds/<YYMMDDNN>/<portal>/{index.html, preview.html, version.txt, <v>/…}` + `builds/<v>/manifest.json` (+ zip) |
+| `pack [--portal] [--all] [--version V] [--compress] [--zip]` | `builds/<YYMMDDNN>/<portal>/{index.html, preview.html, version.txt, <v>/…}` + `builds/<v>/manifest.json` (+ zip). Portal thiếu thông tin bị bỏ qua, báo thiếu gì, thoát mã 1 |
 | `release-check [--version V] [--portal p]` | Mặc định bản mới nhất. Kiểm bố cục az-v1, footer bản quyền, chặn asset reference/placeholder, tên game gốc, link ngoài, đường dẫn tuyệt đối, vượt ngân sách tải |
 | `fanout --wave N` | Mỗi module một worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>` + `BRIEF.md` |
 | `check-ownership` | Module chỉ sửa trong thư mục được giao, không đụng vùng shared |
@@ -67,10 +67,10 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 .claude-plugin/   plugin.json, marketplace.json
 hooks/            SessionStart → using-gamekit + gamekit status
 commands/         /gamekit:status, /gamekit:next
-skills/           using-gamekit, rebuild-game, module-plan, integrate, platform-sdk, package-web-build, release-check
+skills/           using-gamekit, re-notes, rebuild-game, parity-check, module-plan, integrate, platform-sdk, package-web-build, release-check
 portals/          vỏ portal dùng chung: azgames, dev-mock (portal.yaml, kit.mjs, shell.html, loader.entry.js, Icons/), shared/
 scripts/          CLI gamekit.mjs + lệnh; lib/
-schemas/          game, params, provenance, module-plan, asset-manifest (JSON Schema)
+schemas/          game, params, obligations, oracle, provenance, module-plan, asset-manifest (JSON Schema)
 templates/game/   Vite + TS: core/ (deterministic), view/, platform/ (interface, PauseBus, dev-mock), contracts/, tests, gates, .vscode, AGENTS.md
 tests/            node --test
 ```
@@ -101,7 +101,7 @@ Sau đó: `npm run gk -- config` (điền thông tin portal: gameCode, signed…
 
 ## Lộ trình
 
-1. ✅ Khung plugin (bản này)
+1. ✅ Khung plugin, parity theo nghĩa vụ, gói AZGAMES + dev-mock (0.1–0.2)
 2. Adapter SDK thật: gmsdkv2, H5 Games Ads, CrazyGames, GameDistribution, Weegoo — chờ dữ liệu và tiêu chuẩn
 3. Pipeline UI và style, template preview, asset-spec, giao diện review
 4. Adapter engine Unity + script Ghidra headless
@@ -109,6 +109,8 @@ Sau đó: `npm run gk -- config` (điền thông tin portal: gameCode, signed…
 6. Engine còn lại
 7. QA, perf, store assets
 
+Skill `status` gợi ý nhưng **chưa có** (agent làm theo luật trong using-gamekit và checklist `gates/<pha>.md`): P0 `game-recon`, `triage` · P1 `engine-*`, `gameplay-spec`, `asset-inventory`, `ui-extract` · P2 `runtime-select` (tạm thời: mục 2 của rebuild-game) · P3 `web-relayout`; `third-party`: `style-*`, `asset-spec`, `apply-style`, `replace-*`, `rename-and-text` · P4 `add-analytics`, `add-leaderboard`, `add-save`, `add-i18n` (đa ngôn ngữ đã có sẵn trong template: `Language/`, `t()`; chỉ thiếu skill) · P5 `perf-budget`, `qa-smoke`, `store-assets`.
+
 ## Phát triển plugin
 
-`npm test` chạy bộ test của CLI (tạo game tạm, chạy git thật). Kiểm tra template đầy đủ: `init` một game, rồi `npm test`, `npm run typecheck`, `npm run lint`, `npm run gk -- pack --all`, `npm run gk -- release-check`.
+`npm test` chạy bộ test của CLI (tạo game tạm, chạy git thật). Kiểm tra template đầy đủ: `init` một game, rồi `npm test`, `npm run typecheck`, `npm run lint`, `npm run gk -- pack --portal dev-mock` (hoặc `--all` sau khi `config --portal azgames` với token thử), `npm run gk -- release-check`.

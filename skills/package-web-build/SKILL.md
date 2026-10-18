@@ -9,7 +9,7 @@ description: Dùng ở pha P5 (hoặc bất cứ khi nào cần bản build) đ�
 
 - Mỗi lần pack tạo một thư mục phiên bản `builds/<v>/`, mỗi portal trong `portals` (game.yaml) một thư mục con. Bản cũ giữ lại, không tự xoá. `builds/` bị gitignore và hook chặn commit.
 - `<v>` = `YYMMDDNN` (ngày build + số thứ tự trong ngày 01–99). `--version 26101605` để chỉ định: phải 8 chữ số và chưa tồn tại. Đây là `productVersion` gửi SDK, `GM_GAME.version` và nội dung `version.txt`; `version` semver trong game.yaml chỉ ghi vào `manifest.json`.
-- **Cần `portalSettings` đủ** cho portal được pack (gameCode, gameId, portalGid, signed với azgames). Thiếu thì pack dừng portal đó và liệt kê từng mục kèm lệnh `gamekit config --portal <id>`.
+- **Cần `portalSettings` đủ** cho portal được pack (gameCode, gameId, portalGid, signed với azgames). Portal thiếu bị bỏ qua: pack vẫn đóng gói các portal đã đủ, liệt kê từng mục thiếu kèm lệnh `gamekit config --portal <id>`, rồi thoát mã 1 (bản đó chưa đủ để phát hành). Chưa có token azgames mà muốn thử: `pack --portal dev-mock`.
 - Vỏ portal (trang HTML, `loader.js`, màn loading, sitelock, khởi tạo SDK) nằm trong plugin (`portals/<id>/`), game không tự viết.
 
 ## Bố cục
