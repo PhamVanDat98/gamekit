@@ -96,12 +96,13 @@ function validateParams(root, st, pr) {
     for (const e of check('params', data)) pr.error(where, e);
     if (!isObject(data)) continue;
     const stem = rel.replace(/\.json$/, '').replaceAll('/', '.');
+    const demo = [];
     for (const [key, p] of collectParams(data)) {
       keys.add(key).add(`${stem}.${key}`);
       const src = String(p.source ?? '').trim();
       if (!src) pr.error(where, `${key}: thiếu source (luật cứng: số liệu phải có nguồn từ game gốc)`);
       else if (/^todo\b/i.test(src)) (strict ? pr.error : pr.warn).call(pr, where, `${key}: source còn TODO`);
-      else if (DEMO_SOURCE.test(src)) (strict ? pr.error : pr.warn).call(pr, where, `${key}: vẫn là số của game demo (template-demo) — thay bằng số của game gốc`);
+      else if (DEMO_SOURCE.test(src)) demo.push(key);
       if (p.confidence === 'inferred' && p.tolerance == null)
         (strict ? pr.error : pr.warn).call(pr, where, `${key}: giá trị ước lượng (inferred) cần tolerance để parity test so được`);
       if (p.deviation) {
@@ -110,6 +111,8 @@ function validateParams(root, st, pr) {
         if (!d.approved) (strict ? pr.error : pr.warn).call(pr, where, `${key}: sai khác game gốc chưa được duyệt (${d.decision})`);
       }
     }
+    if (demo.length)
+      (strict ? pr.error : pr.warn).call(pr, where, `${demo.length} số vẫn của game demo (template-demo) — thay bằng số của game gốc: ${demo.slice(0, 5).join(', ')}${demo.length > 5 ? '…' : ''}`);
   }
   return keys;
 }
