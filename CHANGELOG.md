@@ -12,6 +12,9 @@
 - `integrate --keep-going`: đơn vị lỗi không dừng cả lượt, đơn vị phụ thuộc nó được giữ lại, đơn vị độc lập vẫn merge.
 - `links` trong kế hoạch: symlink tư liệu local (`decompiled/`, `reference/`) vào worktree; tên được thêm vào `info/exclude` chung (mẫu `decompiled/` của `.gitignore` không phủ symlink). Brief của mảng ghi câu hỏi, đầu ra, đơn vị chuẩn, mã `D-<mảng>-n`; brief của module dựng từ một mảng kèm nghĩa vụ của mảng đó.
 - File `params/<tên>.json` chưa được nạp trong `src/core/params.ts`: cảnh báo trước P2 (mảng phân tích ghi số trước khi game đọc), lỗi từ P2.
+- Câu hỏi theo mảng có liên kết được kiểm: `notes`, `params`, `obligations` mà câu hỏi trỏ tới phải có thật (mọi pha). Từ P2: câu `answered` phải có ghi chú; ghi chú được trỏ tới phải đủ năm phần (Kết luận, Vị trí, Độ tin cậy, Phạm vi đã tìm, Còn chưa biết) và ghi `observed|derived|inferred`; câu bắt buộc chưa xong phải có `openReason` + `impact`. Trước P2 là cảnh báo.
+- `obligations[].source` phải trỏ tới file có thật.
+- Lệnh `gamekit questions [--area id] [--json]`: tiến độ từng mảng và câu bắt buộc còn chặn.
 - `docs/re-process-review.md`: rà soát quy trình RE và kế hoạch chạy song song.
 
 ## 0.2.0 — 2026-10-16

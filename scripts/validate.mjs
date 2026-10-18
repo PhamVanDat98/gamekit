@@ -11,6 +11,7 @@ import { pngInfo, isWebp } from './lib/png.mjs';
 import { loadLanguages, placeholders } from './lib/languages.mjs';
 import { checkSetting, loadPortal, missingSettings } from './lib/portals.mjs';
 import { checkRePlan, checkUnits, loadPlan, pathUnder, unitsOf } from './lib/plan.mjs';
+import { checkQuestions } from './lib/notes.mjs';
 
 export { pathUnder };
 
@@ -48,7 +49,7 @@ export function validateGame(root, { stage } = {}) {
   validateProvenance(root, st, pr);
   validateModulePlan(root, pr);
   validateRePlan(root, pr);
-  validateQuestions(root, pr);
+  validateQuestions(root, st, pr, paramKeys);
   validateAssetManifest(root, pr);
   return { problems: pr, game };
 }
@@ -207,6 +208,7 @@ function validateObligations(root, st, pr, paramKeys) {
       else seen.set(o.id, where);
       for (const k of o.params ?? []) if (!paramKeys.has(k)) pr.error(where, `${o.id}: params ${k} không có trong params/`);
       if (o.oracle && !exists(path.join(root, o.oracle))) pr.error(where, `${o.id}: không có file oracle ${o.oracle}`);
+      if (o.source && !exists(path.join(root, o.source))) pr.error(where, `${o.id}: không có ghi chú ${o.source} (source)`);
       if ((o.status ?? 'active') !== 'active') {
         if (!o.decision) pr.error(where, `${o.id}: ${o.status} cần decision D-n (hoặc D-<mảng>-n) trong DECISIONS.md / notes/<mảng>/decisions.md`);
         else if (!decisions.has(o.decision)) pr.error(where, `${o.id}: trỏ tới ${o.decision} nhưng không có mục này trong DECISIONS.md hay notes/<mảng>/decisions.md`);
@@ -421,39 +423,22 @@ function validateRePlan(root, pr) {
   if (r.ok) checkLinks(root, plan, 're-plan.yaml', pr);
 }
 
-// ---------- notes/<area>/questions.yaml: analysis questions of one area ----------
-const QUESTIONS_FILE = /^([a-z0-9][a-z0-9-]*)\/questions\.yaml$/;
-
-function validateQuestions(root, pr) {
+// ---------- notes/<area>/questions.yaml: analysis questions of one area (scripts/lib/notes.mjs) ----------
+function validateQuestions(root, st, pr, paramKeys) {
   let areas = null;
+  let obligationIds = null;
   try {
     const plan = loadPlan(root, 're');
     if (plan) areas = new Set(unitsOf(plan, 're').map((a) => a.id));
   } catch {
     // reported by validateRePlan
   }
-  const seen = new Map();
-  for (const rel of walk(path.join(root, 'notes'))) {
-    const area = QUESTIONS_FILE.exec(rel)?.[1];
-    if (!area) continue;
-    const where = `notes/${rel}`;
-    let data;
-    try {
-      data = readYaml(path.join(root, 'notes', rel));
-    } catch (e) {
-      pr.error(where, e.message);
-      continue;
-    }
-    const errs = check('questions', data);
-    for (const e of errs) pr.error(where, e);
-    if (errs.length) continue;
-    if (areas && !areas.has(area)) pr.warn(where, `re-plan.yaml không có mảng ${area}`);
-    for (const q of data.questions) {
-      if (!q.id.startsWith(`${area}.`)) pr.error(where, `${q.id}: câu hỏi của mảng ${area} phải có id ${area}.<tên>`);
-      if (seen.has(q.id)) pr.error(where, `trùng id câu hỏi ${q.id} (đã có trong ${seen.get(q.id)})`);
-      else seen.set(q.id, where);
-    }
+  try {
+    obligationIds = new Set((loadObligations(root)?.obligations ?? []).map((o) => o?.id));
+  } catch {
+    // reported by validateObligations
   }
+  checkQuestions(root, pr, { strict: st >= PHASES.indexOf('P2'), paramKeys, obligationIds, areas });
 }
 
 // ---------- asset-manifest.json ----------

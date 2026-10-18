@@ -192,6 +192,83 @@ test('obligations per area: spec/obligations/<area>.yaml joins the ledger, ids c
   assert.match(r.out, /parity: 7\/7/);
 });
 
+const GOOD_NOTE = `# Di chuyển
+
+- **Kết luận**: chạy 4 px/frame ở 30 fps = 120 px/s.
+- **Vị trí**: Assembly-CSharp.dll, PlayerController.Update
+- **Độ tin cậy**: observed
+- **Phạm vi đã tìm**: PlayerController, PlayerInput
+- **Còn chưa biết**: tốc độ khi bị làm chậm
+`;
+
+test('questions: links to notes, params and obligations must exist; completeness binds from P2', () => {
+  const dir = newGame('qlink');
+  const q = (extra) => write(dir, 'notes/player/questions.yaml', `questions:\n  - { id: player.q1, question: Tốc độ?, evidence: hằng số, ${extra} }\n`);
+  q('status: answered, notes: [notes/player/move.md], params: [player.nope], obligations: [player.fly]');
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /player\.q1: không có ghi chú notes\/player\/move\.md/);
+  assert.match(r.out, /player\.q1: params player\.nope không có/);
+  assert.match(r.out, /player\.q1: không có nghĩa vụ player\.fly/);
+  write(dir, 'notes/player/move.md', '# Di chuyển\n\nChạy nhanh.\n');
+  q('status: answered, notes: [notes/player/move.md], params: [player.speed], obligations: [player.move]');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 0, 'an incomplete note is a warning during P1');
+  assert.match(r.out, /notes\/player\/move\.md: ghi chú thiếu: Kết luận, Vị trí, Độ tin cậy, Phạm vi đã tìm, Còn chưa biết, độ tin cậy observed/);
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 1);
+  write(dir, 'notes/player/move.md', GOOD_NOTE);
+  r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 0, r.out);
+  // headings count as parts too
+  write(dir, 'notes/player/move.md', '## Kết luận\nx\n## Vị trí\nx\n## Độ tin cậy\nderived\n## Phạm vi đã tìm\nx\n## Còn chưa biết\nkhông\n');
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0);
+  // answered without a note; required and open without a reason
+  q('status: answered');
+  r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /player\.q1: đã trả lời nhưng chưa trỏ tới ghi chú nào/);
+  q('status: partial');
+  r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /player\.q1: câu bắt buộc còn partial — trả lời, hoặc ghi openReason và impact/);
+  q('status: partial, openReason: bản build không có hàm này, impact: dùng giá trị đo từ video');
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0);
+  q('status: open, required: false');
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0, 'optional questions may stay open');
+});
+
+test('obligations: source names a note that exists', () => {
+  const dir = newGame('osrc');
+  write(dir, 'spec/obligations/hero.yaml', 'obligations:\n  - { id: hero.run, title: Chạy, cases: [normal], source: notes/hero/run.md }\n');
+  const r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /hero\.run: không có ghi chú notes\/hero\/run\.md \(source\)/);
+  write(dir, 'notes/hero/run.md', GOOD_NOTE);
+  assert.equal(gk(dir, 'validate').code, 0);
+});
+
+test('questions command: progress per area and the required questions that still block', () => {
+  const dir = newGame('qcmd');
+  assert.match(gk(dir, 'questions').out, /Chưa có notes\/<mảng>\/questions\.yaml/);
+  write(dir, 'notes/player/move.md', GOOD_NOTE);
+  write(dir, 'notes/player/questions.yaml', `questions:
+  - { id: player.q1, question: Tốc độ?, evidence: E, status: answered, notes: [notes/player/move.md] }
+  - { id: player.q2, question: Nhảy cao bao nhiêu?, evidence: E, status: partial }
+  - { id: player.q3, question: Hiệu ứng bụi?, evidence: E, status: open, required: false }
+`);
+  write(dir, 'notes/audio/questions.yaml', 'questions:\n  - { id: audio.q1, question: Q, evidence: E, status: open, openReason: thiếu file âm thanh, impact: dùng âm thanh tạm }\n');
+  let r = gk(dir, 'questions');
+  assert.equal(r.code, 0);
+  assert.match(r.out, /player: 1\/3 đã trả lời, 1 một phần, 1 mở — 1 câu bắt buộc chưa xong:/);
+  assert.match(r.out, /player\.q2 \(partial\): Nhảy cao bao nhiêu\?/);
+  assert.doesNotMatch(r.out, /player\.q3/);
+  assert.match(r.out, /✔ audio: 0\/1 đã trả lời/);
+  r = gk(dir, 'questions', '--area', 'player', '--json');
+  const rows = JSON.parse(r.out);
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0].blocking.map((b) => b.id), ['player.q2']);
+});
+
 test('provenance: unlabeled assets fail; reference blocked from P3; placeholder blocked at P5', () => {
   const dir = newGame();
   write(dir, 'assets/hero.png', 'x');
