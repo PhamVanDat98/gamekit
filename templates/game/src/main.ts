@@ -90,7 +90,7 @@ async function main(): Promise<void> {
     const elapsed = (now - last) / MS;
     last = now;
     if (state === 'playing' && !bus.paused) {
-      const { steps } = advance(step, elapsed);
+      const steps = advance(step, elapsed);
       for (let i = 0; i < steps; i++) {
         const events = stepWorld(world, PARAMS, input.frame(world.tick), step.stepSec);
         for (const e of events) {

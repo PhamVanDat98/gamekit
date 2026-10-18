@@ -14,18 +14,13 @@ export function createFixedStep(hz: number, maxStepsPerFrame = 5): FixedStep {
 }
 
 /**
- * Feed real elapsed seconds; returns how many fixed steps to run now and the
- * interpolation factor (0..1) for rendering between the last two states.
- * Large gaps (tab was hidden) are clamped so the game never fast-forwards.
+ * Feed real elapsed seconds; returns how many fixed steps to run now.
+ * At most maxStepsPerFrame run per frame; what is left over is kept (up to one frame's worth of steps)
+ * so a slow frame catches up over the next ones, while a long gap (tab was hidden) never fast-forwards.
  */
-export function advance(fs: FixedStep, elapsedSec: number): { steps: number; alpha: number } {
+export function advance(fs: FixedStep, elapsedSec: number): number {
   fs.accumulator += Math.max(0, elapsedSec);
-  let steps = Math.floor(fs.accumulator / fs.stepSec);
-  if (steps > fs.maxStepsPerFrame) {
-    steps = fs.maxStepsPerFrame;
-    fs.accumulator = 0;
-  } else {
-    fs.accumulator -= steps * fs.stepSec;
-  }
-  return { steps, alpha: fs.accumulator / fs.stepSec };
+  const steps = Math.min(Math.floor(fs.accumulator / fs.stepSec), fs.maxStepsPerFrame);
+  fs.accumulator = Math.min(fs.accumulator - steps * fs.stepSec, fs.maxStepsPerFrame * fs.stepSec);
+  return steps;
 }
