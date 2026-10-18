@@ -312,7 +312,7 @@ Thứ tự phụ thuộc: **W0** phải xong trước; các gói trong cùng m�
 | **W1 Params/obligations nhiều file** (đã xong, xem 5.0c) | 1 | `scripts/validate.mjs` (params, obligations), `templates/game/src/core/params.ts`, `templates/game/spec/` | `loadObligations` gộp `spec/obligations.yaml` + `spec/obligations/*.yaml`; báo trùng khoá params giữa file; `params.ts` gộp `import.meta.glob('../../params/*.json', {eager:true})` theo tên file (giữ `game.json` gộp ở gốc để tương thích) | trùng khoá lỗi; game thử: test/typecheck/lint/pack xanh |
 | **W2 Câu hỏi & ghi chú** (đã xong, xem 5.0 và 5.0e) | 1 | `scripts/questions.mjs` (mới), `scripts/validate.mjs` (phần notes — tách thành `scripts/lib/validate-notes.mjs` để không đụng W1), `templates/game/notes/` | Đọc `notes/**/questions.yaml` (và cảnh báo nếu còn `QUESTIONS.md` kiểu cũ); kiểm liên kết; kiểm frontmatter ghi chú; lệnh `questions` | câu `answered` không có ghi chú → lỗi; `openReason` bắt buộc khi đóng |
 | **W3 Lập lịch song song** (đã xong, xem 5.0d) | 1 | `scripts/parallel.mjs` | `fanout/integrate --plan re|build --ready`, `--keep-going`, `links:` symlink, chia lượt `maxParallel`, tiền tố nhánh theo kind, brief giàu thông tin | worktree có symlink `decompiled/`; nhánh đỏ không chặn nhánh độc lập; con của nhánh đỏ bị bỏ qua |
-| **W4 Recon** | 1 | `scripts/recon.mjs` (mới), `schemas/inventory.schema.json` | Nhận diện engine, kiểm kê, ghi `notes/inventory.json`, điền `game.yaml` | thư mục giả cho từng engine (Unity Mono, IL2CPP, WebGL, Godot, APK) |
+| **W4 Recon** (đã xong, xem 5.0i) | 1 | `scripts/recon.mjs` (mới), `schemas/inventory.schema.json` | Nhận diện engine, kiểm kê, ghi `notes/inventory.json`, điền `game.yaml` | thư mục giả cho từng engine (Unity Mono, IL2CPP, WebGL, Godot, APK) |
 | **W5 Cổng** (đã xong, xem 5.0f) | 2 (sau W2, W3) | `scripts/gate.mjs`, `templates/game/gates/P1.md`, `P2.md` | `gate --area`; auto `areas`, `questions`, `file:spec/gameplay-spec.md`, `merged` (mọi module đã merge + worktree gỡ); chạy auto song song; dùng chung một lần vitest | cổng mảng qua/không qua; P2 chạy vitest đúng 1 lần |
 | **W6 Parity một phần** (đã xong, xem 5.0g) | 2 (sau W1) | `scripts/parity.mjs` | `--area`, `--module`, `--json`, `--mutate` | lọc đúng; mutate làm nghĩa vụ đỏ |
 | **W7 Status/next** (đã xong, xem 5.0h) | 2 (sau W3) | `scripts/status.mjs`, `commands/next.md` | Đơn vị sẵn sàng / đang chạy / chờ integrate / bị chặn; `next` gợi ý giao **nhiều** việc một lượt | output có các nhóm |
@@ -382,6 +382,14 @@ Theo `AGENTS.md`: mỗi lệnh mới thêm vào `COMMANDS` + `HELP` trong `scrip
 - `planState(root, game, kind)` trong `scripts/parallel.mjs`: mỗi đơn vị `merged | done | running | ready (capped) | blocked`, kèm phụ thuộc đang chờ, số commit, worktree. `done` = nhánh có commit và worktree sạch (hoặc đã gỡ) — tính cả khi chưa integrate. Chỗ trống = `maxParallel` − số worktree đang mở; đơn vị `ready` được xếp chỗ theo thứ tự `topo`.
 - `status` in mục "Việc song song" cho từng kế hoạch có mặt (kế hoạch hỏng thì báo, không dừng); hook SessionStart vốn gọi `status` nên agent thấy ngay khi mở phiên.
 - `commands/next.md`: integrate các đơn vị xong → fanout đơn vị sẵn sàng → giao mọi worktree trong cùng một lượt; không giao lại đơn vị đang làm.
+
+### 5.0i Đã làm: W4 — recon
+
+- `scripts/lib/unzip.mjs` (`listZip`): đọc EOCD ở đuôi file, zip64 (locator + record + extra 0x0001), mục lục; không giải nén, không thư viện. Đã thử với zip của `zipDir` trong plugin và zip deflate do Python tạo.
+- `scripts/lib/recon.mjs`: `SIGNATURES` (regex trên đường dẫn chữ thường, trọng số 1–3, `flavor`), `detectEngine` (cộng điểm theo engine, `html5` chỉ khi không engine nào khác khớp), `kindOf`, `scanSource` (thư mục + gói zip bên trong, sha256 đọc theo khối 1 MB), `unityVersion` (1 MB đầu của `*_Data/globalgamemanagers`…, regex `20xx.y.zfN`).
+- `scripts/recon.mjs`: ghi `notes/inventory.json` (schema `schemas/inventory.schema.json`, `validate` kiểm), chỉ điền trường `source.*` còn trống. Từ chối quét chính repo game, trừ `reference/`, `decompiled/`.
+- Template: P0 có `{auto: file:notes/inventory.json}`; `re-plan.example.yaml` để `notes/inventory.json` trong `shared`.
+- Chưa làm: phiên bản engine khác Unity; đọc phiên bản Unity bên trong APK (cần giải nén mục); gợi ý mảng từ kiểm kê (`re-plan --suggest`).
 
 ### 5.1 Tương thích ngược
 

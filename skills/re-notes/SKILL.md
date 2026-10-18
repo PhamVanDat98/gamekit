@@ -30,6 +30,8 @@ Trước khi mở công cụ, xem lại `notes/` và `params/` đã có gì. Kh�
 
 APK: nhìn `lib/*/` để nhận engine (`libunity.so`, `libil2cpp.so`, `libcocos2djs.so`, `libgodot_android.so`).
 
+`gamekit recon <thư mục build | APK/IPA/ZIP>` làm bước này bằng máy: nhận engine theo bảng trên (kèm bằng chứng), đọc phiên bản Unity, kiểm kê mọi file (cỡ, sha256, loại code/data/asset) vào `notes/inventory.json`. Đọc kết quả trước khi mở công cụ RE; chọn `targets` cho từng mảng từ danh sách file `code`/`data` trong đó.
+
 Nếu phiên có công cụ MCP reverse engineering (ví dụ rea: `open_binary`, `analyze_function`, `analyze_javascript_application`, `inspect_managed_artifact`), dùng chúng cho bước phân tích tĩnh. Bắt đầu từ bản tóm tắt; chỉ đào sâu khi còn một câu hỏi cụ thể; không chạy lại một phân tích y hệt.
 
 Chỉ phân tích file tĩnh của bản mà người dùng có. Không can thiệp game đang chạy của người khác, không đụng server online.

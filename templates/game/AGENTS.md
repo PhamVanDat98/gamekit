@@ -25,6 +25,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Việc | Lệnh |
 | --- | --- |
 | Trạng thái, việc tiếp theo | `npm run gk -- status` |
+| Nhận diện engine, kiểm kê game gốc | `npm run gk -- recon <đường dẫn>` → `notes/inventory.json` |
 | Kiểm tra dữ liệu | `npm run gk -- validate` |
 | Test / typecheck / lint | `npm test` · `npm run typecheck` · `npm run lint` |
 | Câu hỏi phân tích theo mảng | `npm run gk -- questions` (`notes/<mảng>/questions.yaml`) |

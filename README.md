@@ -49,6 +49,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | --- | --- |
 | `init <tên>` | Tạo game từ `templates/game`, git init, cài hook, cài dependency. Hỏi thông tin (TTY) hoặc `--set k=v`; `--questions --json` in câu hỏi cho agent; `--third-party` khi làm lại game người khác |
 | `config [--portal p] [--set k=v]` | Điền thông tin portal còn thiếu hoặc thêm portal (chép checklist vào `gates/P4.md`) |
+| `recon [đường dẫn] [--no-hash] [--no-write] [--json]` | Nhận diện engine game gốc theo dấu hiệu file (thư mục build hoặc APK/IPA/ZIP — đọc mục lục zip, không giải nén), phiên bản Unity; kiểm kê file vào `notes/inventory.json`; điền `source.engine/path/engineVersion` còn trống |
 | `status` / `next` | Pha, thời gian ở pha (cảnh báo vượt dự kiến), việc còn mở, skill tiếp theo. Có `re-plan.yaml` / `module-plan.yaml`: việc song song — xong chờ integrate, đang làm, sẵn sàng giao ngay, đủ `maxParallel`, chờ phụ thuộc — kèm lệnh nên chạy |
 | `gate [--advance]` | Chấm `gates/<pha>.md`: mục `{auto: …}` chạy script (song song; `test` + `parity` dùng chung một lần vitest), mục `(bạn)` chỉ người dùng tick. `{only: split\|single}` theo việc có `re-plan.yaml` |
 | `gate --area <id>` | Cổng một mảng phân tích: luật P2 trên file của mảng, câu hỏi bắt buộc xong, nghĩa vụ có nguồn |

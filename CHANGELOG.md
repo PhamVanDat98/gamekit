@@ -22,6 +22,7 @@
 - `parity --mutate`: đổi bảng oracle của nghĩa vụ (test oracle phải đỏ, không thì lỗi) và từng số params (vẫn xanh = cảnh báo: kỳ vọng lấy từ chính params). Luôn khôi phục file. Skill parity-check mục 5 viết lại theo đó — hướng dẫn cũ "đổi params thì phải đỏ" sai với test lấy kỳ vọng từ params.
 - `integrate --scoped`: sau mỗi merge chỉ test của module + `parity --module`, cuối lượt chạy toàn bộ một lần; đỏ thì hoàn tác cả lượt.
 - `status` có mục **Việc song song** cho `re-plan.yaml` và `module-plan.yaml`: xong chờ integrate (kèm số commit), đang làm, sẵn sàng giao ngay, sẵn sàng nhưng đủ `maxParallel`, chờ phụ thuộc nào — kèm lệnh nên chạy. Trạng thái chỉ đọc từ git và worktree. `/gamekit:next` integrate trước, rồi giao mọi đơn vị sẵn sàng cho subagent trong cùng một lượt.
+- Lệnh `gamekit recon [đường dẫn]`: nhận diện engine game gốc theo dấu hiệu file (Unity Mono/IL2CPP/WebGL, Godot, Unreal, Flash, Cocos, Construct, Laya, HTML5 Phaser/Pixi/RPG Maker, GameMaker) kèm bằng chứng; đọc mục lục APK/IPA/AAB/XAPK/ZIP (cả zip64) mà không giải nén; đọc phiên bản Unity; kiểm kê mọi file vào `notes/inventory.json` (cỡ, sha256 hoặc crc32 trong gói, loại). Chỉ điền `source.engine/path/engineVersion` còn trống, cảnh báo khi engine đã ghi khác. Không quét chính repo game (trừ `reference/`, `decompiled/`). Cổng P0 có `{auto: file:notes/inventory.json}`.
 - `docs/re-process-review.md`: rà soát quy trình RE và kế hoạch chạy song song.
 
 ## 0.2.0 — 2026-10-16

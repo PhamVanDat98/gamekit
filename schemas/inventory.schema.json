@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gamekit/inventory.schema.json",
+  "title": "notes/inventory.json — kiểm kê file game gốc do gamekit recon sinh (tên, cỡ, hash; không chứa nội dung file)",
+  "type": "object",
+  "required": ["source", "scannedAt", "engine", "candidates", "totals", "files"],
+  "additionalProperties": false,
+  "properties": {
+    "source": { "type": "string" },
+    "scannedAt": { "type": "string" },
+    "engine": { "enum": ["unknown", "unity", "cocos", "godot", "unreal", "flash", "construct", "laya", "html5", "other"] },
+    "flavor": { "type": ["string", "null"], "description": "Kiểu build trong engine: il2cpp, mono, webgl, phaser, gamemaker…" },
+    "engineVersion": { "type": ["string", "null"] },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["engine", "score", "evidence"],
+        "additionalProperties": false,
+        "properties": {
+          "engine": { "type": "string" },
+          "flavor": { "type": ["string", "null"] },
+          "score": { "type": "number" },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "totals": { "type": "object" },
+    "archives": { "type": "array" },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "size", "kind"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "description": "Tương đối với game gốc; mục trong gói: <gói>!/<mục>" },
+          "size": { "type": "integer", "minimum": 0 },
+          "kind": { "enum": ["code", "data", "asset", "package", "other"] },
+          "sha256": { "type": "string" },
+          "crc32": { "type": "string" }
+        }
+      }
+    }
+  }
+}

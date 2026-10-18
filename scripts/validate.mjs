@@ -51,6 +51,7 @@ export function validateGame(root, { stage } = {}) {
   validateRePlan(root, pr);
   validateQuestions(root, st, pr, paramKeys);
   validateAssetManifest(root, pr);
+  validateInventory(root, pr);
   return { problems: pr, game };
 }
 
@@ -475,6 +476,17 @@ function validateAssetManifest(root, pr) {
     if (info.width !== w || info.height !== a.height)
       pr.error(where, `${a.id}: ${a.path} là ${info.width}×${info.height}, spec cần ${w}×${a.height}`);
     if (a.alpha === true && info.alpha === false) pr.error(where, `${a.id}: cần nền trong suốt nhưng PNG không có kênh alpha`);
+  }
+}
+
+// ---------- notes/inventory.json (gamekit recon) ----------
+function validateInventory(root, pr) {
+  const f = path.join(root, 'notes', 'inventory.json');
+  if (!exists(f)) return;
+  try {
+    for (const e of check('inventory', readJson(f))) pr.error('notes/inventory.json', e);
+  } catch (e) {
+    pr.error('notes/inventory.json', e.message);
   }
 }
 

@@ -8,6 +8,7 @@ base: main
 maxParallel: 4
 shared:              # chỉ agent chính được sửa
   - DECISIONS.md
+  - notes/inventory.json   # gamekit recon — targets của mỗi mảng chọn từ đây
   - spec/gameplay-spec.md
   - src/contracts/
   - game.yaml

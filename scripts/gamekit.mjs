@@ -15,6 +15,8 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   init <tên> --questions --json             In danh sách câu hỏi kèm giải thích (cho agent hỏi người dùng)
   config [--portal p] [--set k=v…] [--questions --json]   Điền thông tin portal còn thiếu, thêm portal
   status | next                             Game đang ở pha nào, việc gì tiếp
+  recon [đường dẫn] [--no-hash] [--no-write] [--json]   Nhận diện engine của game gốc từ tên file (thư mục, APK/IPA/ZIP),
+                                            kiểm kê vào notes/inventory.json, điền source.engine/path/engineVersion còn trống
   gate [--advance]                          Kiểm tra cổng của pha hiện tại (mục auto chạy song song)
   gate --area <id>                          Cổng của một mảng phân tích (re-plan.yaml): đủ điều kiện để dựng lại chưa
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, re-plan, câu hỏi, asset-manifest
@@ -37,7 +39,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'ready', 'keep-going', 'mutate', 'scoped']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'ready', 'keep-going', 'mutate', 'scoped', 'no-hash', 'no-write']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -60,6 +62,7 @@ const COMMANDS = {
   config: () => import('./config.mjs').then((m) => m.run),
   status: () => import('./status.mjs').then((m) => m.run),
   next: () => import('./status.mjs').then((m) => m.run),
+  recon: () => import('./recon.mjs').then((m) => m.run),
   gate: () => import('./gate.mjs').then((m) => m.run),
   validate: () => import('./validate.mjs').then((m) => m.run),
   questions: () => import('./questions.mjs').then((m) => m.run),

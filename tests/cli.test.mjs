@@ -11,6 +11,13 @@ import { parseArgs } from '../scripts/gamekit.mjs';
 import { evaluateParity, testsFromVitestReport } from '../scripts/parity.mjs';
 import YAML from 'yaml';
 
+/** P0 needs notes/inventory.json: run recon on a tiny original build next to the game. */
+const withInventory = (dir) => {
+  write(path.dirname(dir), 'orig/game.swf', 'x');
+  const r = gk(dir, 'recon', '../orig');
+  assert.equal(r.code, 0, r.out);
+};
+
 test('init creates a valid game with git, hook and schemas', () => {
   const dir = newGame();
   assert.ok(fs.existsSync(path.join(dir, 'game.yaml')));
@@ -532,6 +539,38 @@ areas:
   assert.match(gk(dir, 'status').out, /kế hoạch không hợp lệ/);
 });
 
+test('recon: inventories the original build, fills what game.yaml still lacks, never scans the game repo itself', () => {
+  const dir = newGame('recon');
+  const orig = path.join(path.dirname(dir), 'original');
+  write(orig, 'Game_Data/Managed/Assembly-CSharp.dll', 'il');
+  write(orig, 'Game_Data/globalgamemanagers', 'UnityFS\0\0\x002021.3.5f1\0rest');
+  write(orig, 'UnityPlayer.dll', 'x');
+  write(orig, 'Game_Data/sharedassets0.assets', 'x');
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('engine: unity', 'engine: unknown'));
+  let r = gk(dir, 'recon', '../original');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Engine: unity \(mono\) 2021\.3\.5f1/);
+  const inv = JSON.parse(read(dir, 'notes/inventory.json'));
+  assert.equal(inv.files.length, 4);
+  assert.equal(inv.totals.byKind.code.files, 2);
+  assert.ok(inv.files.every((f) => f.sha256.length === 64));
+  const y = YAML.parse(read(dir, 'game.yaml'));
+  assert.deepEqual([y.source.engine, y.source.path, y.source.engineVersion], ['unity', '../original', '2021.3.5f1']);
+  assert.equal(gk(dir, 'validate').code, 0);
+  // with source.path filled, no argument is needed; a different engine set by the user is kept, with a warning
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('engine: unity', 'engine: godot'));
+  r = gk(dir, 'recon', '--no-hash');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /game\.yaml ghi engine godot nhưng file trông như unity/);
+  assert.equal(YAML.parse(read(dir, 'game.yaml')).source.engine, 'godot');
+  assert.ok(!('sha256' in JSON.parse(read(dir, 'notes/inventory.json')).files[0]));
+  r = gk(dir, 'recon', '.');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /không quét chính repo này/);
+  write(dir, 'reference/game.swf', 'x'); // gitignored copies inside the repo are fine
+  assert.match(gk(dir, 'recon', 'reference', '--no-write').out, /Engine: flash/);
+});
+
 test('provenance: unlabeled assets fail; reference blocked from P3; placeholder blocked at P5', () => {
   const dir = newGame();
   write(dir, 'assets/hero.png', 'x');
@@ -573,9 +612,11 @@ test('gate: parses items, runs auto checks, advances and records timings', () =>
   assert.equal(gk(dir, 'gate').code, 1);
   write(dir, 'gates/P0.md', read(dir, 'gates/P0.md').replaceAll('- [ ]', '- [x]'));
   const fieldFail = gk(dir, 'gate');
-  assert.equal(fieldFail.code, 1, 'source.path and forbiddenTerms still empty');
+  assert.equal(fieldFail.code, 1, 'source.path, forbiddenTerms and the inventory still missing');
   assert.match(fieldFail.out, /source\.path chưa điền/);
-  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig').replace('forbiddenTerms: []', 'forbiddenTerms: [OldName]'));
+  assert.match(fieldFail.out, /thiếu notes\/inventory\.json/);
+  withInventory(dir); // fills source.path too
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('forbiddenTerms: []', 'forbiddenTerms: [OldName]'));
   assert.equal(gk(dir, 'gate').code, 0);
   assert.equal(gk(dir, 'gate', '--advance').code, 0);
   const y = read(dir, 'game.yaml');
@@ -1265,7 +1306,7 @@ test('ownership: a new game is the user\'s own — P0 passes without forbiddenTe
   assert.match(read(dir, 'game.yaml'), /ownership: own/);
   assert.match(gk(dir, 'status').out, /game của bạn/);
   tickAll(dir, 'P0');
-  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig'));
+  withInventory(dir);
   const r = gk(dir, 'gate');
   assert.equal(r.code, 0, r.out);
   assert.doesNotMatch(r.out, /forbiddenTerms|clone/);
@@ -1276,7 +1317,7 @@ test('ownership: init --third-party requires forbiddenTerms, keeps reskin phase 
   assert.match(read(dir, 'game.yaml'), /ownership: third-party/);
   assert.match(gk(dir, 'status').out, /làm lại game người khác/);
   tickAll(dir, 'P0');
-  write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig'));
+  withInventory(dir);
   let r = gk(dir, 'gate');
   assert.equal(r.code, 1);
   assert.match(r.out, /forbiddenTerms chưa điền/);
