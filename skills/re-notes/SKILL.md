@@ -28,7 +28,9 @@ Trước khi mở công cụ, xem lại `notes/` và `params/` đã có gì. Kh�
 
 APK: nhìn `lib/*/` để nhận engine (`libunity.so`, `libil2cpp.so`, `libcocos2djs.so`, `libgodot_android.so`).
 
-Nếu phiên có công cụ MCP reverse engineering (ví dụ rea: `open_binary`, `analyze_function`, `analyze_javascript_application`, `inspect_managed_artifact`), dùng chúng cho bước phân tích tĩnh. Bắt đầu từ bản tóm tắt; chỉ đào sâu khi còn một câu hỏi cụ thể; không chạy lại một phân tích y hệt.
+**Không có source, logic là mã máy** (Unity IL2CPP, Unreal native, C/C++): làm theo [references/ghidra-headless.md](references/ghidra-headless.md) — lấy số liệu từ file data trước (AssetRipper → `gamekit unity scan`), gắn tên bằng Il2CppDumper, phân tích bằng Ghidra headless (`analyzeHeadless`) hoặc Ghidra qua MCP, project trong `.gamekit/ghidra/`, kết quả decompile trong `decompiled/`.
+
+Nếu phiên có công cụ MCP reverse engineering khác (ví dụ rea: `open_binary`, `analyze_function`, `analyze_javascript_application`, `inspect_managed_artifact`), dùng chúng cho bước phân tích tĩnh. Bắt đầu từ bản tóm tắt; chỉ đào sâu khi còn một câu hỏi cụ thể; không chạy lại một phân tích y hệt.
 
 Chỉ phân tích file tĩnh của bản mà người dùng có. Không can thiệp game đang chạy của người khác, không đụng server online.
 

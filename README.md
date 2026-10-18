@@ -118,7 +118,7 @@ Sau đó: `npm run gk -- config` (điền thông tin portal: gameCode, signed…
 1. ✅ Khung plugin (bản này)
 2. Adapter SDK thật: gmsdkv2, H5 Games Ads, CrazyGames, GameDistribution, Weegoo — chờ dữ liệu và tiêu chuẩn
 3. Pipeline UI và style, template preview, asset-spec, giao diện review
-4. Adapter engine Unity + script Ghidra headless
+4. Adapter engine Unity (đã có `unity scan`, skill `engine-unity`) + script Ghidra headless (đã có hướng dẫn trong `re-notes/references/ghidra-headless.md`; chưa có lệnh tự động)
 5. Tạo đồ hoạ và âm thanh qua Codex/OpenAI
 6. Engine còn lại
 7. QA, perf, store assets

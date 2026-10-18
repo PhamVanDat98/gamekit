@@ -16,7 +16,7 @@ description: Dùng khi game gốc làm bằng Unity, nhất là khi có source p
 GameKit xử lý từng điểm: (1) `gamekit unity scan` đọc giá trị serialized; (2) `src/core/unity/` có sẵn ngữ nghĩa Unity; (3) `Scheduler`; (4) `src/view/unity-space.ts`; (5) REPORT.md liệt kê; (6) `spec/port-map.yaml` + cổng `{auto: port-map}`; và oracle ghi thẳng từ Unity để kiểm.
 
 ## P1: quét trước, đọc sau
-1. `source.path` trong `game.yaml` trỏ tới **thư mục project** (có `Assets/`, `ProjectSettings/`). Chỉ có bản build (APK, WebGL, `_Data`): dùng skill **re-notes**, bỏ qua phần quét.
+1. `source.path` trong `game.yaml` trỏ tới **thư mục project** (có `Assets/`, `ProjectSettings/`). Chỉ có bản build (APK, WebGL, `_Data`): dùng skill **re-notes**. Bản IL2CPP: xuất project bằng AssetRipper rồi vẫn `gamekit unity scan` trên bản xuất để lấy giá trị inspector; logic lấy bằng Ghidra theo `re-notes/references/ghidra-headless.md`.
 2. `gamekit unity scan` (hoặc `--src <thư mục>`). Ra:
    - `notes/unity/REPORT.md` — settings, scene, camera/CanvasScaler, **Inspector ghi đè**, script và bẫy từng dòng, Animator, animation event, PPU, input axes.
    - `notes/unity/params-draft.json` — giá trị serialized ở dạng params, `source` = `file › object › Class.field`.

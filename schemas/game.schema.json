@@ -252,7 +252,7 @@
         "null"
       ],
       "additionalProperties": true,
-      "description": "Đường dẫn project Ghidra và trạng thái phân tích (dự án con 4)"
+      "description": "Project Ghidra và trạng thái phân tích (project, binary, names, analyzedAt) — skill re-notes, references/ghidra-headless.md"
     },
     "release": {
       "type": "object",
