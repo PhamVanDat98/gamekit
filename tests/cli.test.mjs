@@ -1067,3 +1067,14 @@ test('asset-manifest: audio needs no size; collider must be a param; brief witho
   gk(dir, 'provenance', 'add', 'assets/p.svg', '--label', 'own');
   assert.match(gk(dir, 'validate').out, /make image-gen nhưng assets\/p\.svg có nhãn own/);
 });
+
+test('validate: data/*.json converted from the original needs a source', () => {
+  const dir = newGame('dat');
+  write(dir, 'data/levels.json', JSON.stringify([{ id: 1 }]));
+  assert.match(gk(dir, 'validate').out, /data\/levels\.json: thiếu "source"/);
+  write(dir, 'data/levels.json', JSON.stringify({ source: 'TODO: level1.asset', levels: [] }));
+  assert.equal(gk(dir, 'validate').code, 0);
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 1);
+  write(dir, 'data/levels.json', JSON.stringify({ source: 'Assets/Levels/*.asset (scripts/import-levels.mjs)', levels: [] }));
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0);
+});

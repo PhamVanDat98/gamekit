@@ -1,6 +1,11 @@
 # Changelog
 
 ## Chưa phát hành
+P2 có hướng dẫn cho từng phần khó của việc dựng lại:
+- Skill `port-data` (chuyển level/bảng dữ liệu bằng script chạy lại được → `data/*.json`; `validate` chặn file `data/` thiếu `source`), `port-timing` (Update/coroutine/Invoke/tween/Animator → hẹn giờ và máy trạng thái theo tick), `port-physics` (tái hiện công thức gốc hay Box2D/planck, tích phân, thứ tự va chạm, đi xuyên, float32), `parity-debug` (tìm tick đầu tiên lệch, bảng dấu hiệu → nguyên nhân).
+- Template: `tests/support/trace.ts` (`recordTrace`, `firstDivergence`) có test.
+- `rebuild-game` thành skill điều phối của P2 (lộ trình 11 bước, skill nào lúc nào).
+
 Bộ skill đủ cho cả 6 pha (38 skill):
 - P1: một skill cho mỗi engine — `engine-unity`, `engine-cocos`, `engine-godot`, `engine-html5`, `engine-construct`, `engine-laya`, `engine-flash`, `engine-unreal`, `engine-gamemaker`, `engine-native` (engine `other`); `status` gợi ý đúng skill theo `source.engine` (engine chưa biết → `game-recon`). `ui-extract`.
 - P2: `runtime-select`. P3 (làm lại game người khác): `style-direction`, `style-preview`, `asset-spec`, `apply-style`, `replace-graphics`, `replace-audio`, `rename-and-text`. P4: `add-analytics`, `add-leaderboard`, `add-save`, `add-i18n`. P5: `store-assets`.

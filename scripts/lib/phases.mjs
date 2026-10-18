@@ -5,7 +5,7 @@ export const PHASES = ['P0', 'P1', 'P2', 'P3', 'P4', 'P5'];
 export const PHASE_INFO = {
   P0: { name: 'Intake', skills: ['game-recon', 'triage'], human: 'Bạn quyết định làm hay bỏ (triage).' },
   P1: { name: 'Phân tích', skills: ['engine-<engine>', 're-notes', 'asset-inventory', 'parity-check', 'ui-extract'] },
-  P2: { name: 'Dựng lại', skills: ['runtime-select', 'module-plan', 'rebuild-game', 'integrate', 'parity-check'] },
+  P2: { name: 'Dựng lại', skills: ['runtime-select', 'module-plan', 'rebuild-game', 'port-data', 'port-timing', 'port-physics', 'integrate', 'parity-check', 'parity-debug'] },
   P3: {
     name: 'Chuyển sang web',
     skills: ['web-relayout'],
@@ -42,7 +42,11 @@ export const AVAILABLE_SKILLS = new Set([
   'runtime-select',
   'module-plan',
   'rebuild-game',
+  'port-data',
+  'port-timing',
+  'port-physics',
   'integrate',
+  'parity-debug',
   // P3
   'web-relayout',
   'style-direction',

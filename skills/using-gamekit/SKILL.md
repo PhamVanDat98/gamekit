@@ -23,7 +23,7 @@ GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, 
 | --- | --- | --- | --- |
 | P0 Intake | `gamekit recon`: nhận diện engine, nơi chứa logic, SDK, danh mục cơ chế; chấm khả thi | game-recon, triage | Làm hay bỏ |
 | P1 Phân tích | Trích logic, số liệu, asset, UI từ game gốc; phủ hết danh mục cơ chế; lập nghĩa vụ parity | engine-\<engine\> (engine-unity, engine-cocos, engine-godot, engine-html5, engine-construct, engine-laya, engine-flash, engine-unreal, engine-gamemaker, engine-native), re-notes, asset-inventory, ui-extract, parity-check (§1) | Làm tiếp sau khi xem lại khả thi |
-| P2 Dựng lại | Dựng lại bằng JS/TS, chơi được (asset gốc nếu là game của người dùng, placeholder nếu làm lại) | runtime-select, module-plan, rebuild-game, integrate, parity-check | |
+| P2 Dựng lại | Dựng lại bằng JS/TS, chơi được (asset gốc nếu là game của người dùng, placeholder nếu làm lại) | rebuild-game (điều phối), runtime-select, module-plan, port-data, port-timing, port-physics, parity-check, parity-debug, integrate | |
 | P3 Chuyển sang web | Điều khiển, bố cục web, nén asset. `third-party`: thêm reskin | web-relayout; `third-party`: style-direction, style-preview, asset-spec, apply-style, replace-graphics, replace-audio, rename-and-text | Duyệt bố cục; `third-party`: chọn style |
 | P4 Tích hợp | SDK portal, analytics, leaderboard, save, ngôn ngữ | platform-sdk, add-analytics, add-leaderboard, add-save, add-i18n | |
 | P5 Phát hành | Đóng gói, smoke và hiệu năng, ảnh store, kiểm tra phát hành | package-web-build, qa-smoke, store-assets, release-check | Playtest cuối |
@@ -46,7 +46,7 @@ Cổng tự bỏ các mục `{only: …}` không áp cho game này.
 5. **Art brief** (`third-party`) mô tả thiết kế mới, không viết "vẽ lại nhân vật X của game gốc".
 
 ## Cấu trúc một game
-`src/core/` logic thuần, deterministic (không DOM, không render, `Rng` có seed, fixed timestep) · `src/view/` render + input, chỉ đọc state · `src/platform/` interface chung cho mọi portal · `src/contracts/` type dùng chung · `params/` số liệu có nguồn · `spec/` (gameplay spec, `obligations.yaml` nghĩa vụ parity, `oracles/` bảng từ game gốc) · `notes/` (`recon.md`, ghi chú RE, `QUESTIONS.md`, nhật ký `re-log.jsonl`, `assets.md`) · `spec/inventory.yaml` danh mục cơ chế · `gates/` · `DECISIONS.md` · `provenance.json` · `module-plan.yaml` (khi dựng song song).
+`src/core/` logic thuần, deterministic (không DOM, không render, `Rng` có seed, fixed timestep) · `src/view/` render + input, chỉ đọc state · `src/platform/` interface chung cho mọi portal · `src/contracts/` type dùng chung · `params/` số liệu có nguồn · `spec/` (gameplay spec, `obligations.yaml` nghĩa vụ parity, `oracles/` bảng từ game gốc) · `notes/` (`recon.md`, ghi chú RE, `QUESTIONS.md`, nhật ký `re-log.jsonl`, `assets.md`) · `spec/inventory.yaml` danh mục cơ chế · `data/` nội dung chuyển từ game gốc (có `source`) · `gates/` · `DECISIONS.md` · `provenance.json` · `module-plan.yaml` (khi dựng song song).
 
 ## Test
 - `core/` và adapter: **TDD** (dùng skill test-driven-development của Superpowers nếu có). Giá trị kỳ vọng lấy từ `params/` = game gốc, kèm `tolerance`.

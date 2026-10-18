@@ -40,6 +40,7 @@ export function validateGame(root, { stage } = {}) {
   const paramKeys = validateParams(root, st, pr);
   validateObligations(root, st, pr, paramKeys);
   validateOracles(root, pr);
+  validateData(root, st, pr);
   validateEvidence(root, pr);
   validateInventory(root, pr);
   validatePortalSettings(game, st, pr);
@@ -151,6 +152,25 @@ function validateOracles(root, pr) {
     } catch (e) {
       pr.error(where, e.message);
     }
+  }
+}
+
+// ---------- data/*.json: game content converted from the original (skill port-data) ----------
+function validateData(root, st, pr) {
+  const dir = path.join(root, 'data');
+  const strict = st >= PHASES.indexOf('P2');
+  for (const rel of walk(dir).filter((f) => f.endsWith('.json'))) {
+    const where = `data/${rel}`;
+    let d;
+    try {
+      d = readJson(path.join(dir, rel));
+    } catch (e) {
+      pr.error(where, e.message);
+      continue;
+    }
+    const src = d && typeof d === 'object' && !Array.isArray(d) ? String(d.source ?? '').trim() : '';
+    if (!src) pr.error(where, 'thiếu "source" (file/asset của game gốc mà dữ liệu này chuyển từ đó) — luật cứng: dữ liệu phải có nguồn');
+    else if (/^todo\b/i.test(src)) (strict ? pr.error : pr.warn).call(pr, where, 'source còn TODO');
   }
 }
 
