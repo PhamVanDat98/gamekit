@@ -14,7 +14,8 @@ export function translate(dict: Readonly<Record<string, unknown>>, code: string,
   }
   const s = dict[k];
   if (typeof s !== 'string') return key;
-  return s.replace(/\{(\w+)\}/g, (m, name: string) => (Object.hasOwn(params, name) ? String(params[name]) : m));
+  // Not Object.hasOwn: that is ES2022 and builds target es2020 (older portal webviews).
+  return s.replace(/\{(\w+)\}/g, (m, name: string) => (Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : m));
 }
 
 export const t = (key: string, params?: Params): string => translate(window.GM_LANG?.dict ?? {}, window.GM_LANG?.code ?? 'en', key, params);

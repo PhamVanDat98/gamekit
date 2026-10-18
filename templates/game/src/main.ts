@@ -85,6 +85,8 @@ async function main(): Promise<void> {
   let last = performance.now();
   let shown = false;
   const frame = (now: number) => {
+    // Scheduled first: one exception in a frame must not stop the game for good.
+    requestAnimationFrame(frame);
     const elapsed = (now - last) / MS;
     last = now;
     if (state === 'playing' && !bus.paused) {
@@ -112,7 +114,6 @@ async function main(): Promise<void> {
       shown = true;
       window.GM_LOADER?.ready(); // first frame on screen: the portal hides its loading screen
     }
-    requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
 }
