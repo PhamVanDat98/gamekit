@@ -9,7 +9,9 @@ import { requireGameRoot } from './lib/game.mjs';
 import { check } from './lib/schema.mjs';
 import { decisionIds, loadObligations, OBLIGATIONS_FILE } from './validate.mjs';
 
-export const CASE_KINDS = ['normal', 'edge', 'invalid', 'oracle', 'replay'];
+export const CASE_KINDS = ['normal', 'edge', 'invalid', 'oracle', 'replay', 'outcome'];
+export const FIDELITY = ['exact', 'close', 'outcome', 'feel'];
+const FIDELITY_LABEL = { exact: 'khớp tuyệt đối', close: 'khớp gần', outcome: 'khớp kết quả', feel: 'khớp cảm giác (người dùng duyệt)' };
 const TAG = /\[([a-z0-9][a-z0-9._-]*):([a-z-]+)\]/g;
 
 /** Vitest `--reporter=json` → [{ name, file, status }]; status is passed | failed | skipped | pending | todo. */
@@ -28,7 +30,8 @@ export function testsFromVitestReport(report) {
  *   closed  — every required case has a passing tagged test, and no tagged test is red or unrun
  *   open    — some case has no passing test        failed — a tagged test is red
  *   unknown — a tagged test was skipped/todo       waived — blocked/out-of-scope via an approved D-n
- * Only closed counts as verified; waived is recorded but never counts as closed.
+ *   accepted — fidelity feel: no numeric test, the user compared it with the original and approved a D-n
+ * closed and accepted satisfy the ledger (accepted is reported apart); waived never does.
  */
 export function evaluateParity({ obligations, tests, decisions = new Set() }) {
   const errors = [];
@@ -51,9 +54,16 @@ export function evaluateParity({ obligations, tests, decisions = new Set() }) {
     const failing = tagged.filter((t) => t.status === 'failed').map((t) => t.name);
     const unverified = tagged.filter((t) => t.status !== 'passed' && t.status !== 'failed').map((t) => t.name);
     const covered = new Set(tagged.filter((t) => t.status === 'passed').map((t) => t.kind));
-    const missing = o.cases.filter((c) => !covered.has(c));
+    const fidelity = o.fidelity ?? 'exact';
+    const missing = (o.cases ?? []).filter((c) => !covered.has(c));
     let state;
-    if (status !== 'active') {
+    if (fidelity === 'feel' && status === 'active') {
+      if (failing.length) state = 'failed';
+      else if (!o.decision || !decisions.has(o.decision) || !o.approved) {
+        state = 'open';
+        missing.push(`duyệt cảm giác (${o.decision ?? 'D-n'} + approved)`);
+      } else state = missing.length ? 'open' : 'accepted';
+    } else if (status !== 'active') {
       state = 'waived';
       if (!o.decision || !decisions.has(o.decision)) errors.push(`${o.id}: ${status} cần mục ${o.decision ?? 'D-n'} trong DECISIONS.md`);
       else if (!o.approved) errors.push(`${o.id}: ${status} (${o.decision}) chưa được người dùng duyệt`);
@@ -61,13 +71,14 @@ export function evaluateParity({ obligations, tests, decisions = new Set() }) {
     else if (unverified.length) state = 'unknown';
     else if (missing.length) state = 'open';
     else state = 'closed';
-    items.push({ id: o.id, title: o.title, required: o.required !== false, status, decision: o.decision, state, missing, failing, unverified });
+    items.push({ id: o.id, title: o.title, required: o.required !== false, status, fidelity, decision: o.decision, state, missing, failing, unverified });
   }
 
   const mustClose = items.filter((i) => i.required && i.state !== 'waived');
   if (!mustClose.length) errors.push('chưa có nghĩa vụ bắt buộc nào cần kiểm chứng — parity không chứng minh được gì');
-  const ok = errors.length === 0 && mustClose.length > 0 && mustClose.every((i) => i.state === 'closed');
-  return { ok, items, errors };
+  const ok = errors.length === 0 && mustClose.length > 0 && mustClose.every((i) => i.state === 'closed' || i.state === 'accepted');
+  const byFidelity = Object.fromEntries(FIDELITY.map((f) => [f, mustClose.filter((i) => i.fidelity === f && (i.state === 'closed' || i.state === 'accepted')).length]));
+  return { ok, items, errors, byFidelity };
 }
 
 const REPORT = '.gamekit/local/parity-report.json';
@@ -97,7 +108,7 @@ export function parityForGame(root, { report, cwd = root } = {}) {
 
 /** One line for gate output: what still blocks parity. */
 export function parityDetail(result) {
-  const open = result.items.filter((i) => i.required && !['closed', 'waived'].includes(i.state)).map((i) => `${i.id} (${i.state})`);
+  const open = result.items.filter((i) => i.required && !['closed', 'accepted', 'waived'].includes(i.state)).map((i) => `${i.id} (${i.state})`);
   return [...open, ...result.errors].slice(0, 5).join('; ');
 }
 
@@ -105,8 +116,9 @@ export async function run(args) {
   const root = requireGameRoot(args.cwd);
   const result = parityForGame(root, { report: args.report, cwd: args.cwd ?? process.cwd() });
   for (const i of result.items) {
-    const head = `${i.id} — ${i.title}${i.required ? '' : ' (tuỳ chọn)'}`;
+    const head = `${i.id} — ${i.title}${i.required ? '' : ' (tuỳ chọn)'}${i.fidelity !== 'exact' ? ` [${FIDELITY_LABEL[i.fidelity]}]` : ''}`;
     if (i.state === 'closed') log.ok(head);
+    else if (i.state === 'accepted') log.ok(`${head}: người dùng đã so cạnh bản gốc và duyệt (${i.decision})`);
     else if (i.state === 'waived') log.warn(`${head}: ${i.status} theo ${i.decision}, không tính là đã kiểm chứng`);
     else {
       const why = {
@@ -119,7 +131,9 @@ export async function run(args) {
   }
   for (const e of result.errors) log.fail(e);
   const must = result.items.filter((i) => i.required && i.state !== 'waived');
-  const closed = must.filter((i) => i.state === 'closed').length;
+  const closed = must.filter((i) => i.state === 'closed' || i.state === 'accepted').length;
   (result.ok ? log.ok : log.fail)(`parity: ${closed}/${must.length} nghĩa vụ bắt buộc đã đóng`);
+  const mix = FIDELITY.filter((f) => result.byFidelity[f]).map((f) => `${FIDELITY_LABEL[f]} ${result.byFidelity[f]}`);
+  if (mix.length) log.info(`  theo mức khớp: ${mix.join(' · ')}`);
   return result.ok ? 0 : 1;
 }

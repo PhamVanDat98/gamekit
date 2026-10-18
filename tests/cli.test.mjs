@@ -1078,3 +1078,83 @@ test('validate: data/*.json converted from the original needs a source', () => {
   write(dir, 'data/levels.json', JSON.stringify({ source: 'Assets/Levels/*.asset (scripts/import-levels.mjs)', levels: [] }));
   assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0);
 });
+
+// ---------- 2D/3D, physics, fidelity ----------
+test('recon: 2D/3D and physics kind from the types a game uses; triage weighs 3D rigidbody; game.yaml keeps it', () => {
+  const build = (refs) => {
+    const d = tmpDir();
+    fs.mkdirSync(path.join(d, 'G_Data', 'Managed'), { recursive: true });
+    fs.writeFileSync(path.join(d, 'G_Data', 'Managed', 'Assembly-CSharp.dll'), fakeAssembly([{ name: 'Ball', base: 'UnityEngine.MonoBehaviour', methods: 2 }], refs));
+    return d;
+  };
+  let r = JSON.parse(gk(tmpDir(), 'recon', build(['UnityEngine.Rigidbody', 'UnityEngine.MeshRenderer']), '--json').out);
+  assert.deepEqual([r.physics.dimension, r.physics.physics], ['3d', 'rigidbody']);
+  const space = r.triage.factors.find((f) => f.name === 'Không gian, vật lý');
+  assert.equal(space.value, 2.5);
+  assert.equal(r.triage.verdict.level, 'pilot', 'a small 3D rigidbody game still gets a pilot first');
+  r = JSON.parse(gk(tmpDir(), 'recon', build(['UnityEngine.CharacterController']), '--json').out);
+  assert.deepEqual([r.physics.dimension, r.physics.physics], ['3d', 'kinematic']);
+  r = JSON.parse(gk(tmpDir(), 'recon', build(['UnityEngine.Rigidbody2D', 'UnityEngine.SpriteRenderer']), '--json').out);
+  assert.deepEqual([r.physics.dimension, r.physics.physics], ['2d', 'rigidbody']);
+  r = JSON.parse(gk(tmpDir(), 'recon', build([]), '--json').out);
+  assert.equal(r.physics, null);
+  assert.ok(r.unknowns.some((u) => /2D hay 3D/.test(u)));
+
+  // IL2CPP: dump.cs tells (only the game's own code counts), game.yaml keeps it for the build's triage
+  const dir = newGame('phy');
+  write(dir, 'dump.cs', [
+    '// Image 0: UnityEngine.PhysicsModule.dll - 0', '// Image 1: Assembly-CSharp.dll - 10',
+    '// Namespace: UnityEngine', 'public class Rigidbody : Component // TypeDefIndex: 2', '\tpublic Vector3 velocity;',
+    '// Namespace: ', 'public class Car : MonoBehaviour // TypeDefIndex: 11', '\tprivate WheelCollider frontLeft;', '\tprivate Rigidbody body;',
+  ].join('\n'));
+  assert.equal(gk(dir, 'recon', 'dump.cs', '--write').code, 0);
+  let g = YAML.parse(read(dir, 'game.yaml'));
+  assert.deepEqual([g.source.dimension, g.source.physics], ['3d', 'rigidbody']);
+  write(dir, 'dump.cs', ['// Image 0: UnityEngine.PhysicsModule.dll - 0', '// Image 1: Assembly-CSharp.dll - 10', '// Namespace: UnityEngine', 'public class Rigidbody : Component // TypeDefIndex: 2', '// Namespace: ', 'public class Hud : MonoBehaviour // TypeDefIndex: 11', '\tprivate SpriteRenderer icon;'].join('\n'));
+  r = JSON.parse(gk(dir, 'recon', 'dump.cs', '--json').out);
+  assert.deepEqual([r.physics.dimension, r.physics.physics], ['2d', 'kinematic'], 'engine types in other images are ignored');
+  const apk = tmpDir();
+  write(apk, 'GameAssembly.dll', 'x');
+  write(apk, 'G_Data/il2cpp_data/Metadata/global-metadata.dat', 'x');
+  r = JSON.parse(gk(dir, 'recon', apk, '--json').out);
+  assert.equal(r.physics.fromGame, true, 'IL2CPP build recon reuses what dump.cs found');
+  assert.equal(r.triage.factors.find((f) => f.name === 'Không gian, vật lý').value, 2.5);
+});
+
+test('parity: fidelity — feel closes only with an approved D-n, outcome needs an outcome case, report by fidelity', () => {
+  const pass = (name) => ({ name, status: 'passed' });
+  const obligations = [
+    { id: 'score.combo', title: 'combo', cases: ['normal'] },
+    { id: 'car.handling', title: 'lái', cases: ['normal'], fidelity: 'close' },
+    { id: 'crate.topple', title: 'thùng đổ', cases: ['outcome'], fidelity: 'outcome' },
+    { id: 'debris.fx', title: 'mảnh vỡ', fidelity: 'feel', decision: 'D-2' },
+  ];
+  const tests = [pass('[score.combo:normal] x'), pass('[car.handling:normal] y'), pass('[crate.topple:outcome] z')];
+  let r = evaluateParity({ obligations, tests, decisions: new Set(['D-2']) });
+  assert.equal(r.ok, false);
+  assert.equal(r.items.find((i) => i.id === 'debris.fx').state, 'open', 'feel without approval stays open');
+  obligations[3].approved = true;
+  r = evaluateParity({ obligations, tests, decisions: new Set(['D-2']) });
+  assert.equal(r.ok, true);
+  assert.equal(r.items.find((i) => i.id === 'debris.fx').state, 'accepted');
+  assert.deepEqual(r.byFidelity, { exact: 1, close: 1, outcome: 1, feel: 1 });
+
+  const dir = newGame('fid');
+  const ob = YAML.parse(read(dir, 'spec/obligations.yaml'));
+  ob.obligations.push(
+    { id: 'crate.topple', title: 'thùng đổ', cases: ['normal'], fidelity: 'outcome' },
+    { id: 'car.handling', title: 'lái', cases: ['normal'], fidelity: 'close', params: ['player.size'] },
+    { id: 'debris.fx', title: 'mảnh vỡ', fidelity: 'feel' },
+  );
+  write(dir, 'spec/obligations.yaml', YAML.stringify(ob));
+  const out = gk(dir, 'validate').out;
+  assert.match(out, /crate\.topple: fidelity outcome cần case "outcome"/);
+  assert.match(out, /car\.handling: fidelity close cần sai số/);
+  assert.match(out, /debris\.fx: fidelity feel .* cần decision D-n/);
+  ob.obligations.at(-3).cases = ['outcome'];
+  ob.obligations.at(-2).params = ['player.speed']; // has a tolerance in the template
+  Object.assign(ob.obligations.at(-1), { decision: 'D-1', approved: true });
+  write(dir, 'spec/obligations.yaml', YAML.stringify(ob));
+  fs.appendFileSync(path.join(dir, 'DECISIONS.md'), '\n## D-1 Mảnh vỡ dùng Rapier, không khớp quỹ đạo PhysX\n');
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0, gk(dir, 'validate', '--stage', 'P2').out);
+});

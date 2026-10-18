@@ -90,7 +90,7 @@ export const editYaml = (dir, fn) => {
  * Minimal .NET metadata (no PE wrapper) defining `types`: [{ ns, name, base, methods }].
  * `base` = 'UnityEngine.MonoBehaviour' | 'System.Object' | 'System.ValueType' | name of another type here.
  */
-export function fakeAssembly(types) {
+export function fakeAssembly(types, extraRefs = []) {
   const strings = [0];
   const strIndex = new Map();
   const s = (v) => {
@@ -102,7 +102,7 @@ export function fakeAssembly(types) {
     return strIndex.get(v);
   };
   const local = new Map(types.map((t, i) => [t.name, i + 2])); // TypeDef rows: 1 = <Module>
-  const refs = [...new Set(types.map((t) => t.base).filter((b) => b && !local.has(b)))];
+  const refs = [...new Set([...types.map((t) => t.base).filter((b) => b && !local.has(b)), ...extraRefs])];
   const u16 = (v) => Buffer.from([v & 255, v >> 8]);
   const u32 = (v) => { const b = Buffer.alloc(4); b.writeUInt32LE(v); return b; };
   const totalMethods = types.reduce((n, t) => n + (t.methods ?? 0), 0);

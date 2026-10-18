@@ -24,6 +24,12 @@ Nghĩa vụ là **đầu ra của RE**: lập ở cuối P1, trước khi viết
 - Chia theo hành vi, không theo file code. Một nghĩa vụ nên kiểm chứng được bằng vài test.
 - `cases`: `normal` (giá trị điển hình) · `edge` (biên: tường, máu 0, max level, dt lớn) · `invalid` (input sai, save hỏng) · `oracle` (bảng từ game gốc) · `replay` (luồng chơi ghi lại).
 - `required: false` cho thứ có thì tốt (hiệu ứng phụ). Mặc định là bắt buộc.
+- `fidelity` — mức khớp bản gốc cần có (mặc định `exact`):
+  - `exact`: khớp tuyệt đối — luật, điểm, hẹn giờ, RNG, dữ liệu;
+  - `close`: khớp gần — `validate` đòi `tolerance` trong params liên quan hoặc oracle;
+  - `outcome`: chỉ kiểm kết quả/khoảng qua nhiều seed (va chạm rigidbody 3D) — phải có case `outcome`;
+  - `feel`: không có test số, người chơi so cạnh bản gốc — cần `decision: D-n` + `approved: true` (chỉ người dùng đặt), `cases` không bắt buộc.
+  Đừng hạ mức để cho xanh: `close`/`outcome`/`feel` chỉ khi khớp chặt hơn thật sự không làm được (skill port-physics §5) — ghi lý do trong ghi chú.
 - Không làm được hoặc không làm: `status: blocked | out-of-scope`, kèm `decision: D-n` trong `DECISIONS.md`. Chỉ người dùng đặt `approved: true`. Nghĩa vụ bỏ qua được ghi lại, **không bao giờ tính là đã đóng**.
 
 `gamekit validate` kiểm tra schema, id trùng, `params` có tồn tại, file oracle có thật.
@@ -58,9 +64,12 @@ Giá trị kỳ vọng lấy từ `params/` hoặc oracle, **không** gõ lại 
 | failed | có test đỏ | sửa `core/` (không sửa số kỳ vọng cho khớp) |
 | unknown | có test skip/todo | chạy thật hoặc bỏ test đó |
 | waived | blocked/out-of-scope theo D-n | chờ người dùng duyệt |
+| accepted | `fidelity: feel`, người dùng đã duyệt D-n | xong — báo riêng là khớp cảm giác |
+
+Cuối báo cáo, `gamekit parity` in số nghĩa vụ theo mức khớp (tuyệt đối · gần · kết quả · cảm giác).
 
 ## 5. Test xanh có thật sự bắt lỗi không?
 Test xanh có thể chỉ đang so một giá trị với chính nó. Với mỗi nghĩa vụ quan trọng, phá thử một lần: đổi một giá trị trong `params/` hoặc một dòng oracle, chạy `gamekit parity`, phải thấy nghĩa vụ đó đỏ. Xong thì hoàn tác. Nếu vẫn xanh, test chưa chạm tới hành vi thật: viết lại test.
 
 ## 6. Báo cáo
-Báo người dùng: số nghĩa vụ bắt buộc đã đóng / tổng, các nghĩa vụ bỏ qua kèm D-n, các nghĩa vụ chỉ dựa trên `inferred` hoặc `derived`, và những gì **chưa** kiểm chứng. Chỉ báo những lệnh đã thật sự chạy.
+Báo người dùng: số nghĩa vụ bắt buộc đã đóng / tổng, chia theo `fidelity`, các nghĩa vụ bỏ qua kèm D-n, các nghĩa vụ chỉ dựa trên `inferred` hoặc `derived`, và những gì **chưa** kiểm chứng. Chỉ báo những lệnh đã thật sự chạy.

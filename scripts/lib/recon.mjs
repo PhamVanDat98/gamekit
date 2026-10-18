@@ -5,7 +5,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { dotnetTypes, godotPck, zipEntries, zipRead } from './binfmt.mjs';
+import { dotnetMetadata, godotPck, zipEntries, zipRead } from './binfmt.mjs';
+
+export const PHYSICS_LABEL = { rigidbody: 'rigidbody (bộ giải vật lý quyết định chuyển động)', kinematic: 'do code điều khiển (character controller/tự viết)', none: 'không thấy' };
 
 const ZIP_EXT = /\.(apk|aab|ipa|zip|xapk|apks|jar|nupkg|whl)$/i;
 const MAX_FILES = 200000;
@@ -115,7 +117,7 @@ const LIB_NS = /^(DG\.Tweening|TMPro|Spine|Photon|PlayFab|Firebase|GoogleMobileA
 
 /** Gameplay-relevant types of a managed assembly → inventory items. */
 export function inventoryFromAssembly(buf, where) {
-  const types = dotnetTypes(buf);
+  const types = dotnetMetadata(buf)?.types;
   if (!types) return null;
   return types
     .filter((x) => (x.kind === 'class' || x.kind === 'struct') && !/Attribute$/.test(x.base ?? '') && !LIB_NS.test(x.ns))
@@ -197,6 +199,86 @@ const scriptItems = (paths, where) => {
   return out;
 };
 
+// ---------- 2D or 3D, and how things move ----------
+// Names a game's own code uses. `rigid*` = simulated bodies (a physics solver decides the motion);
+// `kin*` = motion written by the game (character controller, nav agent); `any*` = only says 2D or 3D.
+const PHYSICS_NAMES = {
+  unity: {
+    rigid3d: ['Rigidbody', 'WheelCollider', 'ConfigurableJoint', 'HingeJoint', 'FixedJoint', 'SpringJoint', 'CharacterJoint', 'ArticulationBody'],
+    kin3d: ['CharacterController', 'NavMeshAgent'],
+    any3d: ['BoxCollider', 'SphereCollider', 'CapsuleCollider', 'MeshCollider', 'MeshRenderer', 'SkinnedMeshRenderer', 'MeshFilter', 'Physics'],
+    rigid2d: ['Rigidbody2D', 'HingeJoint2D', 'DistanceJoint2D', 'SpringJoint2D', 'WheelJoint2D', 'SliderJoint2D', 'FixedJoint2D'],
+    any2d: ['Collider2D', 'BoxCollider2D', 'CircleCollider2D', 'PolygonCollider2D', 'CapsuleCollider2D', 'EdgeCollider2D', 'Physics2D', 'SpriteRenderer', 'Tilemap'],
+  },
+  godot: {
+    rigid3d: ['RigidBody3D', 'VehicleBody3D', 'VehicleBody', 'RigidBody'],
+    kin3d: ['CharacterBody3D', 'KinematicBody'],
+    any3d: ['Node3D', 'Spatial', 'MeshInstance3D', 'MeshInstance', 'Camera3D'],
+    rigid2d: ['RigidBody2D'],
+    any2d: ['CharacterBody2D', 'KinematicBody2D', 'Node2D', 'Sprite2D', 'Sprite', 'TileMap'],
+  },
+  'cocos:creator-3': {
+    rigid3d: ['RigidBody'],
+    kin3d: ['CharacterController'],
+    any3d: ['MeshRenderer', 'SkinnedMeshRenderer', 'BoxCollider', 'SphereCollider', 'CapsuleCollider'],
+    rigid2d: ['RigidBody2D'],
+    any2d: ['Collider2D', 'BoxCollider2D', 'CircleCollider2D', 'PolygonCollider2D', 'PhysicsSystem2D'],
+  },
+  cocos: {
+    rigid3d: [],
+    kin3d: [],
+    any3d: ['MeshRenderer', 'SkinnedMeshRenderer'],
+    rigid2d: ['RigidBody', 'PhysicsBoxCollider', 'PhysicsCircleCollider', 'PhysicsPolygonCollider'],
+    any2d: ['BoxCollider', 'CircleCollider', 'PolygonCollider', 'Sprite'],
+  },
+};
+// Web libraries bundled in an HTML5 build, by file name.
+const PHYSICS_LIBS = [
+  [/three[\w.-]*\.js$|babylon[\w.-]*\.js$/i, 'any3d', 'three/babylon'],
+  [/cannon[\w.-]*\.js$|ammo[\w.-]*\.(js|wasm)$|rapier3d|oimo[\w.-]*\.js$/i, 'rigid3d', 'cannon/ammo/rapier3d/oimo'],
+  [/matter[\w.-]*\.js$|planck[\w.-]*\.js$|box2d[\w.-]*\.(js|wasm)$|p2[\w.-]*\.js$/i, 'rigid2d', 'matter/planck/box2d/p2'],
+  [/phaser[\w.-]*\.js$|pixi[\w.-]*\.js$/i, 'any2d', 'phaser/pixi'],
+];
+
+/** Names (Unity type refs, identifiers in source, node types) → { dimension, physics, signals } or null. */
+export function classifyPhysics(names, table) {
+  const found = {};
+  for (const [group, list] of Object.entries(table)) {
+    const hits = list.filter((n) => names.has(n));
+    if (hits.length) found[group] = hits;
+  }
+  const signals = [...new Set(Object.values(found).flat())];
+  if (!signals.length) return null;
+  const is3d = Boolean(found.rigid3d || found.kin3d || found.any3d);
+  const is2d = Boolean(found.rigid2d || found.any2d);
+  const dimension = is3d && (!is2d || found.rigid3d || found.kin3d) ? '3d' : '2d';
+  const rigid = dimension === '3d' ? found.rigid3d : found.rigid2d;
+  const physics = rigid ? 'rigidbody' : dimension === '3d' ? (found.kin3d || found.any3d ? 'kinematic' : 'none') : 'kinematic';
+  return { dimension, physics, signals, mixed: is3d && is2d };
+}
+
+const identifiers = (text, table) => {
+  const all = [...new Set(Object.values(table).flat())];
+  if (!all.length) return new Set();
+  const re = new RegExp(`\\b(${all.join('|')})\\b`, 'g');
+  return new Set(text.match(re) ?? []);
+};
+
+/** Text of the game's own types in an Il2CppDumper dump.cs (Assembly-CSharp.dll only). */
+function gameCodeFromDump(text) {
+  const images = [...text.matchAll(/^\/\/ Image \d+: (.+?) - (\d+)/gm)].map((m) => ({ name: m[1], start: Number(m[2]) })).sort((a, b) => a.start - b.start);
+  if (!images.length) return text;
+  const imageOf = (idx) => images.filter((i) => i.start <= idx).at(-1)?.name;
+  const keep = [];
+  let inGame = false;
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/\/\/ TypeDefIndex: (\d+)/);
+    if (m) inGame = imageOf(Number(m[1])) === 'Assembly-CSharp.dll';
+    if (inGame) keep.push(line);
+  }
+  return keep.join('\n');
+}
+
 // ---------- tools ----------
 const TOOLS = {
   'unity:source': ['đọc thẳng Assets/**/*.cs', 'Unity Editor để chạy và đo (game của bạn)'],
@@ -254,13 +336,17 @@ export function recon(target) {
   if (t.kind === 'file') {
     const name = path.basename(t.root);
     if (/\.dll$/i.test(name)) {
-      const items = inventoryFromAssembly(t.read(name), name);
+      const buf = t.read(name);
+      const items = inventoryFromAssembly(buf, name);
       if (!items) throw new Error(`${name} không phải assembly .NET (không có metadata)`);
-      Object.assign(r, { inventoryOnly: true, inventory: { source: name, items } });
+      const refs = new Set(dotnetMetadata(buf).refs.map((n) => n.split('.').pop()));
+      Object.assign(r, { inventoryOnly: true, inventory: { source: name, items }, physics: classifyPhysics(refs, PHYSICS_NAMES.unity) });
       return r;
     }
     if (/\.cs$/i.test(name)) {
-      Object.assign(r, { inventoryOnly: true, inventory: { source: name, items: inventoryFromDump(t.read(name).toString('utf8'), name) } });
+      const text = t.read(name).toString('utf8');
+      const physics = classifyPhysics(identifiers(gameCodeFromDump(text), PHYSICS_NAMES.unity), PHYSICS_NAMES.unity);
+      Object.assign(r, { inventoryOnly: true, inventory: { source: name, items: inventoryFromDump(text, name) }, physics });
       return r;
     }
     if (/\.pck$/i.test(name)) {
@@ -301,13 +387,16 @@ export function recon(target) {
     r.logic = [`Assets/**/*.cs (${scripts.length} file)`];
     r.data = ['Assets/ (scene, prefab, ScriptableObject)'];
     r.inventory = { source: 'Assets/**/*.cs', items: inventoryFromCSharpSources(t, scripts) };
+    const names = new Set();
+    for (const f of scripts) for (const n of identifiers(tryRead(t, f.rel, 2 << 20)?.toString('utf8') ?? '', PHYSICS_NAMES.unity)) names.add(n);
+    r.physics = classifyPhysics(names, PHYSICS_NAMES.unity);
   } else if (metadata || has(/(^|\/)(GameAssembly\.dll|libil2cpp\.so)$/)) {
     Object.assign(r, { engine: 'unity', variant: 'il2cpp' });
     r.logic = [has(/(^|\/)(GameAssembly\.dll|libil2cpp\.so)$/), metadata].filter(Boolean);
     r.data = dataDirs(rels);
     if (metadata) {
       const head = tryRead(t, metadata, 8);
-      if (head && head.readUInt32LE(0) === 0xfab11baf) signal('info', `global-metadata.dat bình thường (v${head.readUInt32LE(4)}) — Il2CppDumper/Cpp2IL dùng được`);
+      if (head && head.length >= 8 && head.readUInt32LE(0) === 0xfab11baf) signal('info', `global-metadata.dat bình thường (v${head.readUInt32LE(4)}) — Il2CppDumper/Cpp2IL dùng được`);
       else {
         signal('risk', 'global-metadata.dat không có magic FAB11BAF — có thể đã mã hoá hoặc đổi định dạng; Il2CppDumper sẽ không chạy thẳng');
         r.obfuscated = true;
@@ -324,6 +413,8 @@ export function recon(target) {
     r.engineVersion = unityVersionFrom(/(^|\/)(globalgamemanagers|data\.unity3d|level0|unity default resources)$/);
     const buf = tryRead(t, managed[0].rel, 128 << 20);
     const items = buf && inventoryFromAssembly(buf, managed[0].rel);
+    const md = buf && dotnetMetadata(buf);
+    if (md) r.physics = classifyPhysics(new Set(md.refs.map((n) => n.split('.').pop())), PHYSICS_NAMES.unity);
     if (items) r.inventory = { source: managed[0].rel, items };
     else r.unknowns.push(`không đọc được metadata của ${managed[0].rel}`);
     if (buf) {
@@ -348,6 +439,9 @@ export function recon(target) {
     r.logic = [`*.gd (${gd.length} file)`];
     r.data = ['*.tscn, *.tres'];
     r.inventory = { source: '*.gd', items: scriptItems(gd.map((f) => f.rel), 'project') };
+    const names = new Set();
+    for (const f of all(/\.(tscn|gd)$/).slice(0, 2000)) for (const n of identifiers(tryRead(t, f.rel, 1 << 20)?.toString('utf8') ?? '', PHYSICS_NAMES.godot)) names.add(n);
+    r.physics = classifyPhysics(names, PHYSICS_NAMES.godot);
   } else if (has(/\.pck$/i) || has(/(^|\/)libgodot_android\.so$/)) {
     Object.assign(r, { engine: 'godot', variant: 'pck' });
     const pckRel = has(/\.pck$/i);
@@ -378,6 +472,11 @@ export function recon(target) {
       signal('risk', `${jsc.length} script .jsc đã mã hoá (xxtea) — cần khoá trong libcocos2djs.so trước khi đọc được`);
     }
     const items = inventoryFromCocos(t, bundles);
+    const table = PHYSICS_NAMES[`cocos:${r.variant}`] ?? PHYSICS_NAMES.cocos;
+    const names = new Set();
+    for (const f of [...bundles, ...(engineJs ? [{ rel: engineJs }] : [])].slice(0, 60))
+      for (const n of identifiers(tryRead(t, f.rel, 16 << 20)?.toString('latin1') ?? '', table)) names.add(n);
+    r.physics = classifyPhysics(names, table);
     if (items.length) r.inventory = { source: 'cc._RF.push / @ccclass', items };
     else r.unknowns.push('không lấy được danh sách component từ bundle (đã mã hoá hoặc build lạ)');
   } else if (has(/(^|\/)c3runtime\.js$/) || has(/(^|\/)c2runtime\.js$/)) {
@@ -406,6 +505,13 @@ export function recon(target) {
     const libs = { phaser: /phaser[\w.-]*\.js$/i, pixi: /pixi[\w.-]*\.js$/i, three: /three[\w.-]*\.js$/i, createjs: /(createjs|easeljs)[\w.-]*\.js$/i };
     r.variant = Object.keys(libs).find((k) => has(libs[k])) ?? 'js';
     r.logic = all(/\.js$/).sort((a, b) => b.size - a.size).slice(0, 5).map((f) => f.rel);
+    const bundled = new Set();
+    const table = { rigid3d: [], kin3d: [], any3d: [], rigid2d: [], any2d: [] };
+    for (const [re, group, label] of PHYSICS_LIBS) if (has(re)) {
+      bundled.add(label);
+      table[group].push(label);
+    }
+    r.physics = classifyPhysics(bundled, table);
   } else if (has(/\.(exe|so|dylib|elf)$/i)) {
     Object.assign(r, { engine: 'other', variant: 'native' });
     r.logic = all(/\.(exe|so|dll|dylib)$/i).sort((a, b) => b.size - a.size).slice(0, 4).map((f) => f.rel);
@@ -424,6 +530,13 @@ export function recon(target) {
       } else r.obfuscated ??= false;
     }
   }
+  if (r.physics) {
+    const p = r.physics;
+    r.signals.push({
+      level: p.dimension === '3d' && p.physics === 'rigidbody' ? 'risk' : 'info',
+      text: `${p.dimension.toUpperCase()}, vật lý ${PHYSICS_LABEL[p.physics]} (${p.signals.slice(0, 6).join(', ')})${p.mixed ? ' — có cả dấu hiệu 2D và 3D' : ''}`,
+    });
+  } else if (r.engine !== 'unknown') r.unknowns.push('2D hay 3D, loại vật lý — code không tham chiếu tới gì nhận ra được (vật lý chỉ gắn trong prefab/scene thì recon không thấy)');
   if (r.engine === 'unknown') r.unknowns.push('engine');
   if (!r.engineVersion && r.engine !== 'unknown') r.unknowns.push('phiên bản engine');
   return finish(r, rels);

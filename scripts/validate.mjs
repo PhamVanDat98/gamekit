@@ -76,7 +76,7 @@ function validateParams(root, st, pr) {
   const files = walk(dir).filter((f) => f.endsWith('.json'));
   const strict = st >= PHASES.indexOf('P2'); // from P2 on, no TODO sources and no unapproved deviations
   const decisions = decisionIds(root);
-  const keys = new Set();
+  const keys = new Map(); // key → param, so obligations can check tolerances
   for (const rel of files) {
     const where = `params/${rel}`;
     let data;
@@ -89,7 +89,7 @@ function validateParams(root, st, pr) {
     for (const e of check('params', data)) pr.error(where, e);
     const stem = rel.replace(/\.json$/, '').replaceAll('/', '.');
     for (const [key, p] of collectParams(data)) {
-      keys.add(key).add(`${stem}.${key}`);
+      keys.set(key, p).set(`${stem}.${key}`, p);
       const src = String(p.source ?? '').trim();
       if (!src) pr.error(where, `${key}: thiếu source (luật cứng: số liệu phải có nguồn từ game gốc)`);
       else if (/^todo\b/i.test(src)) (strict ? pr.error : pr.warn).call(pr, where, `${key}: source còn TODO`);
@@ -134,7 +134,25 @@ function validateObligations(root, st, pr, paramKeys) {
     seen.add(o.id);
     for (const k of o.params ?? []) if (!paramKeys.has(k)) pr.error(where, `${o.id}: params ${k} không có trong params/`);
     if (o.oracle && !exists(path.join(root, o.oracle))) pr.error(where, `${o.id}: không có file oracle ${o.oracle}`);
-    if ((o.status ?? 'active') !== 'active') {
+    const fidelity = o.fidelity ?? 'exact';
+    if (fidelity === 'outcome' && !(o.cases ?? []).includes('outcome'))
+      pr.error(where, `${o.id}: fidelity outcome cần case "outcome" (test kiểm kết quả/khoảng qua nhiều seed)`);
+    if (fidelity === 'close') {
+      let oracleTol = false;
+      try {
+        oracleTol = Boolean(o.oracle && readJson(path.join(root, o.oracle)).tolerance != null);
+      } catch {
+        /* reported above or by validateOracles */
+      }
+      const paramTol = (o.params ?? []).some((k) => paramKeys.get(k)?.tolerance != null);
+      if (!oracleTol && !paramTol) pr.error(where, `${o.id}: fidelity close cần sai số ghi rõ — tolerance trong params liên quan hoặc trong oracle`);
+    }
+    if (fidelity === 'feel') {
+      if (!o.decision) pr.error(where, `${o.id}: fidelity feel (không test số) cần decision D-n trong DECISIONS.md nói vì sao không khớp số được`);
+      else if (!decisions.has(o.decision)) pr.error(where, `${o.id}: trỏ tới ${o.decision} nhưng DECISIONS.md không có mục này`);
+      if (!o.approved) (strict ? pr.error : pr.warn).call(pr, where, `${o.id}: fidelity feel chưa được người dùng duyệt (chơi so cạnh bản gốc rồi đặt approved: true)`);
+    }
+    if ((o.status ?? 'active') !== 'active' && fidelity !== 'feel') {
       if (!o.decision) pr.error(where, `${o.id}: ${o.status} cần decision D-n trong DECISIONS.md`);
       else if (!decisions.has(o.decision)) pr.error(where, `${o.id}: trỏ tới ${o.decision} nhưng DECISIONS.md không có mục này`);
       if (!o.approved) (strict ? pr.error : pr.warn).call(pr, where, `${o.id}: ${o.status} chưa được người dùng duyệt (${o.decision ?? 'thiếu D-n'})`);

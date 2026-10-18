@@ -82,6 +82,23 @@
           ],
           "description": "Dạng build/scripting do gamekit recon nhận ra: source, mono, il2cpp, webgl, pck, creator-2, creator-3, native, c3, c2, swf, pak, bytecode, js…"
         },
+        "dimension": {
+          "enum": [
+            "2d",
+            "3d",
+            null
+          ],
+          "description": "gamekit recon: 2D hay 3D theo code của game"
+        },
+        "physics": {
+          "enum": [
+            "rigidbody",
+            "kinematic",
+            "none",
+            null
+          ],
+          "description": "gamekit recon: rigidbody = bộ giải vật lý quyết định chuyển động; kinematic = code game tự điều khiển (character controller, tự viết)"
+        },
         "path": {
           "type": [
             "string",

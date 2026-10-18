@@ -1,6 +1,13 @@
 # Changelog
 
 ## Chưa phát hành
+Game 3D và vật lý: đặt kỳ vọng đúng từ P0, đo đúng mức ở P2:
+- `recon` nhận ra 2D/3D và loại vật lý (rigidbody / do code điều khiển) từ type mà code của game dùng: tham chiếu trong `Assembly-CSharp.dll`, `dump.cs` (chỉ code của game), script Unity/Godot, bundle Cocos, thư viện JS. Ghi `source.dimension`, `source.physics`; recon bản build IL2CPP dùng lại kết quả từ dump.
+- `triage` có hệ số "Không gian, vật lý" (3D rigidbody ×2.5, luôn ít nhất "chạy thử"); số ngày P2/P3 tính theo.
+- Nghĩa vụ có `fidelity`: `exact` · `close` (validate đòi tolerance) · `outcome` (case mới `outcome`, kiểm kết quả qua nhiều seed) · `feel` (không test số, cần D-n + người dùng duyệt). `gamekit parity` báo số nghĩa vụ theo từng mức.
+- `port-physics`: port theo từng cơ chế với thứ tự gợi ý cho platformer, phá gạch, ném, đua xe, runner 3D; phần riêng cho game 3D.
+- Sửa: recon không còn lỗi khi `global-metadata.dat` ngắn hơn 8 byte.
+
 P2 có hướng dẫn cho từng phần khó của việc dựng lại:
 - Skill `port-data` (chuyển level/bảng dữ liệu bằng script chạy lại được → `data/*.json`; `validate` chặn file `data/` thiếu `source`), `port-timing` (Update/coroutine/Invoke/tween/Animator → hẹn giờ và máy trạng thái theo tick), `port-physics` (tái hiện công thức gốc hay Box2D/planck, tích phân, thứ tự va chạm, đi xuyên, float32), `parity-debug` (tìm tick đầu tiên lệch, bảng dấu hiệu → nguyên nhân).
 - Template: `tests/support/trace.ts` (`recordTrace`, `firstDivergence`) có test.

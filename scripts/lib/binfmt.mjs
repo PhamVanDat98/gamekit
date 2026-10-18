@@ -109,7 +109,10 @@ function metadataOffset(buf) {
  * `base` is the base type's full name; `kind` = class | struct | enum | interface | delegate.
  * Nested and compiler-generated types are left out. Returns null when the file has no metadata.
  */
-export function dotnetTypes(buf) {
+export const dotnetTypes = (buf) => dotnetMetadata(buf)?.types ?? null;
+
+/** { types, refs }: the types above plus every type the assembly references (full names, e.g. UnityEngine.Rigidbody). */
+export function dotnetMetadata(buf) {
   const root = metadataOffset(buf);
   if (root < 0) return null;
   const verLen = buf.readUInt32LE(root + 12);
@@ -221,7 +224,7 @@ export function dotnetTypes(buf) {
       b = byName.get(b)?.base;
     }
   }
-  return out;
+  return { types: out, refs: [...new Set(refs)] };
 }
 
 // ---------- Godot .pck ----------

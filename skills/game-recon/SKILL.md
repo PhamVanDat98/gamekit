@@ -15,7 +15,7 @@ Không có đường dẫn thì dùng `source.path` trong `game.yaml`. Đưa **b
 
 `--write` ghi:
 - `notes/recon.md`: báo cáo, kèm đánh giá khả thi. Phần dưới "Ghi chú thêm" được giữ khi chạy lại.
-- `game.yaml`: `source.engine` (chỉ khi đang `unknown`), `engineVersion`, `variant`, `path`, và `budget.plannedDays` cho pha chưa có số.
+- `game.yaml`: `source.engine` (chỉ khi đang `unknown`), `engineVersion`, `variant`, `dimension` (2d/3d), `physics` (rigidbody/kinematic/none), `path`, và `budget.plannedDays` cho pha chưa có số.
 - `spec/inventory.yaml`: danh mục type gameplay (khi đọc được), chạy lại chỉ thêm mục mới.
 
 `--json` cho agent đọc.
@@ -25,6 +25,7 @@ Recon đọc tên file và header. Nó có thể sai hoặc thiếu:
 - Mục **Chưa biết** là thứ recon không tự xác định được. Tự tìm, ghi kết quả vào "Ghi chú thêm".
 - Engine ghi trong `game.yaml` khác với recon: recon cảnh báo và không ghi đè. Kiểm tra lại, sửa tay bên đúng.
 - SDK **mạng / dữ liệu phía server** nghĩa là một phần gameplay có thể nằm trên server (bảng xếp hạng, nạp level, PvP). Hỏi người dùng phần đó làm thế nào trên web.
+- **2D/3D, loại vật lý** đọc từ type mà code của game dùng (Rigidbody, CharacterController, Rigidbody2D, node Godot…). Vật lý chỉ gắn trong prefab/scene mà code không đụng tới thì recon không thấy — mở vài prefab/scene chính để chắc. IL2CPP: chỉ biết sau khi recon trên `dump.cs`/DummyDll.
 - Không thấy dấu hiệu làm rối code không có nghĩa là không bị làm rối. Recon chỉ biết vài dấu hiệu phổ biến.
 
 ## 3. Danh mục cơ chế khi recon không tự lấy được

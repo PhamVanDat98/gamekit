@@ -1,6 +1,7 @@
 # Nghĩa vụ parity: mỗi hành vi của game gốc mà bản web phải tái hiện (skill parity-check).
 # Đóng bằng test gắn thẻ [id:case] trong tên, vd it('[player.move:edge] …'). `gamekit parity` chấm.
-# Case: normal | edge | invalid | oracle (bảng spec/oracles) | replay.
+# Case: normal | edge | invalid | oracle (bảng spec/oracles) | replay | outcome (kết quả qua nhiều seed).
+# fidelity (mặc định exact): exact | close (cần tolerance) | outcome (cần case outcome) | feel (D-n + approved, không test số).
 # Không làm một nghĩa vụ: status blocked|out-of-scope + decision D-n + approved (người dùng duyệt).
 # Lập ở cuối P1 từ ghi chú RE: mỗi nghĩa vụ có source trỏ tới notes/… (cổng P1 kiểm tra). P2 đóng chúng bằng test.
 # Nội dung sinh từ seed (level, rơi đồ) cần thêm nghĩa vụ RNG, vd:

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { log, GkError } from './lib/log.mjs';
 import { findGameRoot, loadGame, ownershipOf, updateGame, nowIso } from './lib/game.mjs';
-import { recon } from './lib/recon.mjs';
+import { PHYSICS_LABEL, recon } from './lib/recon.mjs';
 import { triage } from './lib/triage.mjs';
 import { INVENTORY_FILE, loadInventory, mergeInventory, writeInventory } from './lib/inventory.mjs';
 import { ENGINES } from './lib/questions.mjs';
@@ -32,6 +32,7 @@ function lines(r, tri) {
   out.push(['head', `Recon: ${r.target} (${where}) — ${r.files} file, ${mb(r.bytes)}`]);
   if (r.inventoryOnly) {
     out.push(['info', `Danh mục cơ chế từ ${r.inventory.source}: ${r.inventory.items.length} type (${kinds(r.inventory.items) || 'không có'})`]);
+    if (r.physics) out.push(['info', `Không gian, vật lý: ${r.physics.dimension.toUpperCase()}, ${PHYSICS_LABEL[r.physics.physics]} (${r.physics.signals.slice(0, 6).join(', ')})`]);
     return out;
   }
   out.push(['info', `Engine: ${r.engine}${r.engineVersion ? ` ${r.engineVersion}` : ''}${r.variant ? ` · ${r.variant}` : ''}${r.platform ? ` · ${r.platform}` : ''}${r.hasSource ? ' · có source' : ''}`]);
@@ -90,12 +91,24 @@ function write(root, r, tri, givenPath) {
     }
     if (r.engineVersion && r.engineVersion !== game.source?.engineVersion) edits.push([['source', 'engineVersion'], r.engineVersion]);
     if (r.variant && r.variant !== game.source?.variant) edits.push([['source', 'variant'], r.variant]);
+    if (r.physics && r.physics.dimension !== game.source?.dimension) edits.push([['source', 'dimension'], r.physics.dimension]);
+    if (r.physics && r.physics.physics !== game.source?.physics) edits.push([['source', 'physics'], r.physics.physics]);
     if (!game.source?.path && givenPath) edits.push([['source', 'path'], givenPath]);
     const planned = game.budget?.plannedDays ?? {};
     for (const p of PHASES) if (planned[p] == null) edits.push([['budget', 'plannedDays', p], tri.plannedDays[p]]);
     if (edits.length) {
       updateGame(root, edits);
       done.push(`game.yaml (${[...new Set(edits.map(([k]) => k.slice(0, 2).join('.')))].join(', ')})`);
+    }
+  }
+  if (r.inventoryOnly && r.physics) {
+    const game = loadGame(root);
+    const edits = [];
+    if (r.physics.dimension !== game.source?.dimension) edits.push([['source', 'dimension'], r.physics.dimension]);
+    if (r.physics.physics !== game.source?.physics) edits.push([['source', 'physics'], r.physics.physics]);
+    if (edits.length) {
+      updateGame(root, edits);
+      done.push('game.yaml (source.dimension, source.physics)');
     }
   }
   // recon is an analysis step too: it shows up in `gamekit re` like any other tool.
@@ -127,6 +140,12 @@ export async function run(args) {
     throw new GkError(`Không đọc được ${target}: ${e.message}`);
   }
   const ownership = root ? ownershipOf(loadGame(root)) : 'own';
+  // IL2CPP builds hide it; a dump.cs/DummyDll recon may have recorded it in game.yaml already.
+  const known = root && loadGame(root).source;
+  if (!r.physics && !r.inventoryOnly && known?.dimension) {
+    r.physics = { dimension: known.dimension, physics: known.physics ?? 'none', signals: ['game.yaml'], mixed: false, fromGame: true };
+    r.unknowns = r.unknowns.filter((u) => !u.startsWith('2D hay 3D'));
+  }
   const tri = r.inventoryOnly ? null : triage(r, { ownership });
   if (args.json) {
     log.info(JSON.stringify({ ...r, triage: tri }, null, 2));
