@@ -16,10 +16,7 @@ export function runLoader(cfg, hooks = {}) {
     if (!root) return;
     root.classList.add('gmIsLoading');
     if (fill) fill.style.width = `${p}%`;
-    if (p >= ALMOST) {
-      root.classList.add('gmAlmost');
-      if (info) info.textContent = 'Almost there...';
-    } else if (info) info.textContent = `${p}%`;
+    if (info) info.textContent = p >= ALMOST ? 'Almost there...' : `${p}%`;
   };
 
   const code = pickLanguage({
@@ -59,7 +56,9 @@ export function runLoader(cfg, hooks = {}) {
     received = 0;
     const [frameworkCode, dictText] = await Promise.all([fetchText('framework.js', onChunk), fetchText(`Language/${code}.json`, onChunk)]);
     const dict = JSON.parse(dictText);
-    if (dict._meta && dict._meta.dir === 'rtl') document.documentElement.dir = 'rtl'; // ar, fa… (kept by pack)
+    // The page is rendered in the default language; the player's may differ (ar, fa… are rtl, kept by pack).
+    document.documentElement.lang = code;
+    document.documentElement.dir = dict._meta && dict._meta.dir === 'rtl' ? 'rtl' : 'ltr';
     window.GM_LANG = { code, dict, available: cfg.languages };
     setProgress(ALMOST);
     await runScript(frameworkCode);

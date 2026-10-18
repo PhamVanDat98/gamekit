@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { exists, walk } from './io.mjs';
 
-const COMPRESSED = /\.(gz|br)$/;
+/** Pre-compressed copies written by `pack --compress`. */
+export const COMPRESSED = /\.(gz|br)$/;
 const INITIAL = ['loader.js', 'framework.js', 'css/style.css'];
 
 /** Outer index.html + <v>/{loader.js, framework.js, css/style.css, Icons/*} + the biggest Language/*.json (uncompressed bytes). */

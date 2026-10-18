@@ -8,6 +8,7 @@ import { GkError } from './log.mjs';
 import { withBase } from './html.mjs';
 import { copyrightFor } from './portals.mjs';
 import { buildLanguages } from './languages.mjs';
+import { versionError } from './version.mjs';
 
 /** What a vite build for a package may contain at its root (public/ is copied there too). */
 export const VITE_TOP = new Set(['framework.js', 'css', 'assets', 'Icons', 'StreamingAssets', 'index.html']);
@@ -23,7 +24,7 @@ function copy(from, to) {
  * Both are injected so tests run without esbuild/javascript-obfuscator (pack passes the game's own).
  */
 export async function assemblePortal({ game, kit, settings = {}, version, viteOut, languages, outDir, buildLoader, obfuscate }) {
-  if (!/^\d{8}$/.test(String(version))) throw new GkError(`version phải gồm 8 chữ số (YYMMDDNN), nhận được "${version}"`);
+  if (versionError(version)) throw new GkError(`version ${versionError(version)}`);
   // The pre-az-v1 template built a page (index.html + Build/); the package now needs framework.js.
   if (exists(path.join(viteOut, 'Build')) || (exists(path.join(viteOut, 'index.html')) && !exists(path.join(viteOut, 'framework.js'))))
     throw new GkError('vite.config.ts của game là bản cũ (ra index.html + Build/) — xem mục Nâng cấp game cũ trong README của GameKit');
@@ -33,6 +34,7 @@ export async function assemblePortal({ game, kit, settings = {}, version, viteOu
     if (top === 'css' && rel !== 'css/style.css') throw new GkError(`${rel}: không thuộc bố cục gói — css/ chỉ có style.css`);
     if (top === 'Icons' && rel !== 'Icons/web.png' && rel !== 'Icons/loading.webp') throw new GkError(`${rel}: không thuộc bố cục gói — Icons/ chỉ có web.png, loading.webp (domain.webp lấy từ bộ vỏ portal)`);
     if (top === 'assets' && !ASSET_KINDS.has(kind)) throw new GkError(`${rel}: asset phải nằm trong assets/{${[...ASSET_KINDS].join(',')}}`);
+    if (top === 'assets' && /\.m?js$/i.test(rel)) throw new GkError(`${rel}: assets/ không chứa code — JS của game phải gộp vào framework.js (bỏ import "?url"/worker riêng)`);
   }
   const need = (rel) => {
     const f = path.join(viteOut, rel);
