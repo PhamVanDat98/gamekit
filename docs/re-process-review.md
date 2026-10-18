@@ -5,6 +5,8 @@
 - Hiện trạng kiểm thử: `npm test` của plugin — 73/73 test xanh (~51 s).
 - Mục đích: (1) mô tả đủ chi tiết từng tính năng để **viết lại được** khi cần; (2) chỉ ra chỗ chưa tối ưu; (3) đề xuất quy trình RE **chạy song song được**, kèm kế hoạch code.
 
+> **Trạng thái (cập nhật sau khi triển khai):** mọi gói W0–W8 ở mục 5 đã làm xong trên nhánh `claude/re-process-optimization-ylu4c7`, mỗi gói một commit, kèm test (`npm test`: 102 test). Chi tiết từng gói và những gì còn để ngỏ: mục 5.0–5.0j. Mục 1–4 giữ nguyên như bản rà soát ban đầu (mô tả hiện trạng trước khi sửa).
+
 ---
 
 ## 1. Tóm tắt
@@ -316,7 +318,7 @@ Thứ tự phụ thuộc: **W0** phải xong trước; các gói trong cùng m�
 | **W5 Cổng** (đã xong, xem 5.0f) | 2 (sau W2, W3) | `scripts/gate.mjs`, `templates/game/gates/P1.md`, `P2.md` | `gate --area`; auto `areas`, `questions`, `file:spec/gameplay-spec.md`, `merged` (mọi module đã merge + worktree gỡ); chạy auto song song; dùng chung một lần vitest | cổng mảng qua/không qua; P2 chạy vitest đúng 1 lần |
 | **W6 Parity một phần** (đã xong, xem 5.0g) | 2 (sau W1) | `scripts/parity.mjs` | `--area`, `--module`, `--json`, `--mutate` | lọc đúng; mutate làm nghĩa vụ đỏ |
 | **W7 Status/next** (đã xong, xem 5.0h) | 2 (sau W3) | `scripts/status.mjs`, `commands/next.md` | Đơn vị sẵn sàng / đang chạy / chờ integrate / bị chặn; `next` gợi ý giao **nhiều** việc một lượt | output có các nhóm |
-| **W8 Skill** | 3 | `skills/re-plan/` (mới), `skills/re-notes/`, `skills/game-recon/` (mới), `skills/module-plan/`, `skills/integrate/`, `skills/using-gamekit/`, `scripts/lib/phases.mjs` (`AVAILABLE_SKILLS`), `README.md`, `CHANGELOG.md` | Viết theo luồng mới; nêu cách giao song song (Claude Code: nhiều Agent trong một lượt; Codex: mỗi worktree một session) | `tests/skills.test.mjs` (frontmatter) |
+| **W8 Skill** (đã xong, xem 5.0j) | 3 | `skills/re-plan/` (mới), `skills/re-notes/`, `skills/game-recon/` (mới), `skills/module-plan/`, `skills/integrate/`, `skills/using-gamekit/`, `scripts/lib/phases.mjs` (`AVAILABLE_SKILLS`), `README.md`, `CHANGELOG.md` | Viết theo luồng mới; nêu cách giao song song (Claude Code: nhiều Agent trong một lượt; Codex: mỗi worktree một session) | `tests/skills.test.mjs` (frontmatter) |
 
 Theo `AGENTS.md`: mỗi lệnh mới thêm vào `COMMANDS` + `HELP` trong `scripts/gamekit.mjs` và có test trong `tests/cli.test.mjs`; sửa template thì tạo game thử và chạy test / typecheck / lint / pack / release-check của nó; `npm test` trước khi commit.
 
@@ -390,6 +392,13 @@ Theo `AGENTS.md`: mỗi lệnh mới thêm vào `COMMANDS` + `HELP` trong `scrip
 - `scripts/recon.mjs`: ghi `notes/inventory.json` (schema `schemas/inventory.schema.json`, `validate` kiểm), chỉ điền trường `source.*` còn trống. Từ chối quét chính repo game, trừ `reference/`, `decompiled/`.
 - Template: P0 có `{auto: file:notes/inventory.json}`; `re-plan.example.yaml` để `notes/inventory.json` trong `shared`.
 - Chưa làm: phiên bản engine khác Unity; đọc phiên bản Unity bên trong APK (cần giải nén mục); gợi ý mảng từ kiểm kê (`re-plan --suggest`).
+
+### 5.0j Đã làm: W8 — skill
+
+- `skills/game-recon/SKILL.md` (gộp triage), `skills/re-plan/SKILL.md`; `AVAILABLE_SKILLS` và `PHASE_INFO` (P0: game-recon; P1: re-plan đứng đầu).
+- Cập nhật theo luồng mới: using-gamekit (bảng pha, gate --area, Việc song song, lệnh), re-notes (recon, questions.yaml, năm phần, gate --area), parity-check (phạm vi, --mutate), module-plan (--ready, obligations, buildModule), integrate (--ready, --keep-going, --scoped), rebuild-game (params nhiều file, mảng → module), references/claude-code.md, codex.md.
+
+**Kế hoạch W0–W8 trong tài liệu này đã làm xong.** Việc còn mở được ghi ở mục "Chưa làm" của từng gói (5.0e, 5.0g, 5.0i) và các skill P1–P5 còn ghi "chưa có" trong `PHASE_INFO`.
 
 ### 5.1 Tương thích ngược
 

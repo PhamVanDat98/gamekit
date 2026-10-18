@@ -3,8 +3,8 @@
 export const PHASES = ['P0', 'P1', 'P2', 'P3', 'P4', 'P5'];
 
 export const PHASE_INFO = {
-  P0: { name: 'Intake', skills: ['game-recon', 'triage'], human: 'Bạn quyết định làm hay bỏ (triage).' },
-  P1: { name: 'Phân tích', skills: ['engine-<engine>', 're-notes', 'gameplay-spec', 'asset-inventory', 'ui-extract'] },
+  P0: { name: 'Intake', skills: ['game-recon'], human: 'Bạn quyết định làm hay bỏ (triage).' },
+  P1: { name: 'Phân tích', skills: ['re-plan', 'engine-<engine>', 're-notes', 'gameplay-spec', 'asset-inventory', 'ui-extract'] },
   P2: { name: 'Dựng lại', skills: ['runtime-select', 'module-plan', 'rebuild-game', 'integrate', 'parity-check'] },
   P3: {
     name: 'Chuyển sang web',
@@ -19,6 +19,8 @@ export const PHASE_INFO = {
 // Skills that ship in this version of the plugin. Others are planned (later sub-projects).
 export const AVAILABLE_SKILLS = new Set([
   'using-gamekit',
+  'game-recon',
+  're-plan',
   're-notes',
   'rebuild-game',
   'parity-check',

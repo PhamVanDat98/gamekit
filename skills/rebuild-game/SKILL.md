@@ -34,7 +34,7 @@ Thêm replay test cho luồng chơi chính (`tests/replay/`). Thay `src/core/wor
 `src/view/` vẽ từ state, map input thiết bị → `Action` (`src/contracts/input.ts`). Không sửa state. Không unit test; kiểm tra bằng chạy thử `npm run dev` và screenshot.
 
 ## 6. Game lớn → chia module
-Nếu game có nhiều cơ chế độc lập, dùng skill **module-plan** trước khi viết core, rồi **integrate**. Game nhỏ thì làm tuần tự, ghi lý do không chia vào DECISIONS.md.
+Nếu game có nhiều cơ chế độc lập, dùng skill **module-plan** trước khi viết core, rồi **integrate**. P1 đã chia mảng (`re-plan.yaml`): mỗi mảng qua cổng mảng thành một module (`buildModule`), dựng được ngay không chờ mảng khác. Game nhỏ thì làm tuần tự, ghi lý do không chia vào DECISIONS.md.
 
 ## 7. Kết thúc
 `npm test`, `npm run typecheck`, `npm run lint`, `gamekit validate`, `gamekit parity` sạch → `gamekit gate`. Báo người dùng; chỉ `--advance` khi họ đồng ý.
