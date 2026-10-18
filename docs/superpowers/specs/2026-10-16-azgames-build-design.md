@@ -49,7 +49,7 @@ builds/
 ## 3. Số phiên bản
 
 - `YYMMDDNN`: ngày build (giờ máy) + số thứ tự trong ngày `01`–`99`, tính từ các thư mục đã có trong `builds/`.
-- `--version 26101605` để chỉ định; phải là 8 chữ số và chưa tồn tại (không ghi đè).
+- `--version 26101605` để chỉ định; phải là 8 chữ số, `YYMMDD` là ngày có thật, `NN` từ `01` đến `99`, và chưa tồn tại (không ghi đè).
 - Hết `99` trong một ngày → báo lỗi.
 - `game.yaml` `version` (semver) giữ nguyên ý nghĩa bản phát hành, ghi trong `manifest.json`. `YYMMDDNN` là `productVersion` gửi SDK, `GM_GAME.version`, `version.txt`.
 - Năm bản quyền = `20` + `YY` của số phiên bản.
@@ -61,10 +61,13 @@ gamekit/portals/
   azgames/
     portal.yaml     ← khai báo: settings (câu hỏi), allowedHosts, copyright, checklist, icon bắt buộc
     shell.html      ← trang có placeholder
-    loader.ts       ← nguồn loader.js
+    kit.mjs         ← renderShell() điền shell.html, loaderConfig() phần cấu hình loader riêng của portal
+    loader.entry.js ← nguồn loader.js (dùng chung shared/loader-runtime.js, loader-core.js)
     Icons/domain.webp
   dev-mock/
-    portal.yaml  shell.html  loader.ts  Icons/domain.webp (logo GameKit)
+    portal.yaml  shell.html  kit.mjs  loader.entry.js  Icons/domain.webp (logo GameKit)
+  shared/
+    loader-runtime.js  loader-core.js  loading.html (màn loading, chèn vào {{LOADING}})
 ```
 
 `portal.yaml` (azgames):
@@ -116,7 +119,7 @@ Thứ tự trong trang:
 4. `<script src="loader.js" defer>`.
 5. `<link rel="stylesheet" href="css/style.css">` và `<canvas>`/container của game.
 
-Placeholder: `{{TITLE}}`, `{{VERSION}}`, `{{LANG}}`, `{{SETTINGS_SCRIPT}}`, `{{CANONICAL}}`. Giá trị được escape theo ngữ cảnh (HTML / JS string).
+Placeholder của `shell.html`: `{{TITLE}}`, `{{LANG}}`, `{{SETTINGS_SCRIPT}}`, `{{LOADING}}`, và `{{PORTAL_GID}}` (azgames, trong `<link rel="canonical" href="https://azgames.io/{{PORTAL_GID}}">`); `loading.html` có `{{TITLE}}`, `{{VERSION}}`. Giá trị được escape theo ngữ cảnh (HTML / JS string).
 
 ## 5. Hỏi thông tin khi `init` và `config`
 
@@ -144,7 +147,7 @@ languages: [en, es]
 
 ## 6. `loader.js`
 
-Nguồn `portals/<id>/loader.ts`, bundle bằng esbuild (từ `node_modules` của game, đi kèm vite), rồi làm rối bằng `javascript-obfuscator` (devDependency của template game; plugin vẫn chỉ phụ thuộc `yaml` + `ajv`). Seed làm rối = số phiên bản → cùng nguồn + cùng phiên bản ra cùng `loader.js`.
+Nguồn `portals/<id>/loader.entry.js`, bundle bằng esbuild (từ `node_modules` của game, đi kèm vite), rồi làm rối bằng `javascript-obfuscator` (devDependency của template game; plugin vẫn chỉ phụ thuộc `yaml` + `ajv`). Seed làm rối = số phiên bản → cùng nguồn + cùng phiên bản ra cùng `loader.js`.
 
 `pack` nhúng vào loader trước khi làm rối: danh sách ngôn ngữ `[{code, name}]`, kích thước (byte, chưa nén) của `framework.js` và từng file ngôn ngữ, chuỗi bản quyền đã điền năm.
 
@@ -154,7 +157,7 @@ Thứ tự:
    - Cửa sổ trên cùng: `!allowed(location.hostname)` hoặc `!document.referrer` → `location.href = "https://azgames.io/<portalGid>"`.
    - Trong iframe: host cha = `top.location.hostname`, nếu không đọc được thì host của `document.referrer`; không xác định được hoặc `!allowed` → không nạp game (dừng ở màn loading).
 2. **SDK**: `GMGameSDK.init(gameId, "https://gm.azgame.io").setVersion(<v>)`; gửi `game_loaded` lên cha (`postMessage` `{source:"azgames", type, game, version, host, time}`, mỗi loại một lần — như `gmPostToParent` mẫu).
-3. **Ngôn ngữ**: localStorage `azgames.<gameCode>.lang` → `?lang=` → `navigator.languages` (khớp `pt-BR` → `pt-br` → `pt`) → `AZ_SETTINGS.language` → `en`. Chỉ chọn mã có trong danh sách.
+3. **Ngôn ngữ**: localStorage `azgames.<gameCode>.lang` → `?lang=` → `navigator.languages` (khớp `pt-BR` → `pt-br` → `pt`) → `AZ_SETTINGS.language` → `en`. Chỉ chọn mã có trong danh sách. Đặt `<html lang>` theo mã đã chọn và `dir` (`rtl` khi `_meta.dir` là `rtl`, còn lại `ltr`).
 4. **Tải song song** `framework.js` và `Language/<lang>.json` bằng `fetch` stream; % = byte đã nhận / tổng kích thước nhúng sẵn. Màn loading: spinner → thanh % → "Almost there…" ở ≥ 99%; màu thanh lấy từ ảnh loading (như GM Loader v1).
 5. **Giao cho game**: `window.GM_LANG = { code, dict, available }`, `window.GM_LOADER = { copyright, ready() }`; chạy `framework.js`. Game gọi `GM_LOADER.ready()` sau khung hình đầu → ẩn màn loading, `window.focus()`, gửi `game_started` kèm `load_time_ms`.
 6. **Lỗi** tải: thông báo + nút "Thử lại" trên màn loading (không `alert`).
@@ -180,12 +183,14 @@ Chế độ `npm run dev` (không qua loader): `src/platform/dev-loader.ts` dự
 
 Với mỗi portal:
 
-1. Kiểm `portalSettings` đủ và đúng (như `validate`); thiếu → dừng portal này, báo từng câu thiếu kèm lệnh `gamekit config --portal <id>`.
+1. Kiểm `portalSettings` đủ và đúng (như `validate`); thiếu → bỏ qua portal này, báo từng câu thiếu kèm lệnh `gamekit config --portal <id>`. Các portal đủ thông tin vẫn được đóng gói, nhưng `pack` trả mã 1 (cổng vẫn trượt). Không portal nào đủ, hoặc `game.yaml` sai `language`/`languages` → dừng trước khi build.
 2. `vite build` (GK_PORTAL) ra thư mục tạm.
 3. `assemblePortal(...)` ráp bố cục §2: framework/css/assets từ đầu ra vite; Icons; Language (điền key thiếu từ `en`, minify; bỏ `_meta.name` vì đã nằm trong danh sách nhúng vào loader, chỉ giữ `_meta.dir` khi là `rtl`); StreamingAssets; loader (bundle → nhúng hằng → làm rối); `<v>/index.html` từ `shell.html`; `index.html` ngoài = chèn `<base href="<v>/">` ngay sau `<head>`; `preview.html` = chép; `version.txt`.
 4. `--compress`: `.gz`/`.br` cho js/css/json/wasm trong `<v>/`.
-5. Ghi `builds/<v>/manifest.json`: `name, title, semver, version, commit, dirty, builtAt, portals.<p>.{hash, initialBytes}`.
+5. Ghi `builds/<v>/manifest.json`: `name, title, semver, version, commit, dirty, builtAt, portals.<p>.{hash, initialBytes}`. `dirty` = có thay đổi chưa commit trong code/asset, hoặc trong các trường `game.yaml` mà gói dùng (`name, title, version, language, languages, portalSettings`); `phase`, `timings`, `gates` không tính.
 6. `--zip`: `builds/<v>/<name>-<portal>-<v>.zip`.
+
+`{auto: pack}` trong cổng dùng lại bản build mới nhất khi `commit` trong manifest = HEAD, không `dirty`, đủ đúng các portal và `hash` từng gói còn khớp — mỗi lần `gamekit gate` không tốn thêm một số `NN`.
 
 `assemblePortal` nhận bước làm rối và bước bundle loader qua tham số (test truyền hàm không làm rối).
 
@@ -197,16 +202,18 @@ Với mỗi portal:
 
 ## 10. `release-check` (viết lại phần gói)
 
-`gamekit release-check [--version V] [--portal p]` — mặc định bản mới nhất trong `builds/`.
+`gamekit release-check [--version V] [--portal a,b]` — mặc định bản mới nhất trong `builds/`.
 
 Mỗi `builds/<v>/<portal>/`:
 
 - Vỏ có đúng `index.html`, `preview.html`, `version.txt`, `<v>/` — không file khác.
 - `version.txt` = tên thư mục, 8 byte, không newline. `preview.html` giống `index.html` từng byte. `index.html` ngoài có `<base href="<v>/">`; `<v>/index.html` không có `<base>`.
 - `<v>/` có `index.html, loader.js, framework.js, css/style.css, Icons/{web.png, loading.webp, domain.webp}, Language/en.json`; `assets/` chỉ có `img art audio fonts`; `StreamingAssets/` không có `.js/.mjs/.wasm/.html`.
-- Script trong trang: chỉ `loader.js` (tương đối) + script trên host thuộc `allowedHosts` của portal.
+- Script trong cả `index.html` và `<v>/index.html` (`src` có hoặc không có nháy): chỉ `loader.js` (tương đối, đúng một lần) + script trên host thuộc `allowedHosts` của portal.
+- `assets/` không chứa `.js`/`.mjs` (JS của game chỉ nằm trong `framework.js`).
+- Gói không bị sửa sau `pack`: `hash` của thư mục portal phải khớp `manifest.json`.
 - `framework.js` chứa `gk-settings-footer` (class của footer bản quyền trong `src/view/settings.ts`, là chuỗi nên minify giữ nguyên; `.copyright` thì luôn có nhờ `src/platform/index.ts` nên không chứng minh được footer).
-- Kiểm tra cũ áp vào bố cục mới: provenance của file phát hành, tên game gốc (`release.forbiddenTerms`, cả trong `Language/`), link ngoài (host: game.yaml + portal.yaml; bỏ qua `loader.js` vì do plugin sinh), đường dẫn tuyệt đối, `dirty` trong manifest.
+- Kiểm tra cũ áp vào bố cục mới: provenance của file phát hành, tên game gốc (`release.forbiddenTerms`, cả trong `Language/`), link ngoài (host: game.yaml + portal.yaml; bỏ qua `loader.js` vì do plugin sinh; cả dạng `//host` sau nháy, `(` hoặc `=` trong html/js/css), đường dẫn tuyệt đối, `dirty` trong manifest.
 - Ngân sách tải đầu = HTML + `loader.js` + `framework.js` + css + **một** file ngôn ngữ lớn nhất + Icons.
 
 ## 11. Test
