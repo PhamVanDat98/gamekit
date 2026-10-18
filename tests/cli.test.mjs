@@ -135,6 +135,61 @@ test('validate: re-plan.yaml and notes/<area>/questions.yaml (template examples 
   assert.match(r.out, /re-plan\.yaml không có mảng audio/);
 });
 
+test('params per area: params/<name>.json sits under its name, must be loaded by src/core/params.ts, groups never overlap', () => {
+  const dir = newGame('pfiles');
+  const speed = { value: 4, unit: 'px/frame', source: 'PlayerController.Update', confidence: 'observed' };
+  write(dir, 'params/hero.json', JSON.stringify({ run: { speed } }));
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 1, 'the usage example in the comment does not count as an import');
+  assert.match(r.out, /params\/hero\.json.*chưa được nạp trong src\/core\/params\.ts/);
+  write(dir, 'src/core/params.ts', read(dir, 'src/core/params.ts')
+    .replace("import game from '../../params/game.json';", "import game from '../../params/game.json';\nimport hero from '../../params/hero.json';")
+    .replace('const FILES = {};', 'const FILES = { hero };'));
+  assert.equal(gk(dir, 'validate').code, 0);
+  // obligations name the key the game reads: hero.run.speed
+  write(dir, 'spec/obligations/hero.yaml', 'obligations:\n  - { id: hero.run, title: Chạy, cases: [normal], params: [hero.run.speed] }\n');
+  assert.equal(gk(dir, 'validate').code, 0);
+  write(dir, 'spec/obligations/hero.yaml', 'obligations:\n  - { id: hero.run, title: Chạy, cases: [normal], params: [run.speed] }\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /params run\.speed không có/);
+  fs.rmSync(path.join(dir, 'spec/obligations'), { recursive: true });
+  // a group defined in game.json and in its own file would shadow each other in PARAMS
+  write(dir, 'params/player.json', JSON.stringify({ speed }));
+  write(dir, 'src/core/params.ts', read(dir, 'src/core/params.ts').replace("import hero from", "import player from '../../params/player.json';\nimport hero from").replace('{ hero }', '{ hero, player }'));
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /nhóm player trùng với/);
+});
+
+test('obligations per area: spec/obligations/<area>.yaml joins the ledger, ids carry the area, duplicates across files fail', () => {
+  const dir = newGame('ofiles');
+  write(dir, 'spec/obligations/enemy.yaml', 'obligations:\n  - { id: enemy.ring, title: Vòng đạn, cases: [normal] }\n');
+  assert.equal(gk(dir, 'validate').code, 0);
+  write(dir, 'spec/obligations/enemy.yaml', 'obligations:\n  - { id: ring, title: Vòng đạn, cases: [normal] }\n');
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /ring: nghĩa vụ của mảng enemy phải có id enemy\.<tên>/);
+  write(dir, 'spec/obligations/player.yaml', 'obligations:\n  - { id: player.move, title: Trùng với file chung, cases: [normal] }\n');
+  write(dir, 'spec/obligations/enemy.yaml', 'obligations: []\n');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /trùng id player\.move \(đã có trong spec\/obligations\.yaml\)/);
+  // parity reads the whole ledger: an area obligation without tests stays open
+  fs.rmSync(path.join(dir, 'spec/obligations/player.yaml'));
+  write(dir, 'spec/obligations/enemy.yaml', 'obligations:\n  - { id: enemy.ring, title: Vòng đạn, cases: [normal] }\n');
+  const passed = (name) => ({ fullName: name, status: 'passed', title: name });
+  const names = ['[player.move:normal] a', '[player.move:edge] b', '[obstacle.speed:normal] c', '[obstacle.speed:oracle] d', '[obstacle.spawn:normal] e', '[score.rate:normal] f', '[rules.collision:normal] g', '[run.replay:replay] h'];
+  write(dir, 'report.json', JSON.stringify({ testResults: [{ name: 'x', assertionResults: names.map(passed) }] }));
+  r = gk(dir, 'parity', '--report', 'report.json');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /enemy\.ring — Vòng đạn: thiếu test xanh cho case: normal/);
+  write(dir, 'report.json', JSON.stringify({ testResults: [{ name: 'x', assertionResults: [...names, '[enemy.ring:normal] i'].map(passed) }] }));
+  r = gk(dir, 'parity', '--report', 'report.json');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /parity: 7\/7/);
+});
+
 test('provenance: unlabeled assets fail; reference blocked from P3; placeholder blocked at P5', () => {
   const dir = newGame();
   write(dir, 'assets/hero.png', 'x');

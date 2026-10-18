@@ -1,4 +1,4 @@
-import raw from '../../params/game.json';
+import game from '../../params/game.json';
 
 /** Strips {value, source, …} wrappers so code reads plain numbers. */
 export type Unwrap<T> = T extends { value: infer V }
@@ -18,8 +18,17 @@ export function unwrap<T>(node: T): Unwrap<T> {
 }
 
 /**
+ * params/<name>.json besides game.json, one entry per file, keyed by its name:
+ * params/player.json → PARAMS.player.*. `gamekit validate` fails while a file is missing here.
+ *   import player from '../../params/player.json';
+ *   const FILES = { player };
+ */
+const FILES = {};
+
+/**
  * Gameplay numbers. Every one comes from params/*.json with a source in the
  * original game — never type a gameplay number in code (hard rule).
+ * game.json sits at the root; `validate` rejects a group defined in two files.
  */
-export const PARAMS = unwrap(raw);
+export const PARAMS = { ...unwrap(game), ...unwrap(FILES) };
 export type Params = typeof PARAMS;

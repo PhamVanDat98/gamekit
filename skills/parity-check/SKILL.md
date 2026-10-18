@@ -19,6 +19,7 @@ Parity không phải cảm giác "chơi thấy giống". Nó là danh sách ngh�
   source: notes/enemy.md
 ```
 
+- Chia mảng song song: mỗi mảng ghi nghĩa vụ vào `spec/obligations/<mảng>.yaml`, id bắt đầu bằng `<mảng>.`; `validate` và `parity` gộp mọi file.
 - Chia theo hành vi, không theo file code. Một nghĩa vụ nên kiểm chứng được bằng vài test.
 - `cases`: `normal` (giá trị điển hình) · `edge` (biên: tường, máu 0, max level, dt lớn) · `invalid` (input sai, save hỏng) · `oracle` (bảng từ game gốc) · `replay` (luồng chơi ghi lại).
 - `required: false` cho thứ có thì tốt (hiệu ứng phụ). Mặc định là bắt buộc.

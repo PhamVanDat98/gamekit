@@ -6,8 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { exists, readJson } from './lib/io.mjs';
 import { log, GkError } from './lib/log.mjs';
 import { requireGameRoot } from './lib/game.mjs';
-import { check } from './lib/schema.mjs';
-import { decisionIds, loadObligations, OBLIGATIONS_FILE } from './validate.mjs';
+import { decisionIds, loadObligationFiles, loadObligations, obligationFileErrors, OBLIGATIONS_WHERE } from './validate.mjs';
 
 export const CASE_KINDS = ['normal', 'edge', 'invalid', 'oracle', 'replay'];
 const TAG = /\[([a-z0-9][a-z0-9._-]*):([a-z-]+)\]/g;
@@ -40,7 +39,7 @@ export function evaluateParity({ obligations, tests, decisions = new Set() }) {
         continue;
       }
       const entry = byId.get(id);
-      if (!entry) errors.push(`test "${t.name}" gắn thẻ ${id} nhưng ${OBLIGATIONS_FILE} không có nghĩa vụ này`);
+      if (!entry) errors.push(`test "${t.name}" gắn thẻ ${id} nhưng ${OBLIGATIONS_WHERE} không có nghĩa vụ này`);
       else entry.tagged.push({ ...t, kind });
     }
   }
@@ -87,10 +86,10 @@ function runVitest(root) {
 
 /** Evaluate a game: its ledger against a vitest JSON report (given, or produced by running vitest). */
 export function parityForGame(root, { report, cwd = root } = {}) {
+  const errs = obligationFileErrors(loadObligationFiles(root));
+  if (errs.length) throw new GkError(errs.map(([rel, e]) => `${rel}: ${e}`).join('; '));
   const data = loadObligations(root);
-  if (!data) throw new GkError(`Chưa có ${OBLIGATIONS_FILE}: liệt kê cơ chế của game gốc thành nghĩa vụ (skill parity-check)`);
-  const errs = check('obligations', data);
-  if (errs.length) throw new GkError(`${OBLIGATIONS_FILE}: ${errs.join('; ')}`);
+  if (!data) throw new GkError(`Chưa có ${OBLIGATIONS_WHERE}: liệt kê cơ chế của game gốc thành nghĩa vụ (skill parity-check)`);
   const json = report ? readJson(path.resolve(cwd, report)) : runVitest(root);
   return evaluateParity({ obligations: data.obligations, tests: testsFromVitestReport(json), decisions: decisionIds(root) });
 }

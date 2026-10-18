@@ -47,7 +47,7 @@ Mỗi kết luận trong `notes/<chủ đề>.md` (`third-party`: viết bằng 
 - **Phạm vi đã tìm**: đã xem những gì. Tìm không thấy chỉ có nghĩa là không thấy trong phạm vi đó, không chứng minh là không có.
 - **Còn chưa biết**: ghi lại, đừng lấp bằng phỏng đoán.
 
-Số liệu đưa vào `params/*.json` với `source` trỏ tới vị trí và `confidence`. Giá trị `inferred` phải có `tolerance`; từ P2 `validate` sẽ chặn nếu thiếu. Bảng nhiều điểm (theo level, theo thời gian) đưa vào `spec/oracles/` (xem skill parity-check).
+Số liệu đưa vào `params/*.json` (chia mảng: `params/<mảng>.json`, game đọc là `PARAMS.<mảng>.*`) với `source` trỏ tới vị trí và `confidence`. Giá trị `inferred` phải có `tolerance`; từ P2 `validate` sẽ chặn nếu thiếu. Bảng nhiều điểm (theo level, theo thời gian) đưa vào `spec/oracles/` (xem skill parity-check).
 
 ## 5. Đóng pha
 Xem lại `notes/QUESTIONS.md`: mỗi câu là `đã trả lời` (kèm link ghi chú), `một phần` hoặc `mở`. Câu chưa xong phải ghi lý do và ảnh hưởng tới bản port. Không nói "phân tích xong" khi còn câu bắt buộc chưa trả lời. Sau đó viết `spec/gameplay-spec.md` từ các ghi chú, chạy `gamekit validate`, rồi `gamekit gate`.

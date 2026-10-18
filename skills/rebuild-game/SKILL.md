@@ -19,7 +19,7 @@ Mục tiêu cổng P2: chơi được trọn vẹn (`own`: với asset gốc nh�
 ## 3. Số liệu trước, code sau
 - Mọi số gameplay vào `params/*.json`: `{ "value", "unit", "source", "confidence"?, "tolerance"? }`. `source` trỏ tới chỗ trong game gốc; `confidence` là `observed | derived | inferred` (`inferred` phải có `tolerance`). Chưa biết thì `"TODO: …"` — validate sẽ chặn ở cổng P2.
 - Thay `spec/obligations.yaml` demo bằng nghĩa vụ của game gốc (skill **parity-check**) trước khi viết core: danh sách này là thứ cổng P2 chấm.
-- Code đọc qua `PARAMS` (`src/core/params.ts`), không gõ số trong `core/` (lint chặn).
+- Code đọc qua `PARAMS` (`src/core/params.ts`), không gõ số trong `core/` (lint chặn). `params/game.json` ở gốc `PARAMS`; file khác `params/<tên>.json` nằm dưới `PARAMS.<tên>` và phải thêm vào `FILES` trong `src/core/params.ts` (`validate` nhắc nếu quên).
 
 ## 4. TDD cho core/
 Với mỗi cơ chế trong spec:

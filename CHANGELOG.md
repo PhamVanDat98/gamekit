@@ -5,6 +5,8 @@
 - Kế hoạch chia mảng phân tích `re-plan.yaml` (`kind: re`, mẫu `re-plan.example.yaml`): mảng sở hữu file riêng (bắt buộc `notes/<mảng>/`), phụ thuộc theo đồ thị (không theo đợt), `links` (tư liệu local gitignored sẽ symlink vào worktree), `units` (đơn vị chuẩn), `buildModule` (module P2 nhận kết quả). `validate` kiểm schema, trùng sở hữu, vùng dùng chung, vòng phụ thuộc, `buildModule` có trong `module-plan.yaml`, `links` phải được gitignore. `module-plan.yaml` nhận thêm `kind: build` và `links`.
 - Câu hỏi theo mảng `notes/<mảng>/questions.yaml` (mẫu `notes/questions.example.yaml`): `validate` kiểm schema, id `<mảng>.<tên>`, trùng id giữa các mảng. `notes/QUESTIONS.md` vẫn dùng được khi không chia mảng.
 - `scripts/lib/plan.mjs`: lõi chung cho hai loại kế hoạch (nhánh `re/<id>` / `mod/<id>`, `topo`, `readySet` — đơn vị sẵn sàng chạy theo phụ thuộc và `maxParallel`). Lệnh `fanout`/`integrate` chưa dùng `re-plan.yaml` (gói W3).
+- Params theo mảng: `params/<tên>.json` nằm dưới khoá tên file (`params/player.json` → `PARAMS.player.*`, `params/game.json` vẫn ở gốc). Game nạp file qua `FILES` trong `src/core/params.ts` (giữ kiểu TypeScript); `validate` báo file chưa được nạp, nhóm params nằm ở hai file, khoá trùng. Nghĩa vụ trỏ tới khoá đúng như game đọc (`player.speed`); khoá trần của file khác `game.json` (vd `speed` trong `params/player.json`) không còn được nhận.
+- Nghĩa vụ theo mảng: `spec/obligations/<mảng>.yaml` gộp với `spec/obligations.yaml` cho `validate` và `parity`; id phải có tiền tố `<mảng>.`, trùng id giữa các file là lỗi.
 - `docs/re-process-review.md`: rà soát quy trình RE và kế hoạch chạy song song.
 
 ## 0.2.0 — 2026-10-16
