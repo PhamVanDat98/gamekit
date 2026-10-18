@@ -7,7 +7,7 @@
 | Parity | Mỗi cơ chế một nghĩa vụ trong `spec/obligations.yaml`, đóng bằng test `[id:case]` xanh; bỏ qua phải có `D-n` được duyệt | `gamekit parity` (fail-closed), cổng P2 `{auto: parity}` |
 | Cấu trúc code | TS strict; `core/` / `view/` / `platform/` / `contracts/` | Template + ESLint: `core/` cấm import view/platform/thư viện render, cấm `Math.random`, `Date.now`, DOM |
 | Data-driven | Không số lạ trong `core/` | ESLint `no-magic-numbers` cho `core/` |
-| Asset | Tên, định dạng (WebP, KTX2/Basis, glTF + Meshopt/Draco, AAC/MP3), độ phân giải, atlas, spec trong `asset-manifest.json` | `validate` (kích thước, alpha PNG) |
+| Asset | Tên, định dạng (WebP, KTX2/Basis, glTF + Meshopt/Draco, AAC/MP3), độ phân giải, atlas, spec trong `asset-manifest.json` | `validate` (kích thước, alpha PNG); `art check` cho ảnh do model vẽ (kích thước, mép trong suốt, ảnh một màu, có prompt) |
 | Ngân sách hiệu năng | `budget` trong game.yaml (khởi điểm: tải đầu < 10MB, vào game < 5s, 60fps desktop, 30fps mobile) | `release-check` (tải đầu) |
 | Portal và iframe | Đường dẫn tương đối, không link ngoài, chặn cuộn trang bởi phím, focus, pause khi ẩn tab, bàn phím + cảm ứng | `src/platform/web-guard.ts` + `release-check` |
 | Chơi được khi tắt tiếng | Mọi thông tin gameplay có tín hiệu hình ảnh, không chỉ dựa vào màu | Checklist cổng P3 |

@@ -8,3 +8,5 @@ decompiled/
 .gamekit/ghidra/
 *.log
 .DS_Store
+# Ảnh model vẽ ra trước khi đổi cỡ (gamekit art gen --assets)
+art/raw/

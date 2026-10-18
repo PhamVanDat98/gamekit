@@ -52,9 +52,9 @@ const crc32 = (buf) => {
   for (const b of buf) c = CRC_TABLE[(c ^ b) & 255] ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
 };
-/** A valid RGBA PNG of one colour — test fixtures and template placeholders. */
-export function solidPng(w, h, rgba = [79, 179, 255, 255]) {
-  const row = Buffer.concat([Buffer.from([0]), Buffer.concat(Array.from({ length: w }, () => Buffer.from(rgba)))]);
+/** A valid RGBA PNG; `pixel(x, y)` returns [r, g, b, a]. */
+export function pixelPng(w, h, pixel) {
+  const rows = Array.from({ length: h }, (_, y) => Buffer.concat([Buffer.from([0]), ...Array.from({ length: w }, (_, x) => Buffer.from(pixel(x, y)))]));
   const chunk = (type, data) => {
     const len = Buffer.alloc(4);
     len.writeUInt32BE(data.length);
@@ -71,10 +71,19 @@ export function solidPng(w, h, rgba = [79, 179, 255, 255]) {
   return Buffer.concat([
     Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
     chunk('IHDR', ihdr),
-    chunk('IDAT', zlib.deflateSync(Buffer.concat(Array.from({ length: h }, () => row)))),
+    chunk('IDAT', zlib.deflateSync(Buffer.concat(rows))),
     chunk('IEND', Buffer.alloc(0)),
   ]);
 }
+/** A valid RGBA PNG of one colour — test fixtures and template placeholders. */
+export const solidPng = (w, h, rgba = [79, 179, 255, 255]) => pixelPng(w, h, () => rgba);
+/** Looks like a picture to `art check`: varied colours, optionally on a see-through margin. */
+export const picturePng = (w, h, { alpha = false } = {}) =>
+  pixelPng(w, h, (x, y) => {
+    const m = Math.round(Math.min(w, h) / 8);
+    if (alpha && (x < m || y < m || x >= w - m || y >= h - m)) return [0, 0, 0, 0];
+    return [(x * 7) & 255, (y * 5) & 255, ((x + y) * 3) & 255, 255];
+  });
 /** Smallest valid lossless WebP (1×1). */
 export const tinyWebp = () => Buffer.from('UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==', 'base64');
 /** A GMSOFT_SIGNED-shaped token. */

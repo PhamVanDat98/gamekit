@@ -59,6 +59,8 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | `fanout --wave N` | Mỗi module một worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>` + `BRIEF.md` |
 | `check-ownership` | Module chỉ sửa trong thư mục được giao, không đụng vùng shared |
 | `integrate --wave N [--cleanup]` | Merge theo phụ thuộc, test sau mỗi merge, đỏ thì hoàn tác |
+| `art brief\|gen\|check [--style a,b \| --assets]` | Đồ hoạ raster: viết brief từ `art/styles.yaml` (concept mỗi style) hoặc `asset-manifest.json` (asset theo style đã chốt), gọi Codex vẽ song song (`art.command` để đổi lệnh), kiểm kích thước, nền trong suốt, ảnh một màu, prompt; asset đạt được nhãn `generated` |
+| `art board` / `art lock <style>` | Bảng so concept `art/concepts/index.html`; chốt style người dùng chọn (`game.yaml` `art.style` + `D-n`) |
 | `precommit` | Git hook: chặn `reference/`, `decompiled/`, code decompile, asset chưa nhãn |
 
 ## Cấu trúc plugin
@@ -67,10 +69,10 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 .claude-plugin/   plugin.json, marketplace.json
 hooks/            SessionStart → using-gamekit + gamekit status
 commands/         /gamekit:status, /gamekit:next
-skills/           using-gamekit, rebuild-game, module-plan, integrate, platform-sdk, package-web-build, release-check
+skills/           using-gamekit, rebuild-game, module-plan, integrate, platform-sdk, package-web-build, release-check, style-direction, style-preview, replace-graphics
 portals/          vỏ portal dùng chung: azgames, dev-mock (portal.yaml, kit.mjs, shell.html, loader.entry.js, Icons/), shared/
 scripts/          CLI gamekit.mjs + lệnh; lib/
-schemas/          game, params, provenance, module-plan, asset-manifest (JSON Schema)
+schemas/          game, params, provenance, module-plan, asset-manifest, art-styles (JSON Schema)
 templates/game/   Vite + TS: core/ (deterministic), view/, platform/ (interface, PauseBus, dev-mock), contracts/, tests, gates, .vscode, AGENTS.md
 tests/            node --test
 ```

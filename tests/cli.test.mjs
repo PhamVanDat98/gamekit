@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
+import { gk, newGame, token, sh, write, read, editJson, editYaml, ROOT, picturePng, tinyWebp } from './helpers.mjs';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
 import { ownershipProblems, topo } from '../scripts/parallel.mjs';
 import { parseArgs } from '../scripts/gamekit.mjs';
 import { evaluateParity, testsFromVitestReport } from '../scripts/parity.mjs';
+import { imageInfo, pngPixels, pixelStats } from '../scripts/lib/png.mjs';
 import YAML from 'yaml';
 
 test('init creates a valid game with git, hook and schemas', () => {
@@ -716,4 +717,167 @@ test('ownership: game.yaml without the field counts as own; unknown values are r
   const r = gk(dir, 'validate');
   assert.equal(r.code, 1);
   assert.match(r.out, /ownership/);
+});
+
+// ---------- art: raster concepts and assets drawn by an image agent ----------
+const FAKE_ART = path.join(ROOT, 'tests', 'fixtures', 'fake-imagegen.mjs');
+const STYLES = `concepts:
+  - id: hero
+    brief: Nhân vật chính, một chú chim tròn, toàn thân
+    size: [512, 512]
+    alpha: true
+  - id: screen
+    brief: Màn chơi ngang, HUD điểm giữa trên, nút pause góc phải
+    size: [768, 512]
+styles:
+  - id: paper
+    name: Giấy cắt lớp
+    pitch: Ấm, dễ đọc ở cỡ nhỏ
+    lock: flat layered paper cut-out style, soft drop shadows
+    palette: ['#F4E9D8', '#E07A5F']
+    ui: HUD dạng nhãn giấy, nút tròn to cho cảm ứng
+  - id: pixel
+    name: Pixel 16-bit
+    pitch: Gọn, sắc nét
+    lock: crisp 16-bit pixel art, limited palette
+`;
+function artGame(name) {
+  const dir = newGame(name, '--third-party');
+  editYaml(dir, (g) => {
+    g.release.forbiddenTerms = ['OldBird'];
+    g.art = { command: [process.execPath, FAKE_ART] };
+  });
+  write(dir, 'art/styles.yaml', STYLES);
+  return dir;
+}
+const withFake = (mode, fn) => {
+  process.env.FAKE_ART = mode;
+  try {
+    return fn();
+  } finally {
+    delete process.env.FAKE_ART;
+  }
+};
+
+test('png: WebP size, PNG pixels and the stats art check relies on', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gk-png-'));
+  fs.writeFileSync(path.join(dir, 'a.webp'), tinyWebp());
+  assert.deepEqual(imageInfo(path.join(dir, 'a.webp')), { format: 'webp', width: 1, height: 1, alpha: true });
+  fs.writeFileSync(path.join(dir, 'a.png'), picturePng(40, 20, { alpha: true }));
+  const px = pngPixels(path.join(dir, 'a.png'));
+  assert.equal(px.width, 40);
+  assert.equal(px.channels, 4);
+  assert.equal(px.data[3], 0, 'corner is see-through');
+  const st = pixelStats(px);
+  assert.equal(st.clearBorder, 1);
+  assert.ok(st.flat < 0.5 && st.visible > 0.3);
+});
+
+test('art: Codex-style agent draws concepts for every style, board compares them, lock records the user pick', () => {
+  const dir = artGame('art1');
+  let r = gk(dir, 'art', 'gen');
+  assert.equal(r.code, 0, r.out);
+  for (const s of ['paper', 'pixel']) for (const c of ['hero', 'screen']) assert.ok(fs.existsSync(path.join(dir, `art/concepts/${s}/${c}.png`)));
+  const brief = read(dir, 'art/concepts/paper/BRIEF.md');
+  assert.match(brief, /flat layered paper cut-out style/);
+  assert.match(brief, /reference\//, 'tells the agent to stay out of reference/');
+  assert.match(brief, /tỉ lệ 3:2/);
+  const board = read(dir, 'art/concepts/index.html');
+  assert.match(board, /Giấy cắt lớp/);
+  assert.match(board, /paper\/screen\.png/);
+  assert.match(gk(dir, 'art', 'gen', '--dry-run').out, /fake-imagegen\.mjs Đọc art\/concepts\/paper\/BRIEF\.md/);
+
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^phase: P0/m, 'phase: P3'));
+  tickAll(dir, 'P3');
+  assert.match(gk(dir, 'gate').out, /✘ Style art đã chốt.*art\.style chưa điền/);
+  assert.equal(gk(dir, 'art', 'lock', 'nope').code, 1);
+  r = gk(dir, 'art', 'lock', 'paper');
+  assert.equal(r.code, 0, r.out);
+  assert.equal(YAML.parse(read(dir, 'game.yaml')).art.style, 'paper');
+  assert.match(read(dir, 'DECISIONS.md'), /^## D-1 Chốt style art: Giấy cắt lớp/m);
+  assert.match(read(dir, 'art/concepts/index.html'), /đã chốt/);
+  assert.match(gk(dir, 'gate').out, /✔ Style art đã chốt/);
+  assert.equal(gk(dir, 'validate').code, 0);
+});
+
+test('art: check catches flat fills, fake transparency, missing prompt records; a failing agent is reported', () => {
+  const dir = artGame('art2');
+  let r = withFake('flat', () => gk(dir, 'art', 'gen', '--style', 'pixel'));
+  assert.equal(r.code, 1);
+  assert.match(r.out, /pixel\/screen\.png: .*một màu/);
+  r = withFake('opaque', () => gk(dir, 'art', 'gen', '--style', 'pixel', '--only', 'hero', '--note', 'nền phải trong suốt'));
+  assert.equal(r.code, 1);
+  assert.match(r.out, /hero\.png: .*không có kênh alpha|hero\.png: .*mép ảnh/);
+  assert.match(read(dir, 'art/concepts/pixel/BRIEF.md'), /## Góp ý cho lần vẽ lại\nnền phải trong suốt/);
+  assert.doesNotMatch(read(dir, 'art/concepts/pixel/BRIEF.md'), /screen\.png/, '--only redraws just that concept');
+  assert.equal(gk(dir, 'art', 'gen', '--style', 'pixel').code, 0);
+  fs.rmSync(path.join(dir, 'art/concepts/pixel/hero.json'));
+  r = gk(dir, 'art', 'check', '--style', 'pixel');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /thiếu art\/concepts\/pixel\/hero\.json/);
+  assert.equal(gk(dir, 'art', 'lock', 'pixel').code, 1, 'cannot lock a style whose concepts fail the check');
+  r = withFake('fail', () => gk(dir, 'art', 'gen', '--style', 'paper'));
+  assert.equal(r.code, 1);
+  assert.match(r.out, /concept-paper: thoát mã 3/);
+  assert.match(r.out, /chưa có art\/concepts\/paper\/hero\.png/);
+});
+
+test('art: briefs never name the original game; assets need a locked style; a missing agent is a clear error', () => {
+  const dir = artGame('art3');
+  write(dir, 'art/styles.yaml', STYLES.replace('một chú chim tròn', 'giống OldBird'));
+  let r = gk(dir, 'art', 'gen');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /OldBird/);
+  assert.equal(gk(dir, 'validate').code, 1);
+  write(dir, 'art/styles.yaml', STYLES.replace('pitch: Gọn, sắc nét', 'pitch: xem reference/shot.png'));
+  assert.match(gk(dir, 'validate').out, /reference\//);
+  write(dir, 'art/styles.yaml', STYLES);
+  r = gk(dir, 'art', 'gen', '--style', 'nope');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /Không có style nope/);
+  assert.match(gk(dir, 'art', 'gen', '--assets').out, /Chưa chốt style/);
+  editYaml(dir, (g) => {
+    g.art.command = ['gamekit-no-such-image-tool', '{prompt}'];
+  });
+  r = gk(dir, 'art', 'gen', '--style', 'paper');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /không tìm thấy lệnh "gamekit-no-such-image-tool"/);
+  editYaml(dir, (g) => {
+    g.art.style = 'ghost';
+  });
+  assert.match(gk(dir, 'validate').out, /art\.style = ghost/);
+});
+
+test('art: assets from asset-manifest in the locked style, exact size, labelled generated with model and prompt', () => {
+  const dir = artGame('art4');
+  assert.equal(gk(dir, 'art', 'gen', '--style', 'paper').code, 0);
+  assert.equal(gk(dir, 'art', 'lock', 'paper').code, 0);
+  write(dir, 'asset-manifest.json', JSON.stringify({
+    assets: [
+      { id: 'bird', path: 'assets/img/bird.png', kind: 'anim', make: 'image-gen', width: 64, height: 64, alpha: true, frames: { count: 3, width: 64, height: 64, fps: 12 }, brief: 'chim vỗ cánh' },
+      { id: 'btn', path: 'assets/img/btn.png', kind: 'ui', make: 'image-gen', width: 96, height: 48, alpha: true, nineSlice: [16, 16, 16, 16], brief: 'nút giấy' },
+      { id: 'logo', path: 'assets/img/logo.svg', kind: 'ui', make: 'vector', width: 64, height: 64 },
+    ],
+  }));
+  let r = gk(dir, 'art', 'gen', '--assets', '--batch', '1');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /assets-2: xong/);
+  assert.ok(!fs.existsSync(path.join(dir, 'assets/img/logo.svg')), 'only make: image-gen');
+  const brief = read(dir, 'art/raw/BRIEF-1.md');
+  assert.match(brief, /flat layered paper cut-out style/);
+  assert.match(brief, /art\/concepts\/paper\/hero\.png/, 'chosen concepts are the style reference');
+  assert.match(brief, /3 khung 64×64/);
+  const prov = JSON.parse(read(dir, 'provenance.json')).entries.find((e) => e.path === 'assets/img/bird.png');
+  assert.equal(prov.label, 'generated');
+  assert.match(prov.source, /fake-image-1/);
+  assert.match(prov.note, /test prompt/);
+  assert.equal(gk(dir, 'validate').code, 0);
+  editJson(dir, 'asset-manifest.json', (m) => {
+    m.assets[1].width = 128;
+  });
+  r = gk(dir, 'art', 'check', '--assets');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /btn\.png: 96×48, spec cần 128×48/);
+  write(dir, 'asset-manifest.json', JSON.stringify({ assets: [{ id: 'old', path: 'assets/img/old.png', kind: 'sprite', make: 'image-gen', width: 8, height: 8, brief: 'như OldBird' }] }));
+  assert.match(gk(dir, 'art', 'gen', '--assets').out, /old: brief nhắc "OldBird"/);
 });

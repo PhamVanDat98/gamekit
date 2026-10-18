@@ -27,6 +27,9 @@ export const AVAILABLE_SKILLS = new Set([
   'platform-sdk',
   'package-web-build',
   'release-check',
+  'style-direction',
+  'style-preview',
+  'replace-graphics',
 ]);
 
 /** Phase name, skills and the user's decision for this game's ownership. */

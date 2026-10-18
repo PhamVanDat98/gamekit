@@ -44,6 +44,7 @@ export function validateGame(root, { stage } = {}) {
   validateProvenance(root, st, pr);
   validateModulePlan(root, pr);
   validateAssetManifest(root, pr);
+  validateStyles(root, game, pr);
   return { problems: pr, game };
 }
 
@@ -373,6 +374,55 @@ function validateAssetManifest(root, pr) {
       pr.error(where, `${a.id}: ${a.path} là ${info.width}×${info.height}, spec cần ${w}×${a.height}`);
     if (a.alpha === true && info.alpha === false) pr.error(where, `${a.id}: cần nền trong suốt nhưng PNG không có kênh alpha`);
   }
+}
+
+// ---------- art/styles.yaml: style directions and the concept set they are compared on ----------
+export const STYLES_FILE = 'art/styles.yaml';
+
+export function loadStyles(root) {
+  const f = path.join(root, STYLES_FILE);
+  return exists(f) ? readYaml(f) : null;
+}
+
+/** Names of the original game (release.forbiddenTerms) found in a text — briefs must describe a new design. */
+export function forbiddenHits(game, text) {
+  const low = String(text).toLowerCase();
+  return (game.release?.forbiddenTerms ?? []).filter((t) => t && low.includes(t.toLowerCase()));
+}
+
+export function checkStyles(styles, game) {
+  const pr = new Problems();
+  const where = STYLES_FILE;
+  for (const e of check('art-styles', styles)) pr.error(where, e);
+  if (!pr.ok) return pr;
+  for (const key of ['concepts', 'styles']) {
+    const seen = new Set();
+    for (const it of styles[key]) {
+      if (seen.has(it.id)) pr.error(where, `${key}: trùng id ${it.id}`);
+      seen.add(it.id);
+    }
+  }
+  const text = JSON.stringify(styles);
+  for (const t of forbiddenHits(game, text)) pr.error(where, `nhắc "${t}" của game gốc — art brief mô tả thiết kế mới, không nhắc tên hay nhân vật gốc`);
+  if (/(^|[^a-z])reference\//i.test(text)) pr.error(where, 'trỏ tới reference/ — không đưa asset của game gốc cho bên vẽ ảnh');
+  return pr;
+}
+
+function validateStyles(root, game, pr) {
+  let styles;
+  try {
+    styles = loadStyles(root);
+  } catch (e) {
+    pr.error(STYLES_FILE, e.message);
+    return;
+  }
+  const locked = game.art?.style;
+  if (!styles) {
+    if (locked) pr.error('game.yaml', `art.style = ${locked} nhưng không có ${STYLES_FILE}`);
+    return;
+  }
+  pr.merge(checkStyles(styles, game));
+  if (locked && !(styles.styles ?? []).some((s) => s.id === locked)) pr.error('game.yaml', `art.style = ${locked} không có trong ${STYLES_FILE}`);
 }
 
 export async function run(args) {

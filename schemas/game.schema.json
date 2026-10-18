@@ -273,6 +273,20 @@
           "description": "Host ngoài được phép xuất hiện trong gói (CDN SDK của portal…)"
         }
       }
+    },
+    "art": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "style": { "type": ["string", "null"], "description": "Style đã chốt (gamekit art lock <id>), id trong art/styles.yaml" },
+        "lockedAt": { "type": ["string", "null"] },
+        "command": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Lệnh sinh ảnh; {prompt} được thay bằng yêu cầu. Mặc định: codex exec --full-auto --skip-git-repo-check {prompt}"
+        }
+      }
     }
   }
 }

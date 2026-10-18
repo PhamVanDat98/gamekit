@@ -25,11 +25,13 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
   check-ownership [--module id]             Module chỉ sửa trong thư mục được giao
   integrate --wave N [--test "cmd"] [--cleanup]   Merge theo phụ thuộc, test sau mỗi lần
+  art brief|gen|check [--style a,b | --assets] [--only id,…] [--note "…"]   Concept/asset raster: viết brief, gọi Codex vẽ, kiểm tra
+  art board | art lock <style>              Bảng so concept (art/concepts/index.html); chốt style người dùng chọn
   precommit                                 (git hook) chặn asset gốc, code decompile, asset chưa nhãn
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'assets']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -61,6 +63,7 @@ const COMMANDS = {
   fanout: () => import('./parallel.mjs').then((m) => m.fanout),
   'check-ownership': () => import('./parallel.mjs').then((m) => m.checkOwnership),
   integrate: () => import('./parallel.mjs').then((m) => m.integrate),
+  art: () => import('./art.mjs').then((m) => m.run),
   precommit: () => import('./precommit.mjs').then((m) => m.run),
 };
 

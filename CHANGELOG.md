@@ -1,5 +1,13 @@
 # Changelog
 
+## Chưa phát hành
+Đồ hoạ raster do Codex vẽ, Claude kiểm, người dùng chốt (P3):
+- Lệnh `art`: `brief`, `gen` (gọi `codex exec` song song, `--only`/`--note` để vẽ lại), `check`, `board` (bảng so `art/concepts/index.html`), `lock <style>` (`game.yaml` `art.style` + mục `D-n`). `art.command` trong `game.yaml` để đổi lệnh vẽ.
+- `art check` bắt: sai kích thước/tỉ lệ, thiếu alpha, mép không trong suốt (nền ca-rô giả), ảnh gần như một màu, thiếu prompt và model. Asset đạt được nhãn provenance `generated`.
+- `art/styles.yaml` (schema `art-styles`): các hướng style, style lock, bảng màu, hướng bố cục UI, bộ concept chung. `validate` chặn tên game gốc và đường dẫn `reference/` trong brief.
+- Skill `style-direction`, `style-preview`, `replace-graphics`. Cổng P3 (`third-party`) có mục tự chấm "Style art đã chốt".
+- Template: `art/raw/` gitignored.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.

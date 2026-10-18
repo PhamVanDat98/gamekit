@@ -24,7 +24,7 @@ GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, 
 | P0 Intake | Nhận diện engine, kiểm kê, chấm khả thi | game-recon, triage | Làm hay bỏ |
 | P1 Phân tích | Trích logic, số liệu, asset, UI từ game gốc | engine-*, **re-notes**, gameplay-spec, asset-inventory, ui-extract | |
 | P2 Dựng lại | Dựng lại bằng JS/TS, chơi được (asset gốc nếu là game của người dùng, placeholder nếu làm lại) | runtime-select, **module-plan**, **rebuild-game**, **integrate**, **parity-check** | |
-| P3 Chuyển sang web | Điều khiển, bố cục web, nén asset. `third-party`: thêm reskin (style, asset mới theo spec) | web-relayout; `third-party`: style-*, asset-spec, apply-style, replace-* | Duyệt bố cục; `third-party`: chọn style |
+| P3 Chuyển sang web | Điều khiển, bố cục web, nén asset. `third-party`: thêm reskin (style, asset mới theo spec) | web-relayout; `third-party`: **style-direction**, **style-preview**, asset-spec, apply-style, **replace-graphics**, replace-* | Duyệt bố cục; `third-party`: chọn style |
 | P4 Tích hợp | SDK portal, analytics, leaderboard, save | **platform-sdk**, add-* | |
 | P5 Phát hành | Đóng gói, hiệu năng, QA, ảnh store | **package-web-build**, perf-budget, qa-smoke, store-assets, **release-check** | Playtest cuối |
 
