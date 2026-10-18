@@ -3,7 +3,14 @@
 ## Chưa phát hành
 - `pack` khi có portal chưa điền đủ thông tin: vẫn đóng gói các portal đã đủ, liệt kê mục còn thiếu, thoát mã 1 (trước đây dừng hết). Chưa có token azgames thì thử bằng `pack --portal dev-mock`.
 - `gate`: mục `{auto: pack}` dùng lại bản build mới nhất nếu nó được build từ HEAD, không build lại.
-- `init`/`config --questions` in JSON luôn, bỏ cờ `--json`.
+- `init`/`config --questions` in JSON luôn; `--json` không cần nữa (vẫn nhận để lệnh cũ chạy được).
+- `validate`: số liệu và oracle `template-demo` là cảnh báo trước P2, lỗi từ P2 (cổng P2 không còn qua với game demo). File dữ liệu sai dạng (`null`, thiếu `path`…) được báo theo file thay vì crash `validate`/`gate`.
+- `integrate`: module đã merge mà nhánh có commit mới (sửa sau review) được merge tiếp, `--cleanup` không gỡ worktree đó; test đỏ thì dọn cả file test sinh ra; `fanout` chạy được khi thư mục worktree bị xoá tay. `module-plan.yaml` từ chối đường dẫn glob, `/…`, `..`, `\`.
+- `parity`: file test không nạp được hoặc hook lỗi làm parity đỏ (trước đây thẻ trong file đó biến mất mà vẫn đạt); thẻ sai dạng (`[A:normal]`, `[a : edge]`) được cảnh báo.
+- `provenance add .` không còn ghi đường dẫn có `/` ở đầu hay gắn nhãn `.git/`, `node_modules/`; chặn file ngoài game; `licensed` cần `--license`.
+- `precommit` kiểm `game.yaml` bản đã stage và chạy đúng khi game là thư mục con của repo lớn hơn.
+- `phase` sai trong `game.yaml`, tên game `a-`, cờ thiếu giá trị (`--title`): báo lỗi rõ thay vì crash hoặc ghi `"true"`.
+- Template: phím không còn bị kẹt sau khi rời cửa sổ hay mở Settings; chơi lại sau game over cần 600 ms và nhấn mới (tránh bấm nhầm quảng cáo); `gameplayStop` khi tạm dừng; vòng lặp không chậm đi trên máy yếu và không dừng hẳn khi một khung hình lỗi; `src/core` typecheck không có DOM, ESLint chặn thêm `Date()`, `crypto`, `Intl`, `fetch`, `import()`, số lạ trong object; Settings giữ focus trong hộp thoại; bản dịch có dạng số nhiều không trộn tiếng Anh.
 - Hook SessionStart: npm install lỗi thì chờ 1 ngày mới thử lại (trước đây thử 90 giây mỗi phiên, không báo) và báo lỗi kèm lệnh cài tay; kiểm cả `yaml` và `ajv`; chỉ nhận thư mục có `game.yaml` và `.gamekit/`; đường dẫn `references/` tuyệt đối; bỏ phần trùng với AGENTS.md của game (context nhỏ hơn ~20%).
 - Tài liệu: platform-sdk hướng dẫn tạo bộ vỏ `portals/<id>/`, thêm ghi chú portal azgames; sửa chỗ lệch với code (re-notes, rebuild-game, release-check, standards); README liệt kê skill `status` gợi ý nhưng chưa có.
 

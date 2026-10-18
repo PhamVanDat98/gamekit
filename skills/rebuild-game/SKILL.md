@@ -28,7 +28,7 @@ Với mỗi cơ chế trong spec:
 3. Viết logic trong `src/core/…` cho xanh. Chỉ dùng `Rng` có seed và `dt` của fixed step.
 4. Refactor, `npm run lint`.
 
-Thêm replay test cho luồng chơi chính (`tests/replay/`). Thay `src/core/world.ts` demo bằng logic game thật; giữ `worldHash` cho replay.
+Thêm replay test cho luồng chơi chính (`tests/replay/`). Thay `src/core/world.ts` demo bằng logic game thật; giữ `worldHash` cho replay. `params/` và `spec/oracles/` còn source `template-demo` là lỗi `validate` từ P2.
 
 ## 5. View
 `src/view/` vẽ từ state, map input thiết bị → `Action` (`src/contracts/input.ts`). Không sửa state. Không unit test; kiểm tra bằng chạy thử `npm run dev` và screenshot.
