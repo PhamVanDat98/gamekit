@@ -61,6 +61,42 @@ function progress(root, game, plan, kind) {
   return { units, merged, running };
 }
 
+/**
+ * Where every unit of a plan stands, read from git and the worktrees (nothing else is stored):
+ *   merged · done (committed, clean worktree: integrate it) · running (worktree open, work not committed yet)
+ *   ready (dependencies merged, not started; `capped` when maxParallel is full) · blocked (waits on dependencies)
+ * Returns null when the plan file is missing; { invalid: true } when it does not validate.
+ */
+export function planState(root, game, kind) {
+  let plan;
+  try {
+    plan = loadPlan(root, kind);
+  } catch {
+    return { kind, file: PLAN_FILES[kind], invalid: true };
+  }
+  if (!plan) return null;
+  const pr = kind === 'build' ? checkModulePlan(plan) : checkRePlan(plan);
+  if (!pr.ok) return { kind, file: PLAN_FILES[kind], invalid: true };
+  const { units, merged, running } = progress(root, game, plan, kind);
+  const max = plan.maxParallel ?? 4;
+  let free = Math.max(0, max - running.size);
+  const rows = topo(units).map((u) => {
+    const wt = worktreeOf(root, game, u.id, kind);
+    const br = branchOf(u.id, kind);
+    const ahead = branchExists(root, br) ? commitsAhead(root, plan.base, br) : 0;
+    const waits = (u.dependsOn ?? []).filter((d) => !merged.has(d));
+    let state;
+    if (merged.has(u.id)) state = 'merged';
+    else if (ahead > 0 && !worktreeDirty(wt)) state = 'done';
+    else if (running.has(u.id)) state = 'running';
+    else if (waits.length) state = 'blocked';
+    else state = 'ready';
+    const capped = state === 'ready' && free-- <= 0;
+    return { id: u.id, state, capped, waits, worktree: exists(wt) ? wt : null, branch: br, commits: ahead };
+  });
+  return { kind, file: PLAN_FILES[kind], base: plan.base, maxParallel: max, rows };
+}
+
 const waveOf = (plan, wave) => {
   const mods = plan.modules.filter((m) => m.wave === wave);
   if (!mods.length) throw new GkError(`Không có module nào ở đợt ${wave}`);

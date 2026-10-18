@@ -49,7 +49,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | --- | --- |
 | `init <tên>` | Tạo game từ `templates/game`, git init, cài hook, cài dependency. Hỏi thông tin (TTY) hoặc `--set k=v`; `--questions --json` in câu hỏi cho agent; `--third-party` khi làm lại game người khác |
 | `config [--portal p] [--set k=v]` | Điền thông tin portal còn thiếu hoặc thêm portal (chép checklist vào `gates/P4.md`) |
-| `status` / `next` | Pha, thời gian ở pha (cảnh báo vượt dự kiến), việc còn mở, skill tiếp theo |
+| `status` / `next` | Pha, thời gian ở pha (cảnh báo vượt dự kiến), việc còn mở, skill tiếp theo. Có `re-plan.yaml` / `module-plan.yaml`: việc song song — xong chờ integrate, đang làm, sẵn sàng giao ngay, đủ `maxParallel`, chờ phụ thuộc — kèm lệnh nên chạy |
 | `gate [--advance]` | Chấm `gates/<pha>.md`: mục `{auto: …}` chạy script (song song; `test` + `parity` dùng chung một lần vitest), mục `(bạn)` chỉ người dùng tick. `{only: split\|single}` theo việc có `re-plan.yaml` |
 | `gate --area <id>` | Cổng một mảng phân tích: luật P2 trên file của mảng, câu hỏi bắt buộc xong, nghĩa vụ có nguồn |
 | `validate [--stage Px]` | Schema `game.yaml`, `params/*.json` (mọi giá trị có `source`; `confidence` = observed/derived/inferred, inferred cần `tolerance` từ P2), `spec/obligations.yaml`, `spec/oracles/*.json`, provenance, `module-plan.yaml`, `asset-manifest.json` |

@@ -5,7 +5,7 @@ description: Dùng khi làm việc với một game port/reskin bằng GameKit (
 
 # Dùng GameKit
 
-GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, reskin và phát hành lên portal. Trạng thái mỗi game nằm trong `game.yaml`. **Trước khi làm gì trong một game, chạy `gamekit status`** để biết pha hiện tại, việc còn mở ở cổng và skill nên dùng.
+GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, reskin và phát hành lên portal. Trạng thái mỗi game nằm trong `game.yaml`. **Trước khi làm gì trong một game, chạy `gamekit status`** để biết pha hiện tại, việc còn mở ở cổng và skill nên dùng. Game chia mảng/module: mục **Việc song song** liệt kê đơn vị chờ integrate và đơn vị giao được ngay — giao mọi đơn vị sẵn sàng cho subagent trong cùng một lượt (`/gamekit:next`).
 
 ## Gọi CLI
 - Trong thư mục game: `npm run gk -- <lệnh>` (shim `scripts/gk.mjs` trỏ tới plugin).

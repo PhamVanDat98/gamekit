@@ -495,6 +495,43 @@ modules:
   assert.match(r.out, /Toàn bộ test xanh sau 2 merge/);
 });
 
+test('status: parallel work per plan — done to integrate, running, ready to hand out, capped, blocked, merged', () => {
+  const dir = newGame('pstat');
+  write(dir, 're-plan.yaml', `kind: re
+base: main
+maxParallel: 2
+shared: [re-plan.yaml]
+areas:
+  - { id: a, owns: [notes/a/], brief: A }
+  - { id: b, owns: [notes/b/], brief: B }
+  - { id: c, owns: [notes/c/], brief: C }
+  - { id: d, owns: [notes/d/], dependsOn: [a], brief: D }
+`);
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  let r = gk(dir, 'status');
+  assert.match(r.out, /Việc song song \(re-plan\.yaml, tối đa 2 cùng lúc\) — 0\/4 mảng phân tích đã merge/);
+  assert.match(r.out, /Sẵn sàng, giao được ngay: a, b → `gamekit fanout --plan re --ready`/);
+  assert.match(r.out, /Sẵn sàng nhưng đã đủ 2 việc đang chạy: c/);
+  assert.match(r.out, /Chờ phụ thuộc: d \(chờ a\)/);
+  assert.equal(gk(dir, 'fanout', '--plan', 're', '--ready').code, 0);
+  const wt = (id) => path.join(path.dirname(dir), 'pstat.worktrees', `re-${id}`);
+  commitIn(wt('a'), { 'notes/a/questions.yaml': 'questions: []\n' });
+  write(wt('b'), 'notes/b/wip.md', 'x');
+  r = gk(dir, 'status');
+  assert.match(r.out, /Xong, chờ integrate: a \(1 commit\) → `gamekit integrate --plan re --ready`/);
+  assert.match(r.out, /Đang làm: b/);
+  assert.match(r.out, /Sẵn sàng nhưng đã đủ 2 việc đang chạy: c/);
+  assert.equal(gk(dir, 'integrate', '--plan', 're', '--ready', '--cleanup').code, 0);
+  r = gk(dir, 'status');
+  assert.match(r.out, /1\/4 mảng phân tích đã merge/);
+  assert.match(r.out, /Sẵn sàng, giao được ngay: c → /, 'a merged and its worktree removed: one slot free, c first in order');
+  assert.match(r.out, /Sẵn sàng nhưng đã đủ 2 việc đang chạy: d/);
+  // a broken plan is reported, not a crash
+  write(dir, 're-plan.yaml', 'kind: re\n');
+  assert.match(gk(dir, 'status').out, /kế hoạch không hợp lệ/);
+});
+
 test('provenance: unlabeled assets fail; reference blocked from P3; placeholder blocked at P5', () => {
   const dir = newGame();
   write(dir, 'assets/hero.png', 'x');

@@ -21,6 +21,7 @@
 - `parity --area <id> | --module <id> | --obligation a,b`: chỉ chấm và chỉ chạy (vitest `-t`) test của nghĩa vụ trong phạm vi; thẻ của nghĩa vụ ngoài phạm vi không tính là lạ. `--json`. Module nhận nghĩa vụ từ trường mới `obligations` trong `module-plan.yaml` (validate kiểm có thật), hoặc từ mảng có `buildModule` trỏ tới nó.
 - `parity --mutate`: đổi bảng oracle của nghĩa vụ (test oracle phải đỏ, không thì lỗi) và từng số params (vẫn xanh = cảnh báo: kỳ vọng lấy từ chính params). Luôn khôi phục file. Skill parity-check mục 5 viết lại theo đó — hướng dẫn cũ "đổi params thì phải đỏ" sai với test lấy kỳ vọng từ params.
 - `integrate --scoped`: sau mỗi merge chỉ test của module + `parity --module`, cuối lượt chạy toàn bộ một lần; đỏ thì hoàn tác cả lượt.
+- `status` có mục **Việc song song** cho `re-plan.yaml` và `module-plan.yaml`: xong chờ integrate (kèm số commit), đang làm, sẵn sàng giao ngay, sẵn sàng nhưng đủ `maxParallel`, chờ phụ thuộc nào — kèm lệnh nên chạy. Trạng thái chỉ đọc từ git và worktree. `/gamekit:next` integrate trước, rồi giao mọi đơn vị sẵn sàng cho subagent trong cùng một lượt.
 - `docs/re-process-review.md`: rà soát quy trình RE và kế hoạch chạy song song.
 
 ## 0.2.0 — 2026-10-16
