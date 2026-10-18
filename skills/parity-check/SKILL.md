@@ -1,14 +1,16 @@
 ---
 name: parity-check
-description: Dùng ở P2 khi cần chứng minh bản web tái hiện đúng game gốc — lập spec/obligations.yaml (mỗi cơ chế một nghĩa vụ), dựng bảng oracle trong spec/oracles, gắn thẻ [id:case] vào test, chạy gamekit parity cho tới khi mọi nghĩa vụ bắt buộc đóng. Cũng dùng khi gate P2 báo mục Parity đỏ.
+description: Dùng ở cuối P1 để lập spec/obligations.yaml từ ghi chú RE (mỗi cơ chế một nghĩa vụ, có nguồn), và ở P2 khi cần chứng minh bản web tái hiện đúng game gốc — dựng bảng oracle trong spec/oracles, gắn thẻ [id:case] vào test, chạy gamekit parity cho tới khi mọi nghĩa vụ bắt buộc đóng. Cũng dùng khi gate P2 báo mục Parity đỏ.
 ---
 
-# Parity với game gốc (P2)
+# Parity với game gốc (lập ở P1, đóng ở P2)
 
 Parity không phải cảm giác "chơi thấy giống". Nó là danh sách nghĩa vụ trong `spec/obligations.yaml`, mỗi nghĩa vụ chỉ được đóng bằng test xanh. `gamekit parity` chấm theo kiểu **fail-closed**: test đỏ, test `skip`/`todo`, thiếu case, thẻ trỏ tới nghĩa vụ không tồn tại đều tính là **chưa đạt**. Không có trạng thái "chắc là đúng".
 
-## 1. Lập danh sách nghĩa vụ
-Đọc `spec/gameplay-spec.md`, `notes/`, `params/`. Mỗi hành vi người chơi cảm nhận được = một nghĩa vụ:
+## 1. Lập danh sách nghĩa vụ (cuối P1)
+Nghĩa vụ là **đầu ra của RE**: lập ở cuối P1, trước khi viết code, để biết phạm vi thật của việc dựng lại (và đánh giá khả thi lại nếu lớn hơn dự kiến). Cổng P1 chặn khi nghĩa vụ chưa trỏ tới ghi chú RE có thật (`source`). Ở P2 chỉ thêm nghĩa vụ khi phát hiện cơ chế mới — kèm câu hỏi mới trong `notes/QUESTIONS.md`.
+
+Đọc `spec/gameplay-spec.md`, `notes/`, `params/`, `spec/inventory.yaml`. Mỗi hành vi người chơi cảm nhận được = một nghĩa vụ; thêm id của nó vào `covers` của cơ chế tương ứng trong danh mục:
 
 ```yaml
 - id: enemy.bullet-ring          # ổn định, dùng trong thẻ test
@@ -34,7 +36,7 @@ Lấy `out` từ đâu (ghi vào `confidence`):
 - `derived`: tính theo logic đã lần ra trong `notes/`. Cẩn thận: nếu chính bạn suy ra công thức rồi dùng nó sinh oracle, test chỉ chứng minh code khớp với cách bạn hiểu. Phải ghi rõ điều đó.
 - `inferred`: đo từ video hoặc chơi thử. Bắt buộc có `tolerance`.
 
-Chạy code của game gốc để sinh oracle (harness, emulator, Unity Editor): với game của người dùng (`own`) cứ làm, đây là cách có oracle `observed` tốt nhất. Với `third-party` đó là chạy binary của người khác: chỉ làm khi người dùng đồng ý, và ghi lại thành `D-n`.
+Chạy code của game gốc để sinh oracle (harness, emulator, Unity Editor): với game của người dùng (`own`) cứ làm, đây là cách có oracle `observed` tốt nhất — công thức theo engine trong [references/oracle-harness.md](references/oracle-harness.md). Với `third-party` đó là chạy binary của người khác: chỉ làm khi người dùng đồng ý, và ghi lại thành `D-n`.
 
 ## 3. Gắn thẻ test
 Tên test chứa `[id:case]`, viết ở `it` hoặc `describe`:

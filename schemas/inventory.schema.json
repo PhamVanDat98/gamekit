@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gamekit/inventory.schema.json",
+  "title": "spec/inventory.yaml — danh mục cơ chế (type gameplay) của game gốc; mỗi mục phải covers hoặc skip trước cổng P1",
+  "type": "object",
+  "required": ["items"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "source": { "type": "string", "description": "Lấy từ đâu: file assembly, dump.cs, thư mục script" },
+    "ignore": {
+      "type": "array",
+      "description": "Bỏ nhiều mục một lúc theo mẫu id (* = mọi ký tự)",
+      "items": {
+        "type": "object",
+        "required": ["pattern", "reason"],
+        "additionalProperties": false,
+        "properties": { "pattern": { "type": "string", "minLength": 1 }, "reason": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "description": "Tên type/script trong game gốc" },
+          "kind": { "type": "string", "description": "MonoBehaviour, ScriptableObject, class, struct, component, script…" },
+          "where": { "type": "string" },
+          "methods": { "type": "integer", "minimum": 0 },
+          "lines": { "type": "integer", "minimum": 0 },
+          "covers": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "description": "Câu hỏi (Q3) và/hoặc nghĩa vụ (player.move) xử lý cơ chế này" },
+          "skip": { "type": "string", "minLength": 1, "description": "Lý do không liên quan tới gameplay" },
+          "missing": { "type": "boolean", "description": "recon lần sau không còn thấy mục này" },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

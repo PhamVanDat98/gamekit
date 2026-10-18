@@ -1,6 +1,18 @@
 # Changelog
 
 ## Chưa phát hành
+P0–P1 có công cụ thật, không chỉ checklist:
+- Lệnh `recon`: nhận diện game gốc từ thư mục, APK/IPA/zip, `Assembly-CSharp.dll`, `dump.cs` (Il2CppDumper), `.pck` — engine (thêm `gamemaker`), phiên bản, dạng build (`source.variant`: source, mono, il2cpp, webgl, pck, creator-2/3, native…), nơi chứa logic và data, SDK (server, quảng cáo, analytics, IAP, thư viện), dấu hiệu làm rối code (dấu obfuscator .NET, metadata IL2CPP bị sửa, `_0x…`, `.jsc`), công cụ gợi ý. Tự đọc zip, metadata .NET và gói Godot, không cần công cụ ngoài.
+- Đánh giá khả thi: điểm = truy cập logic × số cơ chế × làm rối × phụ thuộc server → làm / chạy thử / rủi ro, số ngày dự kiến từng pha. `recon --write` ghi `notes/recon.md` (giữ phần "Ghi chú thêm"), `game.yaml` (engine khi đang unknown, version, variant, path, `budget.plannedDays` chưa có), nên cảnh báo cắt lỗ của `status` có kế hoạch để so.
+- Danh mục cơ chế `spec/inventory.yaml` (schema mới): type gameplay của game gốc (MonoBehaviour/ScriptableObject qua cả lớp cha trong game), mỗi mục phải `covers` (câu hỏi/nghĩa vụ) hoặc `skip`/`ignore` có lý do. Chạy lại recon chỉ thêm mục mới.
+- `re` có tỉ lệ phủ danh mục cơ chế và mục "còn phải xong trước cổng": cơ chế chưa xử lý, câu chưa xong thiếu cột **Ảnh hưởng nếu chưa rõ**, `spec/gameplay-spec.md` còn TODO, nghĩa vụ chưa trỏ tới ghi chú RE; từ P2 câu còn `mở`. Cổng P1 và P2 chấm `{auto: re}`; `status` có một dòng tóm tắt.
+- Nghĩa vụ parity lập ở **cuối P1** (đầu ra của RE), P2 chỉ đóng. Template có `spec/gameplay-spec.md` mẫu và cột ảnh hưởng trong `notes/QUESTIONS.md`.
+- RNG gốc: `Rng` nhận `RandomSource`; template có `DotNetRandom` (khớp `System.Random` có seed, test với giá trị đã công bố của .NET) và mẫu nghĩa vụ `rng.sequence`.
+- `skills/parity-check/references/oracle-harness.md`: cách sinh oracle từ chính game gốc theo engine (Unity Editor/batchmode, Mono + Assembly-CSharp.dll, IL2CPP/native qua Frida hoặc giả lập, JS qua Playwright, Godot headless).
+- Lệnh `assets`: kiểm kê asset theo loại và dung lượng, định dạng phải chuyển cho web, file quá nặng, nhãn provenance; `--write` → `notes/assets.md`.
+- Lệnh `smoke`: mở gói `dev-mock` trong Chromium headless (máy tính; điện thoại dọc/ngang, CPU chậm 4×), đo thời gian vào game, bắt đầu chơi bằng phím/chạm, FPS, lỗi console, request hỏng, Settings + footer bản quyền; so với `budget`; ảnh chụp ở `builds/<v>/smoke/`. Cần Playwright (tuỳ chọn). Cổng P5 chấm `{auto: smoke}`.
+- Skill mới: `game-recon`, `triage`, `asset-inventory`, `web-relayout`, `qa-smoke`. Cổng P0 chấm `notes/recon.md`.
+
 Theo dõi RE, REA làm bước phân tích của P1:
 - Lệnh `re`: câu hỏi trong `notes/QUESTIONS.md` theo trạng thái, số bước và evidence mỗi câu, bước gần đây, cảnh báo (bước chưa gắn câu hỏi, phân tích lặp y hệt, kết quả bị cắt/chưa đủ, game third-party dùng tool chạy game). `--watch` cập nhật trực tiếp, `--json` cho agent; `re focus <Q#>` chọn câu đang làm; `re log` ghi tay (công cụ GUI, Codex).
 - Nhật ký `notes/re-log.jsonl`: chỉ ghi tool, đối tượng, evidence id, giới hạn kết quả — không ghi nội dung trả về.

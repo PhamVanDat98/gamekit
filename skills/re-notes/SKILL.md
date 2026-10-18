@@ -1,6 +1,6 @@
 ---
 name: re-notes
-description: Dùng ở P1 khi phân tích game gốc để trích logic, số liệu và cơ chế — đặt câu hỏi trong notes/QUESTIONS.md, soi file bằng REA (MCP) hoặc công cụ theo engine, ghi bước phân tích vào nhật ký RE (gamekit re), kết luận kèm vị trí, độ tin cậy và evidence, đưa số vào params/. Dùng cả khi kết quả decompile trông vô lý, cần đối chiếu nhiều nguồn, hoặc người dùng muốn xem tiến độ phân tích.
+description: Dùng ở P1 khi phân tích game gốc để trích logic, số liệu và cơ chế — đi qua danh mục cơ chế spec/inventory.yaml, đặt câu hỏi trong notes/QUESTIONS.md, soi file bằng REA (MCP) hoặc công cụ theo engine, ghi bước phân tích vào nhật ký RE (gamekit re), kết luận kèm vị trí, độ tin cậy và evidence, đưa số vào params/. Dùng cả khi kết quả decompile trông vô lý, cần đối chiếu nhiều nguồn, hoặc người dùng muốn xem tiến độ phân tích.
 ---
 
 # Ghi chú reverse engineering (P1)
@@ -22,14 +22,18 @@ Game của người dùng (`source.ownership: own`, mặc định): có source t
 GameKit giữ vòng ngoài (câu hỏi, ghi chú, params, cổng); REA hoặc công cụ khác lo bước 2. Mỗi bước 2 được ghi vào nhật ký RE, gắn với câu đang làm.
 
 ## Theo dõi
-- `gamekit re`: câu hỏi theo trạng thái, số bước và evidence mỗi câu, bước gần đây, cảnh báo. `gamekit re --watch` cập nhật trực tiếp; người dùng mở ở terminal thứ hai hoặc task VS Code "GameKit: theo dõi RE". `--json` cho agent.
+- `gamekit re`: câu hỏi theo trạng thái, số bước và evidence mỗi câu, tỉ lệ phủ danh mục cơ chế, bước gần đây, việc còn phải xong trước cổng, cảnh báo. `gamekit re --watch` cập nhật trực tiếp; người dùng mở ở terminal thứ hai hoặc task VS Code "GameKit: theo dõi RE". `--json` cho agent.
 - Trong Claude Code, hook của plugin tự ghi mỗi lần gọi tool REA (`mcp__rea__*`) và lệnh RE qua Bash (ilspycmd, Il2CppDumper, Cpp2IL, AssetRipper, jadx, apktool, gdre_tools, ffdec, wasm2wat, analyzeHeadless, `rea …`). Hook chỉ ghi tool, đối tượng, evidence id và giới hạn của kết quả; không ghi nội dung trả về.
 - Hook nhắc lại trong phiên khi bước chưa gắn câu hỏi, khi lặp y hệt một phân tích trước, hoặc khi kết quả bị cắt/chưa đủ. Làm theo lời nhắc.
 - Công cụ GUI (ILSpy, dnSpy, UABEA), đo bằng video, hoặc Codex: ghi tay `gamekit re log "<đã xem gì, thấy gì>" [--kind inspect|note|conclude] [--evidence ev_…]`.
 - Báo người dùng tiến độ bằng số từ `gamekit re`, không ước lượng.
 
 ## 1. Câu hỏi trước, công cụ sau
-Mở `notes/QUESTIONS.md`. Biến yêu cầu thành danh sách câu hỏi, mỗi câu ghi rõ cần loại bằng chứng gì: "tốc độ đạn bao nhiêu px/s, tăng theo level thế nào?" → cần hằng số và hàm cập nhật đạn. Mỗi câu có trạng thái: `mở` · `một phần` · `đã trả lời`.
+Bắt đầu từ **danh mục cơ chế** `spec/inventory.yaml` (do `gamekit recon` lập; chưa có thì chạy skill **game-recon**, hoặc lập tay khi engine không cho đọc danh sách type). Đây là thứ chống bỏ sót: câu hỏi do mình nghĩ ra sẽ thiếu những cơ chế mình không biết là có. Đi qua từng mục:
+- liên quan tới gameplay → đặt câu hỏi, ghi `covers: [Q#]` (sau này thêm id nghĩa vụ);
+- không liên quan (UI thuần, SDK, tiện ích, editor) → `skip: "lý do"`; nhiều mục cùng kiểu thì dùng `ignore: [{ pattern: "UI*", reason: … }]`.
+
+Mở `notes/QUESTIONS.md`. Mỗi câu ghi rõ cần loại bằng chứng gì: "tốc độ đạn bao nhiêu px/s, tăng theo level thế nào?" → cần hằng số và hàm cập nhật đạn. Mỗi câu có trạng thái: `mở` · `một phần` · `đã trả lời`, và cột **Ảnh hưởng nếu chưa rõ** (bản port sai ở đâu nếu câu này không trả lời được) — cổng chặn câu chưa xong mà thiếu cột này.
 
 Trước khi mở công cụ, xem `gamekit re`, `notes/` và `params/` đã có gì. Không phân tích lại thứ đã có kết luận. Rồi `gamekit re focus Q#` cho câu sắp làm.
 
@@ -75,5 +79,14 @@ Rồi `gamekit re log "<kết luận một dòng>" --kind conclude [--evidence e
 
 Số liệu đưa vào `params/*.json` với `source` trỏ tới vị trí, `confidence`, và `evidence: ["ev_…"]` khi lấy từ REA. Id trong `evidence` phải có trong nhật ký; `validate` chặn id lạ. Giá trị `inferred` phải có `tolerance`; từ P2 `validate` sẽ chặn nếu thiếu. Bảng nhiều điểm (theo level, theo thời gian) đưa vào `spec/oracles/` (xem skill parity-check), cũng nhận `evidence`.
 
-## 5. Đóng pha
-`gamekit re` không còn lỗi: mỗi câu có trạng thái hợp lệ, câu `đã trả lời` có kết luận, evidence trích dẫn có trong nhật ký. Cổng P1 chấm điều này (`{auto: re}`). Câu `một phần` hoặc `mở` phải ghi lý do và ảnh hưởng tới bản port. Không nói "phân tích xong" khi còn câu bắt buộc chưa trả lời. Sau đó viết `spec/gameplay-spec.md` từ các ghi chú, chạy `gamekit validate`, rồi `gamekit gate`.
+## 5. RNG
+Nếu level, rơi đồ, spawn… sinh từ seed, phải biết **thuật toán RNG gốc** và cách seed (Unity `Random` = Xorshift128, .NET `System.Random`, LCG tự viết…). Ghi vào ghi chú + mục RNG trong `spec/gameplay-spec.md`; P2 thay nguồn ngẫu nhiên của `Rng` cho khớp (skill rebuild-game). Game chỉ dùng ngẫu nhiên cho cảm giác (hiệu ứng, rung) thì ghi rõ "không cần khớp chuỗi".
+
+## 6. Đóng pha
+1. `spec/gameplay-spec.md` (template có sẵn khung): điền từng mục từ ghi chú, xoá dòng `<!-- TODO … -->`.
+2. **Lập nghĩa vụ parity ngay ở P1** (skill parity-check §1): thay nghĩa vụ demo trong `spec/obligations.yaml` bằng nghĩa vụ của game gốc, mỗi cái có `source` trỏ tới ghi chú RE (`notes/<chủ đề>.md`). Thêm id nghĩa vụ vào `covers` của mục tương ứng trong danh mục cơ chế. P2 chỉ còn việc đóng các nghĩa vụ này.
+3. `gamekit re`: không lỗi, mục "Còn phải xong trước cổng P1" trống. Cổng P1 chấm điều này (`{auto: re}`): trạng thái câu hỏi, cột ảnh hưởng, danh mục cơ chế đã xử lý hết, spec hết TODO, nghĩa vụ có nguồn, evidence có trong nhật ký.
+4. Xem lại đánh giá khả thi với số liệu thật (số cơ chế, câu còn mở) — skill **triage**; người dùng quyết làm tiếp.
+5. `gamekit validate`, rồi `gamekit gate`.
+
+Không nói "phân tích xong" khi còn câu bắt buộc chưa trả lời.

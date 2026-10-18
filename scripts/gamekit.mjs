@@ -15,16 +15,21 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   init <tên> --questions --json             In danh sách câu hỏi kèm giải thích (cho agent hỏi người dùng)
   config [--portal p] [--set k=v…] [--questions --json]   Điền thông tin portal còn thiếu, thêm portal
   status | next                             Game đang ở pha nào, việc gì tiếp
+  recon [đường dẫn] [--write] [--json]      Nhận diện game gốc (engine, phiên bản, logic/data, SDK, làm rối code), đánh giá khả thi,
+                                            danh mục cơ chế. Nhận thư mục, APK/IPA/zip, Assembly-CSharp.dll, dump.cs, .pck
   gate [--advance]                          Kiểm tra cổng của pha hiện tại
-  validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
+  validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, inventory, nhật ký RE, provenance, module-plan, asset-manifest
   parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)
   re [--watch] [--json] [--last N]          Theo dõi RE: câu hỏi, bước phân tích, evidence (notes/re-log.jsonl); --watch cập nhật trực tiếp
   re focus <Q#> | --clear                   Câu hỏi đang làm — các bước phân tích sau đó gắn vào câu này
   re log "<tóm tắt>" [--kind note|inspect|conclude] [--q Q#] [--tool t] [--evidence ev_…]   Ghi tay một bước (công cụ GUI, Codex)
+  assets [thư mục…] [--write] [--json]      Kiểm kê asset: theo loại, định dạng cần chuyển cho web, file quá lớn, nhãn provenance
   provenance add <file…> --label <nhãn>     Gắn nguồn gốc asset (reference|generated|own|licensed|placeholder)
   provenance list [--label]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
   release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)
+  smoke [--version V] [--json]              Chạy bản build (dev-mock) trong Chromium: máy tính, điện thoại dọc/ngang — thời gian vào game,
+                                            bắt đầu chơi, FPS, lỗi console, Settings; so với ngân sách (cần Playwright)
   fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
   check-ownership [--module id]             Module chỉ sửa trong thư mục được giao
   integrate --wave N [--test "cmd"] [--cleanup]   Merge theo phụ thuộc, test sau mỗi lần
@@ -54,14 +59,17 @@ const COMMANDS = {
   init: () => import('./init.mjs').then((m) => m.run),
   config: () => import('./config.mjs').then((m) => m.run),
   status: () => import('./status.mjs').then((m) => m.run),
+  recon: () => import('./recon.mjs').then((m) => m.run),
   next: () => import('./status.mjs').then((m) => m.run),
   gate: () => import('./gate.mjs').then((m) => m.run),
   validate: () => import('./validate.mjs').then((m) => m.run),
   parity: () => import('./parity.mjs').then((m) => m.run),
   re: () => import('./re.mjs').then((m) => m.run),
   provenance: () => import('./provenance.mjs').then((m) => m.run),
+  assets: () => import('./assets.mjs').then((m) => m.run),
   pack: () => import('./pack.mjs').then((m) => m.run),
   'release-check': () => import('./release-check.mjs').then((m) => m.run),
+  smoke: () => import('./smoke.mjs').then((m) => m.run),
   fanout: () => import('./parallel.mjs').then((m) => m.fanout),
   'check-ownership': () => import('./parallel.mjs').then((m) => m.checkOwnership),
   integrate: () => import('./parallel.mjs').then((m) => m.integrate),

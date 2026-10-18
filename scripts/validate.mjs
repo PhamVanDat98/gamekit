@@ -11,6 +11,7 @@ import { pngInfo, isWebp } from './lib/png.mjs';
 import { loadLanguages, placeholders } from './lib/languages.mjs';
 import { checkSetting, loadPortal, missingSettings } from './lib/portals.mjs';
 import { LOG_FILE, readLog, unloggedEvidence } from './lib/relog.mjs';
+import { INVENTORY_FILE, loadInventory } from './lib/inventory.mjs';
 
 /** Folders whose files end up in a build and therefore need provenance. */
 export const SHIPPED_DIRS = ['assets', 'public'];
@@ -40,6 +41,7 @@ export function validateGame(root, { stage } = {}) {
   validateObligations(root, st, pr, paramKeys);
   validateOracles(root, pr);
   validateEvidence(root, pr);
+  validateInventory(root, pr);
   validatePortalSettings(game, st, pr);
   validateLanguages(root, game, pr);
   validateIcons(root, pr);
@@ -158,6 +160,16 @@ function validateEvidence(root, pr) {
   if (bad.length) pr.error(LOG_FILE, `dòng không phải JSON: ${bad.slice(0, 5).join(', ')}`);
   for (const c of unloggedEvidence(root, entries))
     pr.error(c.where, `evidence ${c.id} không có trong ${LOG_FILE} — ghi lại bước đó (\`gamekit re log "<tóm tắt>" --evidence <id>\`) hoặc bỏ id sai`);
+}
+
+// ---------- spec/inventory.yaml: mechanisms found by recon ----------
+function validateInventory(root, pr) {
+  try {
+    const data = loadInventory(root);
+    if (data) for (const e of check('inventory', data)) pr.error(INVENTORY_FILE, e);
+  } catch (e) {
+    pr.error(INVENTORY_FILE, e.message);
+  }
 }
 
 // ---------- portalSettings: answers to each portal kit's questions ----------

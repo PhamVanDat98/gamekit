@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { ROOT, gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
+import { ROOT, gk, newGame, token, sh, write, read, editJson, editYaml, tmpDir, fakeAssembly } from './helpers.mjs';
+import { zipDir } from '../scripts/lib/zip.mjs';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
 import { ownershipProblems, topo } from '../scripts/parallel.mjs';
@@ -106,6 +107,8 @@ test('gate: parses items, runs auto checks, advances and records timings', () =>
   const dir = newGame();
   assert.equal(gk(dir, 'gate').code, 1);
   write(dir, 'gates/P0.md', read(dir, 'gates/P0.md').replaceAll('- [ ]', '- [x]'));
+  assert.match(gk(dir, 'gate').out, /✘ Đã chạy `gamekit recon/, 'P0 needs notes/recon.md');
+  write(dir, 'notes/recon.md', '# Recon\n');
   const fieldFail = gk(dir, 'gate');
   assert.equal(fieldFail.code, 1, 'source.path and forbiddenTerms still empty');
   assert.match(fieldFail.out, /source\.path chưa điền/);
@@ -675,6 +678,7 @@ test('ownership: a new game is the user\'s own — P0 passes without forbiddenTe
   assert.match(read(dir, 'game.yaml'), /ownership: own/);
   assert.match(gk(dir, 'status').out, /game của bạn/);
   tickAll(dir, 'P0');
+  write(dir, 'notes/recon.md', '# Recon\n');
   write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig'));
   const r = gk(dir, 'gate');
   assert.equal(r.code, 0, r.out);
@@ -686,6 +690,7 @@ test('ownership: init --third-party requires forbiddenTerms, keeps reskin phase 
   assert.match(read(dir, 'game.yaml'), /ownership: third-party/);
   assert.match(gk(dir, 'status').out, /làm lại game người khác/);
   tickAll(dir, 'P0');
+  write(dir, 'notes/recon.md', '# Recon\n');
   write(dir, 'game.yaml', read(dir, 'game.yaml').replace('path: null', 'path: ../orig'));
   let r = gk(dir, 'gate');
   assert.equal(r.code, 1);
@@ -812,7 +817,7 @@ test('re: bad question states, answers without conclusion and unlogged evidence 
   });
   write(dir, 'notes/QUESTIONS.md', read(dir, 'notes/QUESTIONS.md').replace('| mở |', '| ? |'));
   const gate = gk(dir, 'gate');
-  assert.match(gate.out, /✘ Câu hỏi và nhật ký RE nhất quán.*\[auto: re\].*Q1 có trạng thái "\?"/);
+  assert.match(gate.out, /✘ Phân tích đủ để dựng lại.*\[auto: re\].*Q1 có trạng thái "\?"/);
 });
 
 test('re: a third-party game is warned when a runtime REA tool touched the original', () => {
@@ -822,4 +827,221 @@ test('re: a third-party game is warned when a runtime REA tool touched the origi
   assert.ok(reJson(dir).warnings.some((w) => /1 lần chạy\/gắn vào game: capture_process_scenario/.test(w)));
   const own = newGame('re5');
   assert.doesNotMatch(runHook({ cwd: own, tool_name: 'mcp__rea__capture_process_scenario', tool_input: {}, tool_response: 'ok' }), /file tĩnh/);
+});
+
+// ---------- recon: what the original game is made of ----------
+const GAME_TYPES = [
+  { name: 'Unit', base: 'UnityEngine.MonoBehaviour', methods: 3 },
+  { ns: 'Game', name: 'Player', base: 'Unit', methods: 5 },
+  { name: 'LevelData', base: 'UnityEngine.ScriptableObject', methods: 1 },
+  { name: 'Score', base: 'System.Object', methods: 2 },
+  { ns: 'DG.Tweening', name: 'Tween', base: 'System.Object', methods: 9 },
+];
+function unityMonoBuild() {
+  const d = tmpDir();
+  write(d, 'Game.exe', 'MZ');
+  fs.mkdirSync(path.join(d, 'Game_Data', 'Managed'), { recursive: true });
+  fs.writeFileSync(path.join(d, 'Game_Data', 'Managed', 'Assembly-CSharp.dll'), fakeAssembly(GAME_TYPES));
+  write(d, 'Game_Data/Managed/Photon3Unity3D.dll', 'x');
+  write(d, 'Game_Data/Managed/DOTween.dll', 'x');
+  write(d, 'Game_Data/globalgamemanagers', 'UnityFS\0\0\0\0\x065.x.x\x002021.3.5f1\0');
+  return d;
+}
+
+test('recon: Unity Mono build — engine, version, SDKs, inventory through base classes, triage', () => {
+  const src = unityMonoBuild();
+  const r = JSON.parse(gk(src, 'recon', src, '--json').out);
+  assert.deepEqual([r.engine, r.variant, r.engineVersion, r.platform], ['unity', 'mono', '2021.3.5f1', 'windows']);
+  assert.deepEqual(r.inventory.items.map((i) => [i.id, i.kind]), [['Unit', 'MonoBehaviour'], ['Game.Player', 'MonoBehaviour'], ['LevelData', 'ScriptableObject'], ['Score', 'class']], 'library namespaces are left out');
+  assert.equal(r.inventory.items[1].methods, 5);
+  assert.deepEqual(r.sdks.map((s) => s.cat), ['server', 'lib']);
+  assert.ok(r.signals.some((s) => s.level === 'risk' && /Photon3Unity3D/.test(s.text)));
+  assert.equal(r.obfuscated, false);
+  assert.equal(r.triage.factors.find((f) => f.name === 'Phụ thuộc server').value, 1.5);
+  assert.equal(r.triage.verdict.level, 'go');
+  assert.match(gk(src, 'recon', src).out, /Engine: unity 2021\.3\.5f1 · mono · windows/);
+});
+
+test('recon --write: notes/recon.md (keeps own notes), game.yaml, inventory merge keeps covers/skip', () => {
+  const src = unityMonoBuild();
+  const dir = newGame('rc1');
+  editYaml(dir, (g) => {
+    g.source.engine = 'unknown';
+  });
+  let r = gk(dir, 'recon', src, '--write');
+  assert.equal(r.code, 0, r.out);
+  const g = YAML.parse(read(dir, 'game.yaml'));
+  assert.deepEqual([g.source.engine, g.source.engineVersion, g.source.variant], ['unity', '2021.3.5f1', 'mono']);
+  assert.equal(path.resolve(dir, g.source.path), src);
+  assert.equal(g.budget.plannedDays.P0, 0.5);
+  assert.match(gk(dir, 're').out, /gamekit recon .* → unity mono/, 'recon is logged as an analysis step');
+  assert.match(read(dir, 'notes/recon.md'), /## Đánh giá khả thi/);
+  fs.appendFileSync(path.join(dir, 'notes/recon.md'), 'GHI-CHU-CUA-TOI\n');
+  const inv = YAML.parse(read(dir, 'spec/inventory.yaml'));
+  inv.items[0].covers = ['Q1'];
+  inv.items[3].skip = 'không phải gameplay';
+  write(dir, 'spec/inventory.yaml', YAML.stringify(inv));
+  editYaml(dir, (g2) => {
+    g2.budget.plannedDays.P1 = 9;
+  });
+  fs.writeFileSync(path.join(src, 'Game_Data', 'Managed', 'Assembly-CSharp.dll'), fakeAssembly([...GAME_TYPES, { name: 'Boss', base: 'Unit', methods: 4 }]));
+  r = gk(dir, 'recon', '--write'); // path from game.yaml
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /\+1 mục mới/);
+  assert.match(read(dir, 'notes/recon.md'), /GHI-CHU-CUA-TOI/);
+  const inv2 = YAML.parse(read(dir, 'spec/inventory.yaml'));
+  assert.deepEqual(inv2.items[0].covers, ['Q1']);
+  assert.equal(inv2.items[3].skip, 'không phải gameplay');
+  assert.equal(inv2.items.at(-1).id, 'Boss');
+  assert.equal(YAML.parse(read(dir, 'game.yaml')).budget.plannedDays.P1, 9, 'planned days set by hand are kept');
+  assert.equal(gk(dir, 'validate').code, 0);
+  write(dir, 'spec/inventory.yaml', 'items:\n  - id: X\n    covers: []\n');
+  assert.equal(gk(dir, 'validate').code, 1, 'schema: covers needs at least one ref');
+});
+
+test('recon: IL2CPP APK, encrypted metadata, dump.cs inventory, Godot .pck, Cocos bundle, unknown', () => {
+  // IL2CPP inside an APK (zip)
+  const apkDir = tmpDir();
+  write(apkDir, 'lib/arm64-v8a/libil2cpp.so', 'x');
+  write(apkDir, 'lib/arm64-v8a/libunity.so', 'x');
+  const meta = Buffer.concat([Buffer.from([0xaf, 0x1b, 0xb1, 0xfa, 29, 0, 0, 0]), Buffer.from('Assembly-CSharp.dll\0GoogleMobileAds.dll\0')]);
+  fs.mkdirSync(path.join(apkDir, 'assets/bin/Data/Managed/Metadata'), { recursive: true });
+  fs.writeFileSync(path.join(apkDir, 'assets/bin/Data/Managed/Metadata/global-metadata.dat'), meta);
+  write(apkDir, 'assets/bin/Data/globalgamemanagers', 'xx 2022.3.10f1 yy');
+  const apk = path.join(tmpDir(), 'game.apk');
+  zipDir(apkDir, apk);
+  let r = JSON.parse(gk(tmpDir(), 'recon', apk, '--json').out);
+  assert.deepEqual([r.engine, r.variant, r.engineVersion, r.platform, r.obfuscated], ['unity', 'il2cpp', '2022.3.10f1', 'android', null]);
+  assert.deepEqual(r.sdks.map((s) => s.cat), ['ads']);
+  assert.ok(r.unknowns.some((u) => /Il2CppDumper/.test(u)));
+  meta[0] = 0;
+  fs.writeFileSync(path.join(apkDir, 'assets/bin/Data/Managed/Metadata/global-metadata.dat'), meta);
+  zipDir(apkDir, apk);
+  r = JSON.parse(gk(tmpDir(), 'recon', apk, '--json').out);
+  assert.equal(r.obfuscated, true);
+  assert.ok(r.signals.some((s) => /FAB11BAF/.test(s.text)));
+  assert.ok(r.triage.factors.find((f) => f.name === 'Làm rối code').value > 1);
+
+  // Il2CppDumper dump.cs → only Assembly-CSharp types
+  const d = tmpDir();
+  write(d, 'dump.cs', [
+    '// Image 0: mscorlib.dll - 0', '// Image 1: Assembly-CSharp.dll - 10',
+    '// Namespace: System', 'public class Object // TypeDefIndex: 1',
+    '// Namespace: ', 'public class Enemy : MonoBehaviour // TypeDefIndex: 11',
+    '// Namespace: Game', 'public sealed class Boss : Enemy // TypeDefIndex: 12',
+    '// Namespace: ', 'internal struct Hit // TypeDefIndex: 13',
+  ].join('\n'));
+  r = JSON.parse(gk(d, 'recon', 'dump.cs', '--json').out);
+  assert.equal(r.inventoryOnly, true);
+  assert.deepEqual(r.inventory.items.map((i) => [i.id, i.kind]), [['Enemy', 'MonoBehaviour'], ['Game.Boss', 'MonoBehaviour'], ['Hit', 'struct']]);
+
+  // Godot 3 .pck
+  const entry = (p) => Buffer.concat([Buffer.from([p.length, 0, 0, 0]), Buffer.from(p), Buffer.alloc(32)]);
+  const head = Buffer.alloc(20 + 64 + 4);
+  head.write('GDPC');
+  [1, 3, 5, 1].forEach((v, i) => head.writeUInt32LE(v, 4 + i * 4));
+  head.writeUInt32LE(3, 84);
+  write(d, 'game.pck', '');
+  fs.writeFileSync(path.join(d, 'game.pck'), Buffer.concat([head, entry('res://player.gdc'), entry('res://player.gd.remap'), entry('res://icon.png')]));
+  r = JSON.parse(gk(d, 'recon', 'game.pck', '--json').out);
+  assert.deepEqual([r.engine, r.engineVersion], ['godot', '3.5.1']);
+  assert.deepEqual(r.inventory.items.map((i) => i.id), ['player']);
+
+  // Cocos Creator 2 web build
+  const c = tmpDir();
+  write(c, 'index.html', '<html>');
+  write(c, 'cocos2d-js-min.js', 'cc.ENGINE_VERSION = "2.4.11";');
+  write(c, 'src/settings.js', 'window._CCSettings={}');
+  write(c, 'src/project.js', 'cc._RF.push(t, "a1b2", "PlayerCtrl"); cc._RF.push(t, "c3d4", "EnemySpawner");');
+  r = JSON.parse(gk(c, 'recon', c, '--json').out);
+  assert.deepEqual([r.engine, r.variant, r.engineVersion], ['cocos', 'creator-2', '2.4.11']);
+  assert.deepEqual(r.inventory.items.map((i) => i.id), ['PlayerCtrl', 'EnemySpawner']);
+
+  // nothing recognisable
+  const u = tmpDir();
+  write(u, 'readme.txt', 'hi');
+  r = JSON.parse(gk(u, 'recon', u, '--json').out);
+  assert.equal(r.engine, 'unknown');
+  assert.ok(r.unknowns.includes('engine'));
+  assert.equal(gk(u, 'recon', path.join(u, 'missing')).code, 1);
+  assert.equal(gk(u, 'recon').code, 1, 'no path and no game');
+});
+
+test('re: inventory coverage, gameplay spec, obligations from RE and question impact gate P1; open questions gate P2', () => {
+  const dir = newGame('cov');
+  write(dir, 'spec/inventory.yaml', YAML.stringify({ source: 'x', ignore: [{ pattern: 'UI*', reason: 'giao diện' }], items: [{ id: 'Player', covers: ['Q1', 'player.move'] }, { id: 'UIMenu' }, { id: 'Ads', skip: 'SDK' }, { id: 'Enemy' }] }));
+  let r = reJson(dir);
+  assert.deepEqual(r.coverage, { total: 4, covered: 1, skipped: 2, open: 1 });
+  assert.ok(r.pending.some((p) => /1\/4 cơ chế .* chưa xử lý.*Enemy/.test(p)));
+  assert.ok(r.pending.some((p) => /gameplay-spec\.md còn \d+ mục TODO/.test(p)));
+  assert.ok(r.pending.some((p) => /6 nghĩa vụ chưa trỏ tới ghi chú RE/.test(p)));
+  assert.match(gk(dir, 're').out, /Danh mục cơ chế: 75% đã xử lý/);
+  assert.match(gk(dir, 're').out, /Còn phải xong trước cổng P1:/);
+  assert.equal(gk(dir, 're').code, 0, 'pending work is not an error');
+
+  // bad refs are errors
+  write(dir, 'spec/inventory.yaml', YAML.stringify({ items: [{ id: 'Player', covers: ['Q9', 'nope.x'] }] }));
+  r = reJson(dir);
+  assert.equal(r.errors.filter((e) => /covers (Q9|nope\.x)/.test(e)).length, 2);
+
+  // finish everything P1 asks for
+  write(dir, 'spec/inventory.yaml', YAML.stringify({ items: [{ id: 'Player', covers: ['player.move'] }, { id: 'Enemy', skip: 'không có trong bản này' }] }));
+  write(dir, 'spec/gameplay-spec.md', '# Spec\n\n## Core loop\nNé vật rơi.\n');
+  write(dir, 'notes/player.md', '# Player\n');
+  const ob = YAML.parse(read(dir, 'spec/obligations.yaml'));
+  for (const o of ob.obligations) o.source = 'notes/player.md#move';
+  write(dir, 'spec/obligations.yaml', YAML.stringify(ob));
+  r = reJson(dir);
+  assert.deepEqual(r.pending, []);
+  write(dir, 'notes/QUESTIONS.md', read(dir, 'notes/QUESTIONS.md').replace('| điều khiển nhanh/chậm hơn bản gốc |', '| |'));
+  assert.ok(reJson(dir).pending.some((p) => /Q1 chưa xong nhưng chưa ghi ảnh hưởng/.test(p)));
+  write(dir, 'notes/QUESTIONS.md', read(dir, 'notes/QUESTIONS.md').replace('| mở | | |', '| mở | | chậm hơn |'));
+  assert.deepEqual(reJson(dir).pending, []);
+
+  // from P2 an open question blocks the gate
+  editYaml(dir, (g) => {
+    g.phase = 'P2';
+  });
+  r = reJson(dir);
+  assert.equal(r.gatePhase, 'P2');
+  assert.ok(r.pending.some((p) => /từ P2 không còn câu "mở": Q1/.test(p)));
+  assert.match(gk(dir, 'gate').out, /✘ Không còn câu hỏi RE "mở".*\[auto: re\]/);
+});
+
+test('assets: kinds and sizes, formats to convert, oversize files, provenance; --write', () => {
+  const dir = newGame('ast');
+  write(dir, 'reference/export/hero.psd', 'x');
+  write(dir, 'reference/export/bgm.wav', 'x'.repeat(1600000));
+  write(dir, 'reference/export/hit.ogg', 'x');
+  write(dir, 'reference/export/boss.fbx', 'x');
+  write(dir, 'reference/export/data.bin', 'x');
+  const r = JSON.parse(gk(dir, 'assets', 'reference/export', '--json').out);
+  assert.equal(r.files, 5);
+  assert.deepEqual(r.convert.map((f) => [f.ext, f.convert]).sort(), [['fbx', 'glb'], ['psd', 'png/webp'], ['wav', 'ogg/m4a (wav quá nặng cho web)']]);
+  assert.deepEqual(r.large.map((f) => f.path), ['reference/export/bgm.wav']);
+  assert.deepEqual(r.unknown.map((f) => f.path), ['reference/export/data.bin']);
+  // default: the game's assets/ + public/, with provenance labels
+  write(dir, 'assets/new.png', 'x');
+  const out = gk(dir, 'assets', '--write');
+  assert.equal(out.code, 0, out.out);
+  assert.match(out.out, /Provenance: .*chưa có nhãn 1/);
+  assert.match(read(dir, 'notes/assets.md'), /# Kiểm kê asset/);
+  assert.equal(gk(dir, 'assets', 'nope').code, 1);
+});
+
+test('smoke: needs a build; judges readiness, start, FPS, errors and Settings against the budget', async () => {
+  const dir = newGame('smk');
+  const r = gk(dir, 'smoke');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /Chưa có bản build/);
+  assert.match(gk(dir, 'smoke', '--version', '26010101').out, /Không có builds\/26010101/);
+  const { judgeSmoke } = await import('../scripts/smoke.mjs');
+  const budget = { timeToPlaySec: 5, minFpsDesktop: 60, minFpsMobile: 30 };
+  const good = { profile: 'desktop', label: 'd', readyMs: 1200, playable: true, fps: 58, errors: [], failed: [], settings: 'ok' };
+  assert.ok(judgeSmoke(budget, [good])[0].checks.every((c) => c.ok), 'FPS within 10% passes');
+  const bad = { profile: 'mobile-portrait', label: 'm', readyMs: 7000, playable: false, fps: 20, errors: ['boom'], failed: ['/a.png (404)'], settings: null };
+  const failed = judgeSmoke(budget, [bad])[0].checks.filter((c) => !c.ok).map((c) => c.name);
+  assert.deepEqual(failed, ['thời gian vào game', 'bắt đầu chơi bằng phím/chạm', 'FPS', 'không lỗi console', 'không request hỏng']);
+  const never = judgeSmoke(budget, [{ ...bad, readyMs: null, fps: null }])[0].checks.find((c) => c.name === 'vào được game');
+  assert.equal(never.ok, false);
 });

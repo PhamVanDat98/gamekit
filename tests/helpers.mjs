@@ -85,3 +85,53 @@ export const editYaml = (dir, fn) => {
   fn(data);
   fs.writeFileSync(f, YAML.stringify(data));
 };
+
+/**
+ * Minimal .NET metadata (no PE wrapper) defining `types`: [{ ns, name, base, methods }].
+ * `base` = 'UnityEngine.MonoBehaviour' | 'System.Object' | 'System.ValueType' | name of another type here.
+ */
+export function fakeAssembly(types) {
+  const strings = [0];
+  const strIndex = new Map();
+  const s = (v) => {
+    if (!v) return 0;
+    if (!strIndex.has(v)) {
+      strIndex.set(v, strings.length);
+      strings.push(...Buffer.from(v + '\0', 'utf8'));
+    }
+    return strIndex.get(v);
+  };
+  const local = new Map(types.map((t, i) => [t.name, i + 2])); // TypeDef rows: 1 = <Module>
+  const refs = [...new Set(types.map((t) => t.base).filter((b) => b && !local.has(b)))];
+  const u16 = (v) => Buffer.from([v & 255, v >> 8]);
+  const u32 = (v) => { const b = Buffer.alloc(4); b.writeUInt32LE(v); return b; };
+  const totalMethods = types.reduce((n, t) => n + (t.methods ?? 0), 0);
+  const parts = [u32(0), Buffer.from([2, 0, 0, 1])];
+  const valid = Buffer.alloc(8);
+  valid.writeBigUInt64LE((1n << 0n) | (1n << 1n) | (1n << 2n) | (1n << 6n));
+  parts.push(valid, Buffer.alloc(8), u32(1), u32(refs.length), u32(types.length + 1), u32(totalMethods));
+  parts.push(u16(0), u16(s('Fake.dll')), u16(0), u16(0), u16(0)); // Module
+  for (const r of refs) {
+    const dot = r.lastIndexOf('.');
+    parts.push(u16(0), u16(s(r.slice(dot + 1))), u16(s(r.slice(0, dot))));
+  }
+  let method = 1;
+  parts.push(u32(0), u16(s('<Module>')), u16(0), u16(0), u16(1), u16(method)); // <Module>
+  for (const t of types) {
+    const ext = !t.base ? 0 : local.has(t.base) ? (local.get(t.base) << 2) | 0 : ((refs.indexOf(t.base) + 1) << 2) | 1;
+    parts.push(u32(1), u16(s(t.name)), u16(s(t.ns ?? '')), u16(ext), u16(1), u16(method));
+    method += t.methods ?? 0;
+  }
+  const tables = Buffer.concat(parts);
+  const pad4 = (b) => Buffer.concat([b, Buffer.alloc((4 - (b.length % 4)) % 4)]);
+  const tbl = pad4(tables);
+  const str = pad4(Buffer.from(strings));
+  const version = Buffer.from('v4.0.30319\0\0');
+  const headerLen = 16 + version.length + 4 + (8 + 4) + (8 + 12);
+  const root = Buffer.concat([
+    Buffer.from('BSJB'), u16(1), u16(1), u32(0), u32(version.length), version, u16(0), u16(2),
+    u32(headerLen), u32(tbl.length), Buffer.from('#~\0\0'),
+    u32(headerLen + tbl.length), u32(str.length), Buffer.from('#Strings\0\0\0\0'),
+  ]);
+  return Buffer.concat([Buffer.from('MZ-not-a-real-pe-header-padding'), root, tbl, str]);
+}

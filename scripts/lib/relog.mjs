@@ -20,10 +20,13 @@ export const shortEv = (id) => `${id.slice(0, 11)}…`;
 export const STATES = { mo: 'mở', 'mot phan': 'một phần', 'da tra loi': 'đã trả lời' };
 const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
 
-/** Rows `| Q1 | câu hỏi | bằng chứng | trạng thái | kết luận |`. Columns found by header, template order as fallback. */
+/**
+ * Rows `| Q1 | câu hỏi | bằng chứng | trạng thái | kết luận | ảnh hưởng |`. Columns found by header, template order
+ * as fallback. `impact` is null when the table has no "Ảnh hưởng" column (files from before it existed).
+ */
 export function parseQuestions(text) {
   const rows = [];
-  let col = { question: 1, need: 2, state: 3, conclusion: 4 };
+  let col = { question: 1, need: 2, state: 3, conclusion: 4, impact: -1 };
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim().startsWith('|')) continue;
     const cells = line.trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map((c) => c.trim());
@@ -33,7 +36,7 @@ export function parseQuestions(text) {
         const i = cells.findIndex((c) => fold(c).includes(word));
         return i < 0 ? d : i;
       };
-      col = { question: find('cau hoi', 1), need: find('bang chung', 2), state: find('trang thai', 3), conclusion: find('ket luan', 4) };
+      col = { question: find('cau hoi', 1), need: find('bang chung', 2), state: find('trang thai', 3), conclusion: find('ket luan', 4), impact: find('anh huong', -1) };
       continue;
     }
     if (!/^Q\d+$/i.test(id)) continue;
@@ -45,6 +48,7 @@ export function parseQuestions(text) {
       rawState,
       state: STATES[fold(rawState)] ?? null,
       conclusion: cells[col.conclusion] ?? '',
+      impact: col.impact < 0 ? null : (cells[col.impact] ?? ''),
     });
   }
   return rows;

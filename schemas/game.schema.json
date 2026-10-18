@@ -65,6 +65,7 @@
             "construct",
             "laya",
             "html5",
+            "gamemaker",
             "other"
           ]
         },
@@ -73,6 +74,13 @@
             "string",
             "null"
           ]
+        },
+        "variant": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Dạng build/scripting do gamekit recon nhận ra: source, mono, il2cpp, webgl, pck, creator-2, creator-3, native, c3, c2, swf, pak, bytecode, js…"
         },
         "path": {
           "type": [
@@ -126,8 +134,18 @@
     "portalSettings": {
       "type": "object",
       "description": "Thông tin từng portal cần khi đóng gói (gamekit config). Khoá hợp lệ khai báo trong portals/<id>/portal.yaml của plugin",
-      "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
-      "additionalProperties": { "type": "object", "additionalProperties": { "type": ["string", "null"] } }
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
     },
     "language": {
       "type": "string",
@@ -136,7 +154,10 @@
     },
     "languages": {
       "type": "array",
-      "items": { "type": "string", "pattern": "^[a-z]{2,3}(-[a-z0-9]{2,8})*$" },
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z]{2,3}(-[a-z0-9]{2,8})*$"
+      },
       "minItems": 1,
       "uniqueItems": true,
       "description": "Ngôn ngữ phát hành, mỗi mã một file Language/<mã>.json; en bắt buộc"

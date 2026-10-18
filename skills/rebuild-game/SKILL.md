@@ -30,6 +30,8 @@ Với mỗi cơ chế trong spec:
 
 Thêm replay test cho luồng chơi chính (`tests/replay/`). Thay `src/core/world.ts` demo bằng logic game thật; giữ `worldHash` cho replay.
 
+**RNG gốc.** `Rng` mặc định dùng mulberry32 — đủ khi chuỗi ngẫu nhiên không cần khớp bản gốc. Khi nội dung sinh từ seed (level, rơi đồ, spawn) phải giống bản gốc, truyền nguồn ngẫu nhiên của game gốc: `new Rng(new DotNetRandom(seed))` (`src/core/rng-dotnet.ts`, khớp `System.Random` của .NET) hoặc tự viết một `RandomSource` cho thuật toán khác (UnityEngine.Random là Xorshift128, LCG tự viết…). Luôn kèm nghĩa vụ `rng.sequence` với oracle dump từ chính game gốc — không tin cài đặt khi chưa so với bản gốc. Chú ý cách game gốc biến số ngẫu nhiên thành kết quả (`Next(min, max)` loại trừ max; `Random.Range(int)` của Unity cũng loại trừ max, bản float thì không).
+
 ## 5. View
 `src/view/` vẽ từ state, map input thiết bị → `Action` (`src/contracts/input.ts`). Không sửa state. Không unit test; kiểm tra bằng chạy thử `npm run dev` và screenshot.
 

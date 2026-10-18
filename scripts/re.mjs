@@ -6,7 +6,9 @@ import path from 'node:path';
 import { exists } from './lib/io.mjs';
 import { log, GkError } from './lib/log.mjs';
 import { requireGameRoot, loadGame, ownershipOf, nowIso, OWNERSHIP_LABEL } from './lib/game.mjs';
-import { phaseInfo } from './lib/phases.mjs';
+import { PHASES, phaseInfo } from './lib/phases.mjs';
+import { INVENTORY_FILE, inventoryCoverage, loadInventory } from './lib/inventory.mjs';
+import { OBLIGATIONS_FILE, loadObligations } from './validate.mjs';
 import {
   LOG_FILE,
   QUESTIONS_FILE,
@@ -24,7 +26,12 @@ import {
 const KINDS = ['note', 'inspect', 'conclude'];
 const KIND_LABEL = { note: 'ghi chú', conclude: 'kết luận', focus: 'chuyển sang' };
 
-/** Everything `re` shows, as data (also used by `gate` {auto: re} and `--json`). */
+const SPEC_FILE = 'spec/gameplay-spec.md';
+
+/**
+ * Everything `re` shows, as data (also used by `gate` {auto: re} and `--json`).
+ * errors = wrong data; pending = work that must be finished before the gate (P1, or the current phase from P2).
+ */
 export function reReport(root, { last = 8 } = {}) {
   const game = loadGame(root);
   const ownership = ownershipOf(game);
@@ -82,6 +89,53 @@ export function reReport(root, { last = 8 } = {}) {
     const s = stats.get(q.id);
     return { ...q, steps: s?.steps ?? 0, notes: s?.notes ?? 0, evidence: s?.evidence.size ?? 0, lastAt: s?.lastAt ?? null };
   });
+
+  // ---------- readiness for the gate ----------
+  const stage = Math.max(0, PHASES.indexOf(game.phase));
+  const gatePhase = stage <= 1 ? 'P1' : game.phase;
+  const pending = [];
+  if (questions && !questions.length) pending.push(`${QUESTIONS_FILE} chưa có câu hỏi nào`);
+  const unresolved = qs.filter((q) => q.state === 'mở' || q.state === 'một phần');
+  if (qs.length && qs[0].impact === null) warnings.push(`${QUESTIONS_FILE} chưa có cột "Ảnh hưởng nếu chưa rõ" — thêm cột (xem mẫu trong template GameKit) để cổng kiểm được`);
+  else {
+    const noImpact = unresolved.filter((q) => !q.impact);
+    if (noImpact.length) pending.push(`${noImpact.map((q) => q.id).join(', ')} chưa xong nhưng chưa ghi ảnh hưởng nếu chưa rõ`);
+  }
+  if (stage >= PHASES.indexOf('P2')) {
+    const open = qs.filter((q) => q.state === 'mở');
+    if (open.length) pending.push(`từ P2 không còn câu "mở": ${open.map((q) => q.id).join(', ')} — trả lời, hoặc ghi "một phần" kèm ảnh hưởng người dùng đã chấp nhận`);
+  }
+  const specFile = path.join(root, SPEC_FILE);
+  if (!exists(specFile)) pending.push(`chưa có ${SPEC_FILE}`);
+  else {
+    const todo = (fs.readFileSync(specFile, 'utf8').match(/<!--\s*TODO/g) ?? []).length;
+    if (todo) pending.push(`${SPEC_FILE} còn ${todo} mục TODO`);
+  }
+  let obligations = [];
+  try {
+    obligations = loadObligations(root)?.obligations ?? [];
+  } catch (e) {
+    errors.push(`${OBLIGATIONS_FILE}: ${e.message}`);
+  }
+  if (!Array.isArray(obligations)) obligations = [];
+  if (!obligations.length) pending.push(`${OBLIGATIONS_FILE} chưa có nghĩa vụ nào — lập từ ghi chú RE (skill parity-check)`);
+  const noSource = obligations.filter(
+    (o) => (o?.status ?? 'active') === 'active' && o?.required !== false && !(o?.source && exists(path.join(root, String(o.source).split('#')[0]))),
+  );
+  if (noSource.length) pending.push(`${noSource.length} nghĩa vụ chưa trỏ tới ghi chú RE có thật (source): ${clip(noSource.map((o) => o?.id).join(', '), 100)}`);
+  let inventory = null;
+  try {
+    inventory = loadInventory(root);
+  } catch (e) {
+    errors.push(`${INVENTORY_FILE}: ${e.message}`);
+  }
+  const coverage = inventoryCoverage(inventory, { questionIds: ids, obligationIds: new Set(obligations.map((o) => o?.id)) });
+  if (!inventory) pending.push(`chưa có ${INVENTORY_FILE} — \`gamekit recon … --write\`, hoặc lập tay danh sách cơ chế`);
+  else {
+    for (const p of coverage.problems) errors.push(`${INVENTORY_FILE}: ${p}`);
+    for (const b of coverage.badRefs) errors.push(`${INVENTORY_FILE}: ${b.id} covers ${b.ref} — không có câu hỏi/nghĩa vụ này`);
+    if (coverage.open.length) pending.push(`${coverage.open.length}/${coverage.total} cơ chế trong ${INVENTORY_FILE} chưa xử lý (covers hoặc skip): ${clip(coverage.open.slice(0, 6).join(', '), 110)}`);
+  }
   const count = (state) => qs.filter((q) => q.state === state).length;
   return {
     game: { name: game.name, title: game.title, phase: game.phase, ownership },
@@ -97,14 +151,17 @@ export function reReport(root, { last = 8 } = {}) {
       errored: steps.filter((e) => e.error).length,
       lastAt: entries.at(-1)?.at ?? null,
     },
+    coverage: coverage && { total: coverage.total, covered: coverage.covered, skipped: coverage.skipped, open: coverage.open.length },
     recent: entries.slice(-last),
+    gatePhase,
     errors,
+    pending,
     warnings,
   };
 }
 
 // cli steps keep the whole command as target; the tool name would only repeat it.
-const describe = (e) => (e.via === 'cli' ? e.target : [e.via === 'rea' ? `rea ${e.tool}` : e.tool, e.target].filter(Boolean).join(' '));
+const describe = (e) => (e.via === 'cli' ? e.target : [e.via === 'rea' || e.via === 'gamekit' ? `${e.via} ${e.tool}` : e.tool, e.target].filter(Boolean).join(' '));
 const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const pad = (s, n) => s + ' '.repeat(Math.max(0, n - [...s].length));
 
@@ -137,6 +194,11 @@ export function renderReport(r) {
     `Nhật ký: ${t.steps} bước phân tích · ${t.evidence} evidence${t.errored ? ` · ${t.errored} lỗi công cụ` : ''}${t.lastAt ? ` · lần cuối ${hhmm(t.lastAt)} (${ago(t.lastAt)})` : ''}`,
   ]);
   out.push(['info', `Đang làm: ${r.focus ?? 'chưa chọn — `gamekit re focus Q#`'}`]);
+  if (r.coverage) {
+    const c = r.coverage;
+    const pct = c.total ? Math.round(((c.covered + c.skipped) / c.total) * 100) : 100;
+    out.push(['info', `Danh mục cơ chế: ${pct}% đã xử lý — ${c.covered} có câu hỏi/nghĩa vụ · ${c.skipped} bỏ qua · ${c.open} chưa xử lý / ${c.total}`]);
+  }
   if (r.questions.length) {
     out.push(['info', '']);
     for (const q of r.questions) {
@@ -154,6 +216,10 @@ export function renderReport(r) {
       const flags = [...(e.limits ?? []), e.error ? 'lỗi' : null, e.runtime ? 'chạy game' : null].filter(Boolean);
       out.push(['dim', `  ${hhmm(e.at)}  ${pad(e.q ?? '—', 4)} ${clip(what, 90)}${ev}${flags.length ? `  [${flags.join(', ')}]` : ''}`]);
     }
+  }
+  if (r.pending.length) {
+    out.push(['info', `\nCòn phải xong trước cổng ${r.gatePhase}:`]);
+    for (const p of r.pending) out.push(['info', `  - ${p}`]);
   }
   if (r.warnings.length || r.errors.length) out.push(['info', '']);
   for (const w of r.warnings) out.push(['warn', w]);

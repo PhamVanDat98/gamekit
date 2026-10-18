@@ -19,20 +19,23 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 - `src/platform/` interface chung cho mọi portal. Gameplay chỉ gọi `Platform`; adapter nằm trong `src/platform/adapters/`. Event analytics chỉ dùng tên trong `src/platform/events.ts`.
 - `src/contracts/` type dùng chung giữa các module — chỉ agent chính sửa.
 - `Language/` mỗi ngôn ngữ một file (`en.json` bắt buộc) · `public/Icons/` (`web.png`, `loading.webp`) · `builds/` đầu ra của pack (gitignored, không commit).
-- `params/` số liệu có nguồn và `confidence` · `spec/` gameplay spec, `obligations.yaml`, `oracles/` · `notes/` ghi chú RE, `QUESTIONS.md` · `gates/` checklist cổng · `DECISIONS.md` lý do và sai khác.
+- `params/` số liệu có nguồn và `confidence` · `spec/` gameplay spec, `obligations.yaml`, `oracles/`, `inventory.yaml` (danh mục cơ chế) · `notes/` recon, ghi chú RE, `QUESTIONS.md`, nhật ký RE · `gates/` checklist cổng · `DECISIONS.md` lý do và sai khác.
 
 ## Lệnh
 | Việc | Lệnh |
 | --- | --- |
 | Trạng thái, việc tiếp theo | `npm run gk -- status` |
+| Nhận diện game gốc, khả thi, danh mục cơ chế | `npm run gk -- recon <đường dẫn> --write` |
 | Kiểm tra dữ liệu | `npm run gk -- validate` |
 | Test / typecheck / lint | `npm test` · `npm run typecheck` · `npm run lint` |
 | Theo dõi phân tích (RE) | `npm run gk -- re` (`--watch` cập nhật trực tiếp) · `npm run gk -- re focus Q3` trước khi phân tích · `npm run gk -- re log "…"` ghi tay |
+| Kiểm kê asset | `npm run gk -- assets [reference/export] [--write]` |
 | Parity với game gốc | `npm run gk -- parity` (nghĩa vụ trong `spec/obligations.yaml`, test gắn thẻ `[id:case]`) |
 | Kiểm tra cổng, sang pha sau | `npm run gk -- gate` · `npm run gk -- gate --advance` |
 | Dựng song song | `npm run gk -- fanout --wave N` → subagent làm theo `.gamekit/local/BRIEF.md` → `npm run gk -- integrate --wave N` |
 | Thông tin portal còn thiếu | `npm run gk -- config --portal <id>` |
 | Đóng gói, kiểm tra phát hành | `npm run gk -- pack --all` → `builds/<v>/<portal>/` (`--zip`, `--compress`, `--version`) · `npm run gk -- release-check` |
+| Smoke bản build (Chromium, máy tính + điện thoại) | `npm run gk -- smoke` (cần Playwright) |
 | Chơi thử bản build | `npm run preview` → `http://localhost:4173/<v>/dev-mock/<v>/index.html` |
 
 ## Nếu bạn là subagent trong một worktree

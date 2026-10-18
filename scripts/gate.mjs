@@ -62,8 +62,8 @@ function runAuto(root, name, phase) {
     }
   }
   if (name === 're') {
-    const { errors } = reReport(root);
-    return { ok: !errors.length, detail: errors.slice(0, 3).join('; ') };
+    const { errors, pending } = reReport(root);
+    return { ok: !errors.length && !pending.length, detail: [...errors, ...pending].slice(0, 3).join('; ') };
   }
   if (name.startsWith('field:')) {
     // field:release.forbiddenTerms → the game.yaml value must be non-empty
@@ -83,6 +83,7 @@ function runAuto(root, name, phase) {
     lint: ['npm', ['run', 'lint', '--silent']],
     pack: [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'pack', '--all']],
     'release-check': [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'release-check']],
+    smoke: [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'smoke']],
   };
   const cmd = cmds[name];
   if (!cmd) return { ok: false, detail: `không biết kiểm tra tự động "${name}"` };

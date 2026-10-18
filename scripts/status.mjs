@@ -7,6 +7,7 @@ import { findGameRoot, loadGame, ownershipOf, OWNERSHIP_LABEL } from './lib/game
 import { PHASES, AVAILABLE_SKILLS, phaseInfo } from './lib/phases.mjs';
 import { loadPortal, missingSettings } from './lib/portals.mjs';
 import { gateItemsFor } from './gate.mjs';
+import { reReport } from './re.mjs';
 
 const days = (a, b = new Date()) => (b - new Date(a)) / 864e5;
 
@@ -28,6 +29,16 @@ export function summarize(root) {
     const d = days(start);
     lines.push(`Đã ở pha này ${d.toFixed(1)} ngày${planned ? ` / dự kiến ${planned}` : ''}`);
     if (planned && d > planned) lines.push(`⚠ Vượt thời gian dự kiến — cân nhắc quay lại triage (luật cắt lỗ).`);
+  }
+  if (['P0', 'P1', 'P2'].includes(phase)) {
+    try {
+      const re = reReport(root, { last: 0 });
+      const t = re.totals;
+      const cov = re.coverage ? ` · danh mục cơ chế ${re.coverage.total ? Math.round(((re.coverage.covered + re.coverage.skipped) / re.coverage.total) * 100) : 100}% đã xử lý` : '';
+      lines.push(`Phân tích: ${t.answered}/${t.questions} câu đã trả lời${cov} · ${re.pending.length} việc còn trước cổng ${re.gatePhase}${re.errors.length ? ` · ${re.errors.length} lỗi` : ''} — \`gamekit re\``);
+    } catch {
+      /* status must not fail on RE data; `gamekit re` reports it */
+    }
   }
   const gateFile = path.join(root, 'gates', `${phase}.md`);
   const pending = exists(gateFile) ? gateItemsFor(game, fs.readFileSync(gateFile, 'utf8')).filter((i) => !i.auto && !i.checked) : [];

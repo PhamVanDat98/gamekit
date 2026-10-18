@@ -4,7 +4,7 @@ import readline from 'node:readline';
 import { GkError } from './log.mjs';
 import { checkSetting, listPortals, loadPortal } from './portals.mjs';
 
-export const ENGINES = ['unknown', 'unity', 'cocos', 'godot', 'unreal', 'flash', 'construct', 'laya', 'html5', 'other'];
+export const ENGINES = ['unknown', 'unity', 'cocos', 'godot', 'unreal', 'flash', 'construct', 'laya', 'html5', 'gamemaker', 'other'];
 export const LANGUAGE_NAMES = {
   en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', it: 'Italiano', pt: 'Português', 'pt-br': 'Português (Brasil)',
   ru: 'Русский', tr: 'Türkçe', pl: 'Polski', vi: 'Tiếng Việt', id: 'Bahasa Indonesia', th: 'ไทย', ja: '日本語', ko: '한국어',

@@ -2,7 +2,14 @@
 # Đóng bằng test gắn thẻ [id:case] trong tên, vd it('[player.move:edge] …'). `gamekit parity` chấm.
 # Case: normal | edge | invalid | oracle (bảng spec/oracles) | replay.
 # Không làm một nghĩa vụ: status blocked|out-of-scope + decision D-n + approved (người dùng duyệt).
-# Các mục dưới đây là của game demo trong template — thay bằng cơ chế của game gốc ở P2.
+# Lập ở cuối P1 từ ghi chú RE: mỗi nghĩa vụ có source trỏ tới notes/… (cổng P1 kiểm tra). P2 đóng chúng bằng test.
+# Nội dung sinh từ seed (level, rơi đồ) cần thêm nghĩa vụ RNG, vd:
+#   - id: rng.sequence
+#     title: Cùng seed cho ra đúng chuỗi số như System.Random của game gốc
+#     cases: [oracle]
+#     oracle: spec/oracles/rng.json     # dump từ game gốc (skill parity-check, references/oracle-harness.md)
+#     source: notes/rng.md
+# Các mục dưới đây là của game demo trong template — thay bằng cơ chế của game gốc.
 obligations:
   - id: player.move
     title: Người chơi đi ngang player.speed px/s và không ra khỏi sân
