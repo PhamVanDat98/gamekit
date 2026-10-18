@@ -74,8 +74,11 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 .claude-plugin/   plugin.json, marketplace.json
 hooks/            SessionStart → using-gamekit + gamekit status; PostToolUse → nhật ký RE (tool REA, lệnh RE)
 commands/         /gamekit:status, /gamekit:next
-skills/           using-gamekit, game-recon, triage, re-notes, asset-inventory, parity-check (+ oracle-harness), rebuild-game, module-plan, integrate,
-                  web-relayout, platform-sdk, package-web-build, qa-smoke, release-check
+skills/           đủ mọi skill mà 6 pha gợi ý (38): using-gamekit · P0 game-recon, triage · P1 engine-{unity,cocos,godot,html5,
+                  construct,laya,flash,unreal,gamemaker,native}, re-notes, asset-inventory, ui-extract, parity-check (+ oracle-harness) ·
+                  P2 runtime-select, module-plan, rebuild-game, integrate · P3 web-relayout; third-party: style-direction, style-preview,
+                  asset-spec, apply-style, replace-graphics, replace-audio, rename-and-text · P4 platform-sdk, add-analytics,
+                  add-leaderboard, add-save, add-i18n · P5 package-web-build, qa-smoke, store-assets, release-check
 portals/          vỏ portal dùng chung: azgames, dev-mock (portal.yaml, kit.mjs, shell.html, loader.entry.js, Icons/), shared/
 scripts/          CLI gamekit.mjs + lệnh; lib/
 schemas/          game, params, obligations, oracle, inventory, provenance, module-plan, asset-manifest (JSON Schema)

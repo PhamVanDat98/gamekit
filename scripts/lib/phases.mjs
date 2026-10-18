@@ -16,21 +16,52 @@ export const PHASE_INFO = {
   P5: { name: 'Phát hành', skills: ['package-web-build', 'qa-smoke', 'store-assets', 'release-check'], human: 'Bạn playtest bản cuối.' },
 };
 
-// Skills that ship in this version of the plugin. Others are planned (later sub-projects).
+// Engine skills: `engine-<engine>` in a phase list resolves to one of these (see engineSkill).
+export const ENGINE_SKILLS = ['engine-unity', 'engine-cocos', 'engine-godot', 'engine-html5', 'engine-construct', 'engine-laya', 'engine-flash', 'engine-unreal', 'engine-gamemaker', 'engine-native'];
+
+/** The engine skill for source.engine: unknown → recon first; other (native C/C++, DOS…) → engine-native. */
+export function engineSkill(engine = 'unknown') {
+  if (engine === 'unknown') return 'game-recon';
+  if (engine === 'other') return 'engine-native';
+  return `engine-${engine}`;
+}
+
+// Every skill that ships with the plugin (one folder in skills/ each).
 export const AVAILABLE_SKILLS = new Set([
   'using-gamekit',
+  // P0
   'game-recon',
   'triage',
+  // P1
+  ...ENGINE_SKILLS,
   're-notes',
   'asset-inventory',
-  'rebuild-game',
+  'ui-extract',
   'parity-check',
+  // P2
+  'runtime-select',
   'module-plan',
+  'rebuild-game',
   'integrate',
-  'platform-sdk',
+  // P3
   'web-relayout',
+  'style-direction',
+  'style-preview',
+  'asset-spec',
+  'apply-style',
+  'replace-graphics',
+  'replace-audio',
+  'rename-and-text',
+  // P4
+  'platform-sdk',
+  'add-analytics',
+  'add-leaderboard',
+  'add-save',
+  'add-i18n',
+  // P5
   'package-web-build',
   'qa-smoke',
+  'store-assets',
   'release-check',
 ]);
 

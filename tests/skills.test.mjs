@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
 import { ROOT } from './helpers.mjs';
-import { AVAILABLE_SKILLS, PHASE_INFO } from '../scripts/lib/phases.mjs';
+import { AVAILABLE_SKILLS, ENGINE_SKILLS, PHASE_INFO, engineSkill } from '../scripts/lib/phases.mjs';
+import { ENGINES } from '../scripts/lib/questions.mjs';
 
 const SKILLS = path.join(ROOT, 'skills');
 const skillDirs = () => fs.readdirSync(SKILLS).filter((d) => fs.statSync(path.join(SKILLS, d)).isDirectory()).sort();
@@ -26,8 +27,14 @@ test('skills: frontmatter name matches the folder and description says when to u
 
 test('skills: AVAILABLE_SKILLS lists exactly the shipped skills, each suggested by a phase', () => {
   assert.deepEqual([...AVAILABLE_SKILLS].sort(), skillDirs());
-  const suggested = new Set(Object.values(PHASE_INFO).flatMap((p) => p.skills));
+  const suggested = new Set(Object.values(PHASE_INFO).flatMap((p) => [...p.skills, ...(p.thirdParty?.skills ?? [])]));
+  if (suggested.has('engine-<engine>')) for (const e of ENGINE_SKILLS) suggested.add(e);
   for (const s of AVAILABLE_SKILLS) if (s !== 'using-gamekit') assert.ok(suggested.has(s), `${s} không có trong pha nào`);
+  for (const s of suggested) if (s !== 'engine-<engine>') assert.ok(AVAILABLE_SKILLS.has(s), `pha gợi ý ${s} nhưng chưa có skill`);
+});
+
+test('skills: every engine a game can declare has a skill to analyse it', () => {
+  for (const e of ENGINES) assert.ok(AVAILABLE_SKILLS.has(engineSkill(e)), `engine ${e} → ${engineSkill(e)} chưa có`);
 });
 
 test('skills: relative links inside a skill point to files that exist', () => {

@@ -1,6 +1,12 @@
 # Changelog
 
 ## Chưa phát hành
+Bộ skill đủ cho cả 6 pha (38 skill):
+- P1: một skill cho mỗi engine — `engine-unity`, `engine-cocos`, `engine-godot`, `engine-html5`, `engine-construct`, `engine-laya`, `engine-flash`, `engine-unreal`, `engine-gamemaker`, `engine-native` (engine `other`); `status` gợi ý đúng skill theo `source.engine` (engine chưa biết → `game-recon`). `ui-extract`.
+- P2: `runtime-select`. P3 (làm lại game người khác): `style-direction`, `style-preview`, `asset-spec`, `apply-style`, `replace-graphics`, `replace-audio`, `rename-and-text`. P4: `add-analytics`, `add-leaderboard`, `add-save`, `add-i18n`. P5: `store-assets`.
+- Test đồng bộ skill kiểm hai chiều: skill nào pha gợi ý cũng phải có, mọi engine đều có skill.
+- `asset-manifest.json`: âm thanh không cần `width`/`height` (có `duration`, `loop`); `validate` kiểm `collider` trỏ tới param có thật, `brief` không chứa `forbiddenTerms`, `make` khớp nhãn provenance.
+
 P0–P1 có công cụ thật, không chỉ checklist:
 - Lệnh `recon`: nhận diện game gốc từ thư mục, APK/IPA/zip, `Assembly-CSharp.dll`, `dump.cs` (Il2CppDumper), `.pck` — engine (thêm `gamemaker`), phiên bản, dạng build (`source.variant`: source, mono, il2cpp, webgl, pck, creator-2/3, native…), nơi chứa logic và data, SDK (server, quảng cáo, analytics, IAP, thư viện), dấu hiệu làm rối code (dấu obfuscator .NET, metadata IL2CPP bị sửa, `_0x…`, `.jsc`), công cụ gợi ý. Tự đọc zip, metadata .NET và gói Godot, không cần công cụ ngoài.
 - Đánh giá khả thi: điểm = truy cập logic × số cơ chế × làm rối × phụ thuộc server → làm / chạy thử / rủi ro, số ngày dự kiến từng pha. `recon --write` ghi `notes/recon.md` (giữ phần "Ghi chú thêm"), `game.yaml` (engine khi đang unknown, version, variant, path, `budget.plannedDays` chưa có), nên cảnh báo cắt lỗ của `status` có kế hoạch để so.

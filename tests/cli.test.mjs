@@ -1045,3 +1045,25 @@ test('smoke: needs a build; judges readiness, start, FPS, errors and Settings ag
   const never = judgeSmoke(budget, [{ ...bad, readyMs: null, fps: null }])[0].checks.find((c) => c.name === 'vào được game');
   assert.equal(never.ok, false);
 });
+
+test('asset-manifest: audio needs no size; collider must be a param; brief without original names; make matches provenance', () => {
+  const dir = newGame('man', '--third-party');
+  editYaml(dir, (g) => {
+    g.release.forbiddenTerms = ['OldName'];
+  });
+  const man = (assets) => write(dir, 'asset-manifest.json', JSON.stringify({ assets }));
+  man([{ id: 'bgm', path: 'assets/audio/bgm.ogg', kind: 'audio', loop: true, duration: 42 }]);
+  assert.equal(gk(dir, 'validate').code, 0, gk(dir, 'validate').out);
+  man([{ id: 'p', path: 'assets/p.png', kind: 'sprite' }]);
+  assert.match(gk(dir, 'validate').out, /width/);
+  man([{ id: 'p', path: 'assets/p.png', kind: 'sprite', width: 36, height: 36, collider: 'player.nope', brief: 'giống nhân vật của oldname' }]);
+  const out = gk(dir, 'validate').out;
+  assert.match(out, /collider player\.nope không có trong params/);
+  assert.match(out, /brief nhắc "oldname"/);
+  write(dir, 'assets/p.png', 'x');
+  gk(dir, 'provenance', 'add', 'assets/p.png', '--label', 'placeholder');
+  man([{ id: 'p', path: 'assets/p.svg', kind: 'sprite', width: 36, height: 36, collider: 'player.size', make: 'image-gen' }]);
+  write(dir, 'assets/p.svg', '<svg/>');
+  gk(dir, 'provenance', 'add', 'assets/p.svg', '--label', 'own');
+  assert.match(gk(dir, 'validate').out, /make image-gen nhưng assets\/p\.svg có nhãn own/);
+});

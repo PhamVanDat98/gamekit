@@ -4,7 +4,7 @@ import path from 'node:path';
 import { exists } from './lib/io.mjs';
 import { log } from './lib/log.mjs';
 import { findGameRoot, loadGame, ownershipOf, OWNERSHIP_LABEL } from './lib/game.mjs';
-import { PHASES, AVAILABLE_SKILLS, phaseInfo } from './lib/phases.mjs';
+import { PHASES, AVAILABLE_SKILLS, engineSkill, phaseInfo } from './lib/phases.mjs';
 import { loadPortal, missingSettings } from './lib/portals.mjs';
 import { gateItemsFor } from './gate.mjs';
 import { reReport } from './re.mjs';
@@ -42,7 +42,7 @@ export function summarize(root) {
   }
   const gateFile = path.join(root, 'gates', `${phase}.md`);
   const pending = exists(gateFile) ? gateItemsFor(game, fs.readFileSync(gateFile, 'utf8')).filter((i) => !i.auto && !i.checked) : [];
-  const skills = info.skills.map((s) => s.replace('<engine>', game.source?.engine ?? 'unknown'));
+  const skills = [...new Set(info.skills.map((s) => (s === 'engine-<engine>' ? engineSkill(game.source?.engine) : s)))];
   const missing = [];
   for (const p of game.portals ?? []) {
     try {

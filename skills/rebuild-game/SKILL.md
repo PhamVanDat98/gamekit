@@ -12,7 +12,8 @@ Mục tiêu cổng P2: chơi được trọn vẹn (`own`: với asset gốc nh�
 - `own` có source gốc (C#…): đọc thẳng code để lấy logic và số; vẫn viết test trước, viết lại cho hợp `core/`/`view/`, không dịch máy từng dòng.
 - Đã có (đi từ P0/P1): kiểm tra `gamekit status` báo P2.
 
-## 2. Chọn runtime (thay cho skill runtime-select chưa có)
+## 2. Chọn runtime
+Dùng skill **runtime-select** (ghi lựa chọn vào `game.yaml` `runtime` và `DECISIONS.md`). Tóm tắt:
 - 2D đơn giản, ít sprite: canvas thuần (template sẵn). Nhiều sprite, hiệu ứng: Pixi. Cần scene/physics có sẵn: Phaser. 3D: Three.js. Vật lý phức tạp: Rapier (wasm) hoặc viết riêng nếu game gốc dùng công thức đơn giản — ưu tiên **tái hiện đúng công thức gốc** hơn thay bằng engine vật lý khác.
 - Ghi lựa chọn + lý do vào `DECISIONS.md` và `runtime` trong game.yaml. Thư viện render chỉ được dùng trong `view/`.
 

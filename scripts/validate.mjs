@@ -47,7 +47,7 @@ export function validateGame(root, { stage } = {}) {
   validateIcons(root, pr);
   validateProvenance(root, st, pr);
   validateModulePlan(root, pr);
-  validateAssetManifest(root, pr);
+  validateAssetManifest(root, pr, { paramKeys, game });
   return { problems: pr, game };
 }
 
@@ -369,7 +369,10 @@ function validateModulePlan(root, pr) {
 }
 
 // ---------- asset-manifest.json ----------
-function validateAssetManifest(root, pr) {
+// What each way of making an asset must be labelled in provenance.json.
+const MAKE_LABEL = { 'image-gen': ['generated'], own: ['own'], licensed: ['licensed'], vector: ['own', 'generated'] };
+
+function validateAssetManifest(root, pr, { paramKeys, game }) {
   const f = path.join(root, 'asset-manifest.json');
   if (!exists(f)) return;
   const where = 'asset-manifest.json';
@@ -381,10 +384,18 @@ function validateAssetManifest(root, pr) {
     return;
   }
   for (const e of check('asset-manifest', man)) pr.error(where, e);
+  const labels = new Map((loadProvenance(root).entries ?? []).map((e) => [e.path, e.label]));
+  const forbidden = (game.release?.forbiddenTerms ?? []).filter(Boolean).map((t) => String(t).toLowerCase());
   for (const a of man.assets ?? []) {
+    if (a.collider && !paramKeys.has(a.collider)) pr.error(where, `${a.id}: collider ${a.collider} không có trong params/`);
+    const hit = a.brief && forbidden.find((t) => a.brief.toLowerCase().includes(t));
+    if (hit) pr.error(where, `${a.id}: brief nhắc "${hit}" (tên/thương hiệu game gốc trong release.forbiddenTerms) — mô tả thiết kế mới`);
+    const label = labels.get(a.path);
+    if (a.make && label && MAKE_LABEL[a.make] && !MAKE_LABEL[a.make].includes(label))
+      pr.error(where, `${a.id}: make ${a.make} nhưng ${a.path} có nhãn ${label} (cần ${MAKE_LABEL[a.make].join(' hoặc ')})`);
     const file = path.join(root, a.path);
     if (!exists(file)) continue; // not generated yet
-    if (!a.path.toLowerCase().endsWith('.png')) continue;
+    if (a.kind === 'audio' || !a.path.toLowerCase().endsWith('.png')) continue;
     const info = pngInfo(file);
     if (!info) {
       pr.error(where, `${a.path} không phải PNG hợp lệ`);

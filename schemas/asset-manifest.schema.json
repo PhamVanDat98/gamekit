@@ -3,45 +3,169 @@
   "$id": "gamekit/asset-manifest.schema.json",
   "title": "asset-manifest.json — spec kỹ thuật từng asset (asset-spec, P3)",
   "type": "object",
-  "required": ["assets"],
+  "required": [
+    "assets"
+  ],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
     "assets": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "path", "kind", "width", "height"],
+        "required": [
+          "id",
+          "path",
+          "kind"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
-          "path": { "type": "string", "description": "File @1x" },
-          "kind": { "enum": ["sprite", "ui", "anim", "background", "tile", "icon", "texture", "model", "audio"] },
-          "make": { "enum": ["vector", "image-gen", "own", "licensed"], "description": "UI nên là vector (SVG/CSS)" },
-          "width": { "type": "integer", "minimum": 1 },
-          "height": { "type": "integer", "minimum": 1 },
-          "scales": { "type": "array", "items": { "type": "number" } },
-          "alpha": { "type": "boolean" },
-          "pivot": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
-          "padding": { "type": "integer", "minimum": 0 },
-          "atlas": { "type": "string" },
-          "nineSlice": { "type": "array", "items": { "type": "integer" }, "minItems": 4, "maxItems": 4, "description": "left, top, right, bottom" },
-          "states": { "type": "array", "items": { "type": "string" } },
-          "frames": {
-            "type": "object",
-            "required": ["count", "width", "height", "fps"],
-            "properties": {
-              "count": { "type": "integer", "minimum": 1 },
-              "width": { "type": "integer" },
-              "height": { "type": "integer" },
-              "fps": { "type": "number" }
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "description": "File @1x"
+          },
+          "kind": {
+            "enum": [
+              "sprite",
+              "ui",
+              "anim",
+              "background",
+              "tile",
+              "icon",
+              "texture",
+              "model",
+              "audio"
+            ]
+          },
+          "make": {
+            "enum": [
+              "vector",
+              "image-gen",
+              "own",
+              "licensed"
+            ],
+            "description": "UI nên là vector (SVG/CSS)"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "scales": {
+            "type": "array",
+            "items": {
+              "type": "number"
             }
           },
-          "seamless": { "type": "boolean" },
-          "collider": { "type": "string", "description": "Đường dẫn param collider, vd player.hitbox" },
-          "minDisplayPx": { "type": "integer", "description": "Kích thước nhỏ nhất thật sự hiển thị (icon)" },
-          "noText": { "type": "boolean", "description": "Không in chữ vào ảnh" },
-          "brief": { "type": "string" }
+          "alpha": {
+            "type": "boolean"
+          },
+          "pivot": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "padding": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "atlas": {
+            "type": "string"
+          },
+          "nineSlice": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 4,
+            "maxItems": 4,
+            "description": "left, top, right, bottom"
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "frames": {
+            "type": "object",
+            "required": [
+              "count",
+              "width",
+              "height",
+              "fps"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "width": {
+                "type": "integer"
+              },
+              "height": {
+                "type": "integer"
+              },
+              "fps": {
+                "type": "number"
+              }
+            }
+          },
+          "seamless": {
+            "type": "boolean"
+          },
+          "collider": {
+            "type": "string",
+            "description": "Đường dẫn param collider, vd player.hitbox"
+          },
+          "minDisplayPx": {
+            "type": "integer",
+            "description": "Kích thước nhỏ nhất thật sự hiển thị (icon)"
+          },
+          "noText": {
+            "type": "boolean",
+            "description": "Không in chữ vào ảnh"
+          },
+          "brief": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Âm thanh: thời lượng (s)"
+          },
+          "loop": {
+            "type": "boolean",
+            "description": "Âm thanh: lặp (nhạc nền)"
+          }
+        },
+        "if": {
+          "properties": {
+            "kind": {
+              "const": "audio"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        "then": {},
+        "else": {
+          "required": [
+            "width",
+            "height"
+          ]
         }
       }
     }

@@ -8,7 +8,7 @@ GameKit là plugin cho Claude Code giúp **chuyển game di động (Unity, Coco
 
 | Đã chạy | Chưa có |
 | --- | --- |
-| Tạo project game web, theo dõi 6 pha, chấm cổng | Hướng dẫn cho AI tách UI từng màn (P1), chọn runtime (P2), reskin (P3 khi làm lại game người khác) — AI tự làm theo checklist |
+| Tạo project game web, theo dõi 6 pha, chấm cổng; hướng dẫn cho AI ở mọi bước (38 skill, mỗi engine một skill phân tích) | Công cụ tạo hình/âm thanh tự động cho reskin; skill reskin, quảng cáo, leaderboard, save mới viết, chưa thử với game thật |
 | Nhận diện game gốc và đánh giá khả thi (`recon`), theo dõi phân tích (`re`), kiểm kê asset; hướng dẫn cho AI ở P0–P5 (phân tích, dựng lại, test đối chiếu với game gốc, chuyển sang web, SDK portal, đóng gói, smoke test) | Quảng cáo, leaderboard thật trên azgames |
 | Đóng gói cho azgames và bản chạy thử ở máy (`dev-mock`), kiểm tra trước khi phát hành | Game 3D: chưa thử với game thật |
 
