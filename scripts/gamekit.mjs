@@ -22,6 +22,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   provenance list [--label]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
   release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)
+  smoke [--version V]                       Mở gói dev-mock trong trình duyệt: loading → game, lỗi console, máy tính + điện thoại, Settings
   fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
   check-ownership [--module id]             Module chỉ sửa trong thư mục được giao
   integrate --wave N [--test "cmd"] [--cleanup]   Merge theo phụ thuộc, test sau mỗi lần
@@ -58,6 +59,7 @@ const COMMANDS = {
   provenance: () => import('./provenance.mjs').then((m) => m.run),
   pack: () => import('./pack.mjs').then((m) => m.run),
   'release-check': () => import('./release-check.mjs').then((m) => m.run),
+  smoke: () => import('./smoke.mjs').then((m) => m.run),
   fanout: () => import('./parallel.mjs').then((m) => m.fanout),
   'check-ownership': () => import('./parallel.mjs').then((m) => m.checkOwnership),
   integrate: () => import('./parallel.mjs').then((m) => m.integrate),

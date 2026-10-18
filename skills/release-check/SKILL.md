@@ -6,7 +6,7 @@ description: Dùng trước khi phát hành hoặc nộp game lên portal (cổn
 # Kiểm tra phát hành
 
 1. Commit hết, tăng `version` trong game.yaml (semver), ghi changelog.
-2. `gamekit pack --all` → `gamekit release-check` (mặc định kiểm bản mới nhất trong `builds/`; `--version <v>` chọn bản khác, `--portal <id>` chỉ một portal).
+2. `gamekit pack --all` → `gamekit release-check` (mặc định kiểm bản mới nhất trong `builds/`; `--version <v>` chọn bản khác, `--portal <id>` chỉ một portal) → `gamekit smoke` (mở gói dev-mock trong trình duyệt headless; xem ảnh chụp trong `.gamekit/local/smoke/<v>/` trước khi báo người dùng).
 
 ## Luật bố cục (`builds/<v>/<portal>/`)
 - Vỏ có đúng `index.html`, `preview.html`, `version.txt`, `<v>/` — không file khác.
@@ -31,5 +31,17 @@ description: Dùng trước khi phát hành hoặc nộp game lên portal (cổn
 | source map | Tắt `build.sourcemap` |
 | `params`: source TODO / sai khác chưa duyệt | Hoàn tất nguồn hoặc xin người dùng duyệt `D-n` |
 
-3. Checklist tay trong `gates/P5.md`: ngân sách hiệu năng trên máy yếu, smoke test, ảnh store. Mục **playtest bản cuối (bạn)** do người dùng tick.
+## Lỗi của `smoke` và cách sửa
+| Lỗi | Sửa |
+| --- | --- |
+| thiếu `playwright-core` / không mở được trình duyệt | `npm i -D playwright-core`; rồi `npx playwright install chromium`, hoặc cài Chrome, hoặc `GK_CHROME=<đường dẫn chrome>` |
+| màn loading không tắt | Game phải gọi `window.GM_LOADER.ready()` khi khung hình đầu đã vẽ (`src/main.ts`); xem lỗi console đi kèm |
+| `console:` / `lỗi JS:` / `HTTP 404` | Sửa lỗi trong code hoặc file thiếu trong gói; 404 thường là asset không nằm trong `public/` hay import |
+| canvas tràn màn hình / trang cuộn được | Canvas co theo khung (`src/view/renderer.ts`, `style.css`); thử `npm run dev` ở cỡ điện thoại |
+| nút Settings bị che, popup không mở, thiếu footer, Escape không đóng | Giữ `mountSettings` trong `src/view/settings.ts` (class `gk-gear`, `gk-settings`, `gk-settings-footer`) |
+| đổi ngôn ngữ không có tác dụng | Có `Language/<mã>.json` cho mọi mã trong `languages`; select gọi `GM_LOADER.setLanguage` |
+| vào game vượt ngân sách | Đo ở máy còn vượt thì trên mạng thật chắc chắn vượt: giảm `framework.js`, tải asset sau khi vào game |
+| cảnh báo không thấy `gameplayStart` | Smoke chỉ bấm giữa màn hình và phím mũi tên/Space; game có menu riêng thì chơi thử bằng tay |
+
+3. Checklist tay trong `gates/P5.md`: ngân sách hiệu năng trên máy yếu, chơi thử một ván với ad giả, ảnh store. Mục **playtest bản cuối (bạn)** do người dùng tick.
 4. `gamekit gate` → khi người dùng đồng ý, `gamekit gate --advance` (phase = released).

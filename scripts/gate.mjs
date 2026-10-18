@@ -93,14 +93,15 @@ async function runAuto(ctx, name) {
     const v = reusableBuild(root, loadGame(root));
     if (v) return { ok: true, detail: `dùng lại builds/${v} (đúng commit hiện tại; \`gamekit pack\` để đóng gói mới)` };
   }
-  // release-check reads the latest build, so it waits for this gate's pack.
-  if (name === 'release-check' && autos.has('pack')) await ctx.get('pack');
+  // release-check and smoke read the latest build, so they wait for this gate's pack.
+  if ((name === 'release-check' || name === 'smoke') && autos.has('pack')) await ctx.get('pack');
   const cmds = {
     test: ['npm', ['test', '--silent']],
     typecheck: ['npm', ['run', 'typecheck', '--silent']],
     lint: ['npm', ['run', 'lint', '--silent']],
     pack: [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'pack', '--all']],
     'release-check': [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'release-check']],
+    smoke: [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'smoke']],
   };
   const cmd = cmds[name];
   if (!cmd) return { ok: false, detail: `không biết kiểm tra tự động "${name}"` };

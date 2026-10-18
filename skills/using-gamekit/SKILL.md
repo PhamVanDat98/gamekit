@@ -10,7 +10,7 @@ GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, 
 ## Gọi CLI
 - Trong thư mục game: `npm run gk -- <lệnh>` (shim `scripts/gk.mjs` trỏ tới plugin).
 - Từ Claude Code ở bất kỳ đâu: `node "${CLAUDE_PLUGIN_ROOT}/scripts/gamekit.mjs" <lệnh>`.
-- Lệnh: `init`, `config`, `status`, `gate [--advance]`, `validate`, `parity`, `provenance add|list`, `pack`, `release-check`, `fanout`, `check-ownership`, `integrate`. `gamekit help` để xem đủ.
+- Lệnh: `init`, `config`, `status`, `gate [--advance]`, `validate`, `parity`, `provenance add|list`, `pack`, `release-check`, `smoke`, `fanout`, `check-ownership`, `integrate`. `gamekit help` để xem đủ.
 
 ## Tạo game mới (agent)
 1. `gamekit init <tên> --questions --json` → danh sách câu hỏi (label, description, example, default, required). Không có TTY thì init không tự hỏi.

@@ -1,10 +1,15 @@
 # Changelog
 
 ## Chưa phát hành
+Smoke test tự động:
+- Lệnh `smoke`: mở gói dev-mock mới nhất trong trình duyệt headless (`playwright-core` của game; Chromium của Playwright, Chrome/Edge đã cài, hoặc `GK_CHROME`). Kiểm màn loading → game, lỗi console/JS/tải file, canvas vừa máy tính và điện thoại dọc/ngang, nút Settings bấm được, footer bản quyền, Escape đóng popup, đổi ngôn ngữ, thời gian vào game so với `budget.timeToPlaySec`. Ảnh chụp trong `.gamekit/local/smoke/<v>/`.
+- Template: `playwright-core` trong devDependencies, script `smoke`, task VS Code; `gates/P5.md` chấm `{auto: smoke}` thay cho hai mục kiểm tay (loading/Settings, smoke). Game cũ: `npm i -D playwright-core` rồi thêm mục `{auto: smoke}` vào `gates/P5.md` nếu muốn.
+
 Tốc độ:
 - `gate` chạy các kiểm tra tự động song song (test, typecheck, lint, pack); `release-check` chờ `pack` của cùng cổng. Cổng P2 của game mẫu: ~6s → ~3s.
 - Cổng có cả `parity` và `test` chỉ chạy vitest một lần khi `npm test` là `vitest run` của template; `npm test` tự sửa thì vẫn chạy riêng.
 - `gate` ở P4/P5 dùng lại bản build mới nhất khi nó đúng commit HEAD, cây sạch và cùng đầu vào (`game.yaml` trừ phase/gates/timings, bộ vỏ portal, version plugin — ghi ở `manifest.json` `inputs`); trước đây mỗi lần chạy `gate` đóng gói và tốn một số build. `gamekit pack` vẫn luôn đóng gói mới.
+- `pack` build mọi portal cùng lúc (mỗi portal một thư mục riêng); một portal vẫn hiện log vite trực tiếp.
 - Test của plugin tách thành nhiều file (`cli`, `validate`, `provenance`, `gate`, `parallel`) để chạy song song.
 
 ## 0.2.0 — 2026-10-16

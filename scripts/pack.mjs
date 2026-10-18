@@ -15,6 +15,7 @@ import { loadLanguages } from './lib/languages.mjs';
 import { assemblePortal } from './lib/assemble.mjs';
 import { initialLoadBytes } from './lib/budget.mjs';
 import { zipDir } from './lib/zip.mjs';
+import { runAsync } from './lib/run.mjs';
 
 export function hashDir(dir, { exclude = [] } = {}) {
   const h = crypto.createHash('sha256');
@@ -143,16 +144,19 @@ export async function run(args) {
   const inputs = buildInputs(game, kits);
   const manifest = { name: game.name, title: game.title, semver: game.version, version, commit, dirty, inputs, builtAt: nowIso(), portals: {} };
 
+  // Builds differ only by GK_PORTAL and write to their own folders, so every portal builds at once.
+  // One portal keeps vite's live output; several print theirs, portal by portal, once each is done.
+  const tmpOf = (kit) => path.join(base, `.vite-${kit.id}`);
+  const viteArgs = (kit) => [viteBin, 'build', '--outDir', tmpOf(kit), '--emptyOutDir'];
+  const viteEnv = (kit) => ({ ...process.env, GK_PORTAL: kit.id, GK_BUILD: `${version}+${commit}${dirty ? '.dirty' : ''}`, GK_PACK: '1' });
+  const live = kits.length === 1 && !args.quiet;
+  const builds = live ? [] : kits.map((kit) => runAsync(process.execPath, viteArgs(kit), { cwd: root, env: viteEnv(kit) }));
   try {
-    for (const kit of kits) {
+    for (const [i, kit] of kits.entries()) {
       log.head(`Đóng gói ${game.name} ${version} cho ${kit.id}`);
-      const tmp = path.join(base, `.vite-${kit.id}`);
-      const r = spawnSync(process.execPath, [viteBin, 'build', '--outDir', tmp, '--emptyOutDir'], {
-        cwd: root,
-        stdio: args.quiet ? 'pipe' : 'inherit',
-        encoding: 'utf8',
-        env: { ...process.env, GK_PORTAL: kit.id, GK_BUILD: `${version}+${commit}${dirty ? '.dirty' : ''}`, GK_PACK: '1' },
-      });
+      const tmp = tmpOf(kit);
+      const r = live ? spawnSync(process.execPath, viteArgs(kit), { cwd: root, stdio: 'inherit', env: viteEnv(kit) }) : await builds[i];
+      if (!live && !args.quiet) process.stdout.write(`${r.stdout}${r.stderr}`);
       if (r.status !== 0) throw new GkError(`vite build lỗi cho ${kit.id}${args.quiet ? `: ${buildError(`${r.stdout}\n${r.stderr}`)}` : ''}`);
       const outDir = path.join(base, kit.id);
       await assemblePortal({ game, kit, settings: game.portalSettings?.[kit.id] ?? {}, version, viteOut: tmp, languages, outDir, ...tools });
@@ -167,6 +171,7 @@ export async function run(args) {
       }
     }
   } catch (e) {
+    await Promise.allSettled(builds); // other portals may still be writing into base
     fs.rmSync(base, { recursive: true, force: true }); // a failed build never leaves a half package behind
     throw e;
   }

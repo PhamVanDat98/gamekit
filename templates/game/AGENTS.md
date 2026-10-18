@@ -31,7 +31,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Kiểm tra cổng, sang pha sau | `npm run gk -- gate` · `npm run gk -- gate --advance` |
 | Dựng song song | `npm run gk -- fanout --wave N` → subagent làm theo `.gamekit/local/BRIEF.md` → `npm run gk -- integrate --wave N` |
 | Thông tin portal còn thiếu | `npm run gk -- config --portal <id>` |
-| Đóng gói, kiểm tra phát hành | `npm run gk -- pack --all` → `builds/<v>/<portal>/` (`--zip`, `--compress`, `--version`) · `npm run gk -- release-check` |
+| Đóng gói, kiểm tra phát hành | `npm run gk -- pack --all` → `builds/<v>/<portal>/` (`--zip`, `--compress`, `--version`) · `npm run gk -- release-check` · `npm run gk -- smoke` (trình duyệt headless, ảnh chụp trong `.gamekit/local/smoke/`) |
 | Chơi thử bản build | `npm run preview` → `http://localhost:4173/<v>/dev-mock/<v>/index.html` |
 
 ## Nếu bạn là subagent trong một worktree
