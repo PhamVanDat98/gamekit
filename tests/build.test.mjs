@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextVersion, checkVersion, latestVersion, copyrightYear } from '../scripts/lib/version.mjs';
+import { nextVersion, checkVersion, latestVersion, copyrightYear, versionError } from '../scripts/lib/version.mjs';
 import { escapeHtml, jsString, fillTemplate, withBase } from '../scripts/lib/html.mjs';
 import { listPortals, loadPortal, checkSetting, missingSettings, copyrightFor } from '../scripts/lib/portals.mjs';
 import fs from 'node:fs';
@@ -9,12 +9,14 @@ import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { assemblePortal } from '../scripts/lib/assemble.mjs';
 import { initialLoadBytes } from '../scripts/lib/budget.mjs';
-import { zipDir } from '../scripts/lib/zip.mjs';
+import { zipDir, crc32, crc32js } from '../scripts/lib/zip.mjs';
+import { GkError } from '../scripts/lib/log.mjs';
 import { tmpDir, write, read, solidPng, tinyWebp, token } from './helpers.mjs';
 import { PassThrough } from 'node:stream';
 import YAML from 'yaml';
 import { newGame, gk, sh } from './helpers.mjs';
 import { checkBuild } from '../scripts/release-check.mjs';
+import { hashDir } from '../scripts/pack.mjs';
 import { loadProvenance } from '../scripts/validate.mjs';
 import { allQuestions, parseAnswer, checkAnswer, parseSets, withDefaults, settingsFor, ask } from '../scripts/lib/questions.mjs';
 
@@ -240,7 +242,7 @@ async function packedGame(name) {
   const out = path.join(dir, 'builds/26101601/azgames');
   await assemblePortal({ game: { ...GAME, title: 'Demo' }, kit: loadPortal('azgames'), settings: SETTINGS, version: '26101601', viteOut: fakeVite(tmpDir()), languages: LANGS, outDir: out, ...TOOLS });
   const head = sh(dir, 'git', 'rev-parse', '--short', 'HEAD').trim();
-  fs.writeFileSync(path.join(dir, 'builds/26101601/manifest.json'), JSON.stringify({ commit: head, dirty: false }));
+  fs.writeFileSync(path.join(dir, 'builds/26101601/manifest.json'), JSON.stringify({ commit: head, dirty: false, portals: { azgames: { hash: hashDir(out) } } }));
   return { dir, out, game: { ...YAML.parse(read(dir, 'game.yaml')), release: { forbiddenTerms: ['OldName'], allowedHosts: [] } } };
 }
 
@@ -388,4 +390,205 @@ test('release-check: unbuilt, dirty or stale packages are refused', async () => 
   fs.writeFileSync(path.join(dir, 'builds/26101601/manifest.json'), JSON.stringify({ commit: 'abc1234', dirty: false }));
   assert.match(checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir)).errors.join('\n'), /HEAD/);
   assert.match(checkBuild(dir, '26101601', 'dev-mock', game, loadProvenance(dir)).errors.join('\n'), /chưa có gói/);
+});
+
+test('version: YYMMDD must be a real date and NN 01–99', () => {
+  for (const bad of ['99999999', '26023001', '26022901', '26130101', '26100001', '26101600'])
+    assert.throws(() => checkVersion(bad, []), /ngày có thật|NN/, bad);
+  assert.equal(checkVersion('28022901', []), '28022901', 'năm nhuận');
+  assert.equal(versionError('26101699'), null);
+  assert.match(versionError('2610160x'), /8 chữ số/);
+});
+
+test('zip: already-compressed formats are stored, the rest deflated; native and JS CRC agree', () => {
+  const dir = tmpDir();
+  const src = path.join(dir, 'pkg');
+  const same = 'a'.repeat(4000);
+  for (const f of ['a.png', 'b.webp', 'c.jpg', 'd.mp3', 'e.ogg', 'f.woff2', 'g.js.gz', 'h.wasm', 'i.json']) write(src, f, same);
+  const outFile = path.join(dir, 'pkg.zip');
+  zipDir(src, outFile);
+  const method = Object.fromEntries(readZip(fs.readFileSync(outFile)).map((e) => [e.name, e.method]));
+  for (const f of ['a.png', 'b.webp', 'c.jpg', 'd.mp3', 'e.ogg', 'f.woff2', 'g.js.gz']) assert.equal(method[f], 0, `${f} store`);
+  for (const f of ['h.wasm', 'i.json']) assert.equal(method[f], 8, `${f} deflate`);
+  for (const buf of [Buffer.alloc(0), Buffer.from('xin chào'), crypto.randomBytes(5000)]) assert.equal(crc32(buf), crc32js(buf));
+});
+
+test('zip: past the 4 GB format limit is a GkError and no partial zip is left', () => {
+  const dir = tmpDir();
+  const src = path.join(dir, 'pkg');
+  write(src, 'a.bin', crypto.randomBytes(300));
+  write(src, 'b.bin', crypto.randomBytes(300));
+  const outFile = path.join(dir, 'pkg.zip');
+  assert.throws(() => zipDir(src, outFile, { limit: 200 }), (e) => e instanceof GkError && /4 GB/.test(e.message) && /a\.bin/.test(e.message));
+  assert.throws(() => zipDir(src, outFile, { limit: 500 }), /b\.bin/, 'offset vượt giới hạn');
+  assert.ok(!fs.existsSync(outFile));
+});
+
+const setPage = (o, fn) => {
+  const html = fn(read(o, 'index.html'));
+  fs.writeFileSync(path.join(o, 'index.html'), html);
+  fs.writeFileSync(path.join(o, 'preview.html'), html);
+};
+const rehash = (dir, out) => {
+  const f = path.join(dir, 'builds/26101601/manifest.json');
+  const man = JSON.parse(fs.readFileSync(f, 'utf8'));
+  man.portals.azgames.hash = hashDir(out);
+  fs.writeFileSync(f, JSON.stringify(man));
+};
+
+test('release-check: script, link and code bypasses are caught', async () => {
+  const faults = [
+    ['script không có nháy', (o) => setPage(o, (h) => h.replace('</body>', '<script src=https://evil.example.com/x.js></script></body>')), /index\.html nạp script từ evil\.example\.com/],
+    ['script trong <v>/index.html', (o) => write(o, '26101601/index.html', read(o, '26101601/index.html').replace('</body>', '<script src="x.js"></script></body>')), /26101601\/index\.html nạp script "x\.js"/],
+    ['link //host trong JS', (o) => fs.appendFileSync(path.join(o, '26101601/framework.js'), ';fetch("//cdn.evil.example/t.js")'), /framework\.js: link ngoài dạng \/\/cdn\.evil\.example/],
+    ['url(//host) trong CSS', (o) => write(o, '26101601/css/style.css', 'body{background:url(//img.evil.example/a.png)}'), /style\.css: link ngoài dạng \/\/img\.evil\.example/],
+    ['src=//host không nháy', (o) => setPage(o, (h) => h.replace('</body>', '<img src=//px.evil.example/a.gif></body>')), /px\.evil\.example/],
+    ['JS trong assets', (o) => write(o, '26101601/assets/art/x.js', '1'), /assets\/art\/x\.js: assets\/ không chứa code/],
+    ['JS nén trong assets', (o) => write(o, '26101601/assets/img/y.js.br', '1'), /assets\/img\/y\.js\.br: assets\/ không chứa code/],
+  ];
+  for (const [i, [what, mutate, expected]] of faults.entries()) {
+    const { dir, out, game } = await packedGame(`rcb-${i}`);
+    mutate(out);
+    rehash(dir, out);
+    const errors = checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir)).errors.join('\n');
+    assert.match(errors, expected, what);
+  }
+});
+
+test('release-check: comments, w3.org and "//" string joins are not external links', async () => {
+  const { dir, out, game } = await packedGame('rcb-ok');
+  fs.appendFileSync(path.join(out, '26101601/framework.js'), '\nvar a=1; // xem docs.example.com\nvar u=location.protocol+"//"+location.host;var n="http://www.w3.org/2000/svg";');
+  rehash(dir, out);
+  const pr = checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir));
+  assert.ok(pr.ok, pr.errors.join('\n'));
+});
+
+test('release-check: a package edited after pack no longer matches the manifest hash', async () => {
+  const { dir, out, game } = await packedGame('rc-hash');
+  fs.writeFileSync(path.join(out, '26101601/Language/en.json'), '{"a":"A!","b":"B {x}"}');
+  assert.match(checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir)).errors.join('\n'), /bị sửa sau khi pack/);
+  const head = sh(dir, 'git', 'rev-parse', '--short', 'HEAD').trim();
+  fs.writeFileSync(path.join(dir, 'builds/26101601/manifest.json'), JSON.stringify({ commit: head, dirty: false, portals: {} }));
+  assert.match(checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir)).errors.join('\n'), /không có hash của azgames/);
+});
+
+test('release-check command: --portal is trimmed and deduplicated like pack', () => {
+  const dir = newGame('rc-trim');
+  write(dir, 'builds/26101601/.keep', '');
+  const r = gk(dir, 'release-check', '--portal', 'azgames, azgames ,');
+  assert.equal(r.code, 1);
+  assert.equal(r.out.match(/builds\/26101601\/azgames: chưa có gói/g)?.length, 1, r.out);
+  assert.doesNotMatch(r.out, /bộ vỏ portal " azgames"|bộ vỏ portal ""/);
+});
+
+test('loader: the language picked for the player sets <html lang> and dir', async () => {
+  const { runLoader } = await import('../portals/shared/loader-runtime.js');
+  const html = { lang: 'en', dir: '' };
+  const files = { 'framework.js': 'void 0', 'Language/ar.json': '{"_meta":{"dir":"rtl"},"a":"x"}' };
+  const fakes = {
+    window: {},
+    location: { search: '?lang=ar', reload() {} },
+    navigator: { languages: ['en-US'] },
+    fetch: async (url) => new Response(files[url]),
+    document: {
+      documentElement: html,
+      getElementById: () => null,
+      createElement: () => ({}),
+      body: { appendChild: (s) => setTimeout(() => s.onload(), 0) },
+    },
+  };
+  const saved = Object.fromEntries(Object.keys(fakes).map((k) => [k, Object.getOwnPropertyDescriptor(globalThis, k)]));
+  for (const [k, v] of Object.entries(fakes)) Object.defineProperty(globalThis, k, { value: v, configurable: true, writable: true });
+  try {
+    const cfg = { storageKey: 'k', defaultLanguage: 'en', languages: [{ code: 'en', name: 'English' }, { code: 'ar', name: 'العربية' }], sizes: { framework: 6, lang: { ar: 30 } }, copyright: '©', version: '26101601' };
+    runLoader(cfg);
+    for (let i = 0; i < 100 && !fakes.window.GM_LANG; i++) await new Promise((r) => setTimeout(r, 5));
+    assert.equal(fakes.window.GM_LANG?.code, 'ar');
+    assert.equal(html.lang, 'ar');
+    assert.equal(html.dir, 'rtl');
+  } finally {
+    for (const [k, d] of Object.entries(saved)) {
+      if (d) Object.defineProperty(globalThis, k, d);
+      else delete globalThis[k];
+    }
+  }
+});
+
+/** Stand-ins for vite, esbuild and javascript-obfuscator in the game's node_modules (gitignored), so pack runs offline. */
+function fakeToolchain(dir) {
+  write(dir, 'node_modules/vite/package.json', '{"name":"vite"}');
+  write(dir, 'node_modules/vite/bin/vite.js', `const fs = require('fs');
+const path = require('path');
+const out = process.argv[process.argv.indexOf('--outDir') + 1];
+fs.rmSync(out, { recursive: true, force: true });
+fs.cpSync('public', out, { recursive: true });
+fs.mkdirSync(path.join(out, 'css'), { recursive: true });
+fs.writeFileSync(path.join(out, 'framework.js'), 'var f="gk-settings-footer",b=' + JSON.stringify(process.env.GK_BUILD) + ',s=' + JSON.stringify(fs.readFileSync('src/main.ts', 'utf8').length) + ';');
+fs.writeFileSync(path.join(out, 'css/style.css'), 'body{}');
+`);
+  write(dir, 'node_modules/esbuild/package.json', '{"name":"esbuild"}');
+  write(dir, 'node_modules/esbuild/index.js', 'exports.build = async ({ define }) => ({ outputFiles: [{ text: "var cfg=" + define.__GK_LOADER__ + ";" }] });');
+  write(dir, 'node_modules/javascript-obfuscator/package.json', '{"name":"javascript-obfuscator"}');
+  write(dir, 'node_modules/javascript-obfuscator/index.js', 'exports.obfuscate = (code) => ({ getObfuscatedCode: () => code });');
+  return dir;
+}
+const builds = (dir) => (fs.existsSync(path.join(dir, 'builds')) ? fs.readdirSync(path.join(dir, 'builds')).sort() : []);
+const manifestOf = (dir, v) => JSON.parse(read(dir, `builds/${v}/manifest.json`));
+const AZ_SETS = ['--set', 'azgames.gameCode=g205', '--set', `azgames.signed=${token({ signed: 'x', domain: 'azgame.io' })}`];
+
+test('pack: an unconfigured portal is skipped with its fix, the configured ones still build, exit 1', () => {
+  const dir = fakeToolchain(newGame('pk-part'));
+  const r = gk(dir, 'pack', '--all', '--quiet');
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /azgames: thiếu gameCode/);
+  assert.match(r.out, /gamekit config --portal azgames/);
+  const [v] = builds(dir);
+  assert.ok(fs.existsSync(path.join(dir, `builds/${v}/dev-mock/${v}/framework.js`)), r.out);
+  assert.ok(!fs.existsSync(path.join(dir, `builds/${v}/azgames`)));
+  assert.deepEqual(Object.keys(manifestOf(dir, v).portals), ['dev-mock']);
+});
+
+test('pack: game.yaml title/settings/languages count as build input; phase and timings do not', () => {
+  const dir = fakeToolchain(newGame('pk-dirty'));
+  assert.equal(gk(dir, 'pack', '--portal', 'dev-mock', '--quiet').code, 0);
+  assert.equal(manifestOf(dir, builds(dir).at(-1)).dirty, false);
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^phase: P0/m, 'phase: P4'));
+  assert.equal(gk(dir, 'pack', '--portal', 'dev-mock', '--quiet').code, 0);
+  assert.equal(manifestOf(dir, builds(dir).at(-1)).dirty, false, 'phase không vào gói');
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^title: .*/m, 'title: Tên Mới'));
+  const r = gk(dir, 'pack', '--portal', 'dev-mock', '--quiet');
+  const man = manifestOf(dir, builds(dir).at(-1));
+  assert.equal(man.title, 'Tên Mới');
+  assert.equal(man.dirty, true, 'title chưa commit mà gói ghi dirty:false');
+  assert.match(r.out, /chưa commit/);
+});
+
+test('gate {auto: pack}: reuses the last build of the same clean commit instead of taking a new number', () => {
+  const dir = fakeToolchain(newGame('gate-pack'));
+  write(dir, 'gates/P0.md', '- [ ] Đóng gói được {auto: pack}\n');
+  let r = gk(dir, 'gate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /azgames: thiếu gameCode.*gamekit config --portal azgames/);
+  assert.deepEqual(builds(dir), [], 'thiếu thông tin portal thì không tốn số build');
+  assert.equal(gk(dir, 'config', ...AZ_SETS).code, 0);
+  sh(dir, 'git', 'commit', '-qam', 'azgames');
+  r = gk(dir, 'gate');
+  assert.equal(r.code, 0, r.out);
+  assert.equal(builds(dir).length, 1);
+  const first = builds(dir)[0];
+  r = gk(dir, 'gate');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, new RegExp(`dùng lại builds/${first}`));
+  assert.deepEqual(builds(dir), [first]);
+  fs.appendFileSync(path.join(dir, `builds/${first}/dev-mock/${first}/framework.js`), ';1');
+  assert.equal(gk(dir, 'gate').code, 0);
+  assert.equal(builds(dir).length, 2, 'gói bị sửa tay thì pack lại');
+  fs.appendFileSync(path.join(dir, 'src/main.ts'), '\n// đổi\n');
+  assert.equal(gk(dir, 'gate').code, 0);
+  assert.equal(builds(dir).length, 3, 'code chưa commit thì pack lại');
+  sh(dir, 'git', 'commit', '-qam', 'code');
+  assert.equal(gk(dir, 'gate').code, 0);
+  assert.equal(builds(dir).length, 4, 'commit mới thì pack lại');
+  assert.equal(gk(dir, 'gate').code, 0);
+  assert.equal(builds(dir).length, 4);
 });

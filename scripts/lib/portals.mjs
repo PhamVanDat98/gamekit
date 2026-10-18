@@ -11,9 +11,14 @@ export const PORTALS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.u
 export const listPortals = () =>
   fs.readdirSync(PORTALS_DIR).filter((d) => exists(path.join(PORTALS_DIR, d, 'portal.yaml'))).sort();
 
+export const PORTAL_ID_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+/** "--portal a, b,a" → ['a', 'b']: trimmed, no empties, no repeats. */
+export const portalList = (s) => [...new Set(String(s).split(',').map((p) => p.trim()).filter(Boolean))];
+
 export function loadPortal(id) {
   const dir = path.join(PORTALS_DIR, String(id));
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(String(id)) || !exists(path.join(dir, 'portal.yaml')))
+  if (!PORTAL_ID_RE.test(String(id)) || !exists(path.join(dir, 'portal.yaml')))
     throw new GkError(`Không có bộ vỏ portal "${id}" (có: ${listPortals().join(', ')})`);
   return { id, dir, config: readYaml(path.join(dir, 'portal.yaml')) };
 }

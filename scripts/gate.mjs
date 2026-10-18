@@ -11,6 +11,7 @@ import { requireGameRoot, loadGame, updateGame, nowIso, ownershipOf } from './li
 import { PHASES, nextPhase, phaseInfo } from './lib/phases.mjs';
 import { validateGame } from './validate.mjs';
 import { parityDetail, parityForGame } from './parity.mjs';
+import { packPlan, reusableBuild } from './pack.mjs';
 
 /**
  * Gate file syntax (gates/P2.md):
@@ -72,16 +73,31 @@ function runAuto(root, name, phase) {
     const ok = exists(f) && fs.statSync(f).size > 0;
     return { ok, detail: ok ? '' : `thiếu ${name.slice(5).trim()}` };
   }
+  if (name === 'pack') {
+    // Every pack takes one of the day's 01–99 build numbers: reuse the last build when nothing it is made of changed.
+    try {
+      const game = loadGame(root);
+      const portals = [...new Set(game.portals ?? [])];
+      const { common, skipped } = packPlan(game, portals);
+      const problems = [...common, ...skipped.flatMap((s) => [...s.problems, `gamekit config --portal ${s.kit.id}`])];
+      if (problems.length) return { ok: false, detail: problems.join('; ') };
+      const v = reusableBuild(root, portals, game);
+      if (v) return { ok: true, detail: `dùng lại builds/${v} (cùng commit, chưa sửa gì)` };
+    } catch (e) {
+      return { ok: false, detail: e.message };
+    }
+  }
+  // npm is npm.cmd on Windows and needs a shell; node runs straight from execPath (no shell: a path with spaces stays one argument).
   const cmds = {
-    test: ['npm', ['test', '--silent']],
-    typecheck: ['npm', ['run', 'typecheck', '--silent']],
-    lint: ['npm', ['run', 'lint', '--silent']],
+    test: ['npm', ['test', '--silent'], true],
+    typecheck: ['npm', ['run', 'typecheck', '--silent'], true],
+    lint: ['npm', ['run', 'lint', '--silent'], true],
     pack: [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'pack', '--all']],
     'release-check': [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'release-check']],
   };
   const cmd = cmds[name];
   if (!cmd) return { ok: false, detail: `không biết kiểm tra tự động "${name}"` };
-  const r = spawnSync(cmd[0], cmd[1], { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' });
+  const r = spawnSync(cmd[0], cmd[1], { cwd: root, encoding: 'utf8', shell: Boolean(cmd[2]) && process.platform === 'win32' });
   const tail = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim().split('\n').slice(-3).join(' | ');
   return { ok: r.status === 0, detail: r.status === 0 ? '' : tail };
 }

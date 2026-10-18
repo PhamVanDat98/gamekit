@@ -7,11 +7,12 @@ import { Problems, log } from './lib/log.mjs';
 import { git } from './lib/git.mjs';
 import { requireGameRoot } from './lib/game.mjs';
 import { PHASES } from './lib/phases.mjs';
-import { latestVersion } from './lib/version.mjs';
-import { loadPortal } from './lib/portals.mjs';
+import { latestVersion, versionError } from './lib/version.mjs';
+import { loadPortal, portalList } from './lib/portals.mjs';
 import { ASSET_KINDS } from './lib/assemble.mjs';
-import { initialLoadBytes } from './lib/budget.mjs';
+import { COMPRESSED, initialLoadBytes } from './lib/budget.mjs';
 import { validateGame, loadProvenance } from './validate.mjs';
+import { hashDir } from './pack.mjs';
 
 const ALWAYS_ALLOWED_HOSTS = ['www.w3.org', 'w3.org'];
 const TEXT = /\.(html|js|mjs|css|json|svg|txt|xml)$/i;
@@ -20,8 +21,12 @@ const INNER_TOP = new Set(['index.html', 'loader.js', 'framework.js', 'css', 'Ic
 const REQUIRED = ['index.html', 'loader.js', 'framework.js', 'css/style.css', 'Icons/web.png', 'Icons/loading.webp', 'Icons/domain.webp', 'Language/en.json'];
 const hostAllowed = (host, allowed) => allowed.some((a) => host === a || host.endsWith('.' + a));
 const URL_RE = /(?:https?|wss?):\/\/((?:[a-z0-9-]+\.)+[a-z]{2,}|localhost|\d{1,3}(?:\.\d{1,3}){3})/gi;
+// Protocol-relative //host links where code or markup can use them: right after a quote, "(" (url(…)) or "=".
+// A JS comment ("x; // see a.b") never follows one of these, so comments don't trip it.
+const PROTO_REL_RE = /["'(=]\s*\/\/((?:[a-z0-9-]+\.)+[a-z]{2,}|localhost)(?![a-z0-9.-])/gi;
+const CODE = /\.(html?|m?js|css)$/i;
+const SCRIPT_SRC_RE = /<script\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi;
 const BINARY_SCAN_LIMIT = 64 * 1024 * 1024;
-const COMPRESSED = /\.(gz|br)$/;
 const SETTINGS_FOOTER = 'gk-settings-footer';
 
 function checkLayout(dir, version, kit, where, pr) {
@@ -43,27 +48,35 @@ function checkLayout(dir, version, kit, where, pr) {
     const [top, kind] = rel.replace(COMPRESSED, '').split('/');
     if (!INNER_TOP.has(top)) pr.error(where, `${version}/${rel}: không thuộc bố cục gói`);
     if (top === 'assets' && !ASSET_KINDS.has(kind)) pr.error(where, `${version}/${rel}: asset phải nằm trong assets/{${[...ASSET_KINDS].join(',')}}`);
+    if (top === 'assets' && /\.m?js$/i.test(rel.replace(COMPRESSED, ''))) pr.error(where, `${version}/${rel}: assets/ không chứa code — JS của game chỉ nằm trong framework.js`);
     if (top === 'StreamingAssets' && /\.(m?js|wasm|html?)$/i.test(rel.replace(COMPRESSED, ''))) pr.error(where, `${version}/${rel}: StreamingAssets chỉ chứa dữ liệu, không chứa code`);
   }
+  checkScripts(outerText, 'index.html', kit, where, pr);
+  const innerPage = path.join(inner, 'index.html');
+  if (exists(innerPage)) checkScripts(fs.readFileSync(innerPage, 'utf8'), `${version}/index.html`, kit, where, pr);
+  for (const f of kit.config.placeholders ?? []) pr.warn(where, `${f} của bộ vỏ ${kit.id} còn là placeholder — thay bằng file thật trong plugin`);
+}
+
+/** A page may load loader.js (relative, exactly once) and scripts from the portal's allowedHosts — nothing else. */
+function checkScripts(html, page, kit, where, pr) {
   let loaders = 0;
-  for (const m of outerText.matchAll(/<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi)) {
-    const src = m[1];
+  for (const m of html.matchAll(SCRIPT_SRC_RE)) {
+    const src = m[1] ?? m[2] ?? m[3];
     if (src === 'loader.js') loaders++;
     else if (/^https:\/\//i.test(src)) {
       let host = null;
       try {
         host = new URL(src).hostname;
       } catch {
-        pr.error(where, `index.html nạp script với URL không hợp lệ "${src}"`);
+        pr.error(where, `${page} nạp script với URL không hợp lệ "${src}"`);
       }
-      if (host && !hostAllowed(host, kit.config.allowedHosts ?? [])) pr.error(where, `index.html nạp script từ ${host} — không thuộc allowedHosts của portal ${kit.id}`);
-    } else pr.error(where, `index.html nạp script "${src}" — trang chỉ được nạp loader.js và SDK của portal`);
+      if (host && !hostAllowed(host, kit.config.allowedHosts ?? [])) pr.error(where, `${page} nạp script từ ${host} — không thuộc allowedHosts của portal ${kit.id}`);
+    } else pr.error(where, `${page} nạp script "${src}" — trang chỉ được nạp loader.js và SDK của portal`);
   }
-  if (loaders !== 1) pr.error(where, `index.html phải nạp loader.js đúng một lần (đang ${loaders})`);
-  for (const f of kit.config.placeholders ?? []) pr.warn(where, `${f} của bộ vỏ ${kit.id} còn là placeholder — thay bằng file thật trong plugin`);
+  if (loaders !== 1) pr.error(where, `${page} phải nạp loader.js đúng một lần (đang ${loaders})`);
 }
 
-function checkContent(root, dir, version, kit, game, prov, where, pr) {
+function checkContent(dir, version, kit, game, prov, where, pr) {
   const labels = new Map((prov.entries ?? []).map((e) => [e.path, e.label]));
   const terms = (game.release?.forbiddenTerms ?? []).filter(Boolean).map((t) => t.toLowerCase());
   const allowed = [...ALWAYS_ALLOWED_HOSTS, ...(game.release?.allowedHosts ?? []), ...(kit.config.allowedHosts ?? [])];
@@ -93,9 +106,12 @@ function checkContent(root, dir, version, kit, game, prov, where, pr) {
         // loader.js is generated by the plugin's portal kit (obfuscated); its hosts come from portal.yaml.
         for (const m of text.matchAll(URL_RE))
           if (!hostAllowed(m[1].toLowerCase(), allowed)) pr.error(where, `${rel}: link ngoài tới ${m[1]} (thêm vào release.allowedHosts nếu là SDK portal)`);
+        if (CODE.test(rel))
+          for (const m of text.matchAll(PROTO_REL_RE))
+            if (!hostAllowed(m[1].toLowerCase(), allowed)) pr.error(where, `${rel}: link ngoài dạng //${m[1]} (thêm vào release.allowedHosts nếu là SDK portal)`);
       }
       if (rel.endsWith('index.html')) {
-        for (const m of text.matchAll(/\b(?:src|href)\s*=\s*["'](\/\/?[^"']*)["']/gi)) {
+        for (const m of text.matchAll(/\b(?:src|href)\s*=\s*["']?(\/\/?[^"'\s>]*)/gi)) {
           if (m[1].startsWith('//')) pr.error(where, `${rel}: link ngoài dạng ${m[1]}`);
           else pr.error(where, `${rel}: đường dẫn tuyệt đối ${m[1]} — phải là đường dẫn tương đối`);
         }
@@ -114,8 +130,8 @@ function checkContent(root, dir, version, kit, game, prov, where, pr) {
   else log.dim(`${where}: tải đầu ${mb.toFixed(2)}MB${budget ? ` / ${budget}MB` : ''}`);
 }
 
-/** The package must come from the current commit with no pending code/asset changes. */
-function checkFreshness(root, version, where, pr) {
+/** The package must come from the current commit with no pending code/asset changes, unchanged since pack. */
+function checkFreshness(root, version, portal, where, pr) {
   const f = path.join(root, 'builds', version, 'manifest.json');
   if (!exists(f)) {
     pr.error(where, `thiếu builds/${version}/manifest.json — đóng gói bằng \`gamekit pack\``);
@@ -134,6 +150,9 @@ function checkFreshness(root, version, where, pr) {
   const head = git(root, ['rev-parse', '--short', 'HEAD'], { allowFail: true });
   if (man.dirty) pr.error(where, `đóng gói từ bản chưa commit — commit rồi pack lại`);
   else if (head && man.commit && man.commit !== head) pr.error(where, `gói build từ commit ${man.commit}, HEAD là ${head} — pack lại`);
+  const expected = man.portals?.[portal]?.hash;
+  if (!expected) pr.error(where, `builds/${version}/manifest.json không có hash của ${portal} — gói không do \`gamekit pack\` tạo, pack lại`);
+  else if (hashDir(path.join(root, 'builds', version, portal)) !== expected) pr.error(where, 'gói đã bị sửa sau khi pack (hash khác manifest.json) — pack lại, đừng sửa tay trong builds/');
 }
 
 export function checkBuild(root, version, portal, game, prov) {
@@ -152,8 +171,8 @@ export function checkBuild(root, version, portal, game, prov) {
     return pr;
   }
   checkLayout(dir, version, kit, where, pr);
-  checkFreshness(root, version, where, pr);
-  checkContent(root, dir, version, kit, game, prov, where, pr);
+  checkFreshness(root, version, portal, where, pr);
+  checkContent(dir, version, kit, game, prov, where, pr);
   return pr;
 }
 
@@ -164,11 +183,11 @@ export async function run(args) {
   const buildsDir = path.join(root, 'builds');
   const version = args.version ? String(args.version) : latestVersion(exists(buildsDir) ? fs.readdirSync(buildsDir) : []);
   if (!version) all.error('builds', 'chưa có bản build — chạy `gamekit pack`');
-  else if (!/^\d{8}$/.test(version)) all.error('builds', '--version phải là 8 chữ số YYMMDDNN');
+  else if (versionError(version)) all.error('builds', `${args.version ? '--version' : `builds/${version}`} ${versionError(version)}`);
   else if (!exists(path.join(buildsDir, version))) all.error('builds', `chưa có builds/${version}`);
   else {
     const prov = loadProvenance(root);
-    const portals = args.portal ? String(args.portal).split(',') : game.portals ?? [];
+    const portals = args.portal ? portalList(args.portal) : game.portals ?? [];
     if (!portals.length) all.error('builds', 'không có portal nào để kiểm');
     log.info(`Kiểm builds/${version}`);
     for (const p of portals) all.merge(checkBuild(root, version, p, game, prov));
