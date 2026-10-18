@@ -29,10 +29,11 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Test / typecheck / lint | `npm test` · `npm run typecheck` · `npm run lint` |
 | Parity với game gốc | `npm run gk -- parity` (nghĩa vụ trong `spec/obligations.yaml`, test gắn thẻ `[id:case]`) |
 | Kiểm tra cổng, sang pha sau | `npm run gk -- gate` · `npm run gk -- gate --advance` |
-| Dựng song song | `npm run gk -- fanout --wave N` → subagent làm theo `.gamekit/local/BRIEF.md` → `npm run gk -- integrate --wave N` |
+| Phân tích song song (P1) | `re-plan.yaml` → `npm run gk -- fanout --plan re --ready` → subagent làm theo `.gamekit/local/BRIEF.md` → `npm run gk -- integrate --plan re --ready` (lặp lại tới khi mọi mảng merge) |
+| Dựng song song (P2) | `module-plan.yaml` → `npm run gk -- fanout --ready` (hoặc `--wave N`) → subagent → `npm run gk -- integrate --ready` |
 | Thông tin portal còn thiếu | `npm run gk -- config --portal <id>` |
 | Đóng gói, kiểm tra phát hành | `npm run gk -- pack --all` → `builds/<v>/<portal>/` (`--zip`, `--compress`, `--version`) · `npm run gk -- release-check` |
 | Chơi thử bản build | `npm run preview` → `http://localhost:4173/<v>/dev-mock/<v>/index.html` |
 
 ## Nếu bạn là subagent trong một worktree
-Đọc `.gamekit/local/BRIEF.md`. Chỉ sửa trong thư mục được giao; cần đổi contract/params/package.json thì dừng và báo lại. Quyết định của mảng ghi vào `notes/<mảng>/decisions.md` với mã `D-<mảng>-n`, không sửa `DECISIONS.md`. Trước khi xong: test xanh, `npm run gk -- check-ownership` đạt, commit trên nhánh của module.
+Đọc `.gamekit/local/BRIEF.md`. Chỉ sửa trong thư mục được giao; cần đổi contract/params/package.json thì dừng và báo lại. Quyết định của mảng ghi vào `notes/<mảng>/decisions.md` với mã `D-<mảng>-n`, không sửa `DECISIONS.md`. Trước khi xong: test xanh (mảng phân tích: `npm run gk -- validate`), `npm run gk -- check-ownership` đạt, commit trên nhánh của module (`mod/<id>`) hoặc mảng (`re/<id>`). Thư mục trong `links` (vd `decompiled/`) là symlink tới thư mục game: chỉ đọc.

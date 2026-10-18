@@ -311,7 +311,7 @@ Thứ tự phụ thuộc: **W0** phải xong trước; các gói trong cùng m�
 | **W0 Lược đồ chung** (đã xong, xem 5.0b) | 0 | `schemas/questions.schema.json` (mới), `schemas/module-plan.schema.json` (thêm `kind`, `links`, `areas`/`modules`, `wave` tuỳ chọn), `scripts/lib/plan.mjs` (mới: `loadPlan(root, kind)`, `units()`, `readySet()`, `branchOf(kind,id)`) | Chốt định dạng; giữ tương thích `module-plan.yaml` cũ | plan cũ vẫn hợp lệ; DAG vòng bị chặn; `readySet` đúng |
 | **W1 Params/obligations nhiều file** (đã xong, xem 5.0c) | 1 | `scripts/validate.mjs` (params, obligations), `templates/game/src/core/params.ts`, `templates/game/spec/` | `loadObligations` gộp `spec/obligations.yaml` + `spec/obligations/*.yaml`; báo trùng khoá params giữa file; `params.ts` gộp `import.meta.glob('../../params/*.json', {eager:true})` theo tên file (giữ `game.json` gộp ở gốc để tương thích) | trùng khoá lỗi; game thử: test/typecheck/lint/pack xanh |
 | **W2 Câu hỏi & ghi chú** (mã quyết định theo mảng đã xong, xem 5.0) | 1 | `scripts/questions.mjs` (mới), `scripts/validate.mjs` (phần notes — tách thành `scripts/lib/validate-notes.mjs` để không đụng W1), `templates/game/notes/` | Đọc `notes/**/questions.yaml` (và cảnh báo nếu còn `QUESTIONS.md` kiểu cũ); kiểm liên kết; kiểm frontmatter ghi chú; lệnh `questions` | câu `answered` không có ghi chú → lỗi; `openReason` bắt buộc khi đóng |
-| **W3 Lập lịch song song** | 1 | `scripts/parallel.mjs` | `fanout/integrate --plan re|build --ready`, `--keep-going`, `links:` symlink, chia lượt `maxParallel`, tiền tố nhánh theo kind, brief giàu thông tin | worktree có symlink `decompiled/`; nhánh đỏ không chặn nhánh độc lập; con của nhánh đỏ bị bỏ qua |
+| **W3 Lập lịch song song** (đã xong, xem 5.0d) | 1 | `scripts/parallel.mjs` | `fanout/integrate --plan re|build --ready`, `--keep-going`, `links:` symlink, chia lượt `maxParallel`, tiền tố nhánh theo kind, brief giàu thông tin | worktree có symlink `decompiled/`; nhánh đỏ không chặn nhánh độc lập; con của nhánh đỏ bị bỏ qua |
 | **W4 Recon** | 1 | `scripts/recon.mjs` (mới), `schemas/inventory.schema.json` | Nhận diện engine, kiểm kê, ghi `notes/inventory.json`, điền `game.yaml` | thư mục giả cho từng engine (Unity Mono, IL2CPP, WebGL, Godot, APK) |
 | **W5 Cổng** | 2 (sau W2, W3) | `scripts/gate.mjs`, `templates/game/gates/P1.md`, `P2.md` | `gate --area`; auto `areas`, `questions`, `file:spec/gameplay-spec.md`, `merged` (mọi module đã merge + worktree gỡ); chạy auto song song; dùng chung một lần vitest | cổng mảng qua/không qua; P2 chạy vitest đúng 1 lần |
 | **W6 Parity một phần** | 2 (sau W1) | `scripts/parity.mjs` | `--area`, `--module`, `--json`, `--mutate` | lọc đúng; mutate làm nghĩa vụ đỏ |
@@ -341,6 +341,17 @@ Theo `AGENTS.md`: mỗi lệnh mới thêm vào `COMMANDS` + `HELP` trong `scrip
 - `params/game.json` ở gốc `PARAMS`; `params/<tên>.json` (và `params/<tên>/…`) dưới khoá `<tên>`. Template `src/core/params.ts`: `PARAMS = { ...unwrap(game), ...unwrap(FILES) }`, `FILES` là import tường minh từng file — giữ kiểu (gõ sai khoá thì typecheck đỏ); không dùng `import.meta.glob` vì mất kiểu.
 - `validate`: file params chưa có trong `src/core/params.ts` (bỏ qua comment) là lỗi; một nhóm cấp 1 chỉ đến từ một nơi (khoá của `game.json`, `params/<g>.json`, hoặc các file trong `params/<g>/`); khoá đầy đủ trùng giữa file là lỗi. Khoá dùng trong nghĩa vụ = đường dẫn trong `PARAMS` (+ bí danh `game.<khoá>` như cũ).
 - `loadObligationFiles` / `loadObligations` (gộp) / `obligationFileErrors` trong `scripts/validate.mjs`: `spec/obligations.yaml` + `spec/obligations/*.yaml`, schema từng file, id trong file mảng phải có tiền tố `<mảng>.`, trùng id giữa file báo kèm file đã có. `parity` dùng cùng bộ đọc.
+
+### 5.0d Đã làm: W3 — lập lịch song song
+
+- `scripts/parallel.mjs` viết lại quanh `lib/plan.mjs`, dùng chung cho `--plan build` (mặc định, `module-plan.yaml`) và `--plan re` (`re-plan.yaml`). Trạng thái chỉ suy ra từ git: đã merge = có merge commit trên base; đang chạy = worktree tồn tại mà chưa merge.
+- `fanout --ready`: `readySet` (phụ thuộc đã merge, chưa chạy, tối đa `maxParallel` trừ số đang chạy) và in đơn vị đang chờ cùng lý do. `--wave N` (chỉ build) giữ như cũ nhưng cũng giới hạn `maxParallel`.
+- `integrate --ready`: duyệt toàn kế hoạch theo `topo`; bỏ qua đơn vị chưa fanout hoặc làm dở; đơn vị có phụ thuộc chưa merge được báo "chờ". `--keep-going`: ghi lỗi rồi đi tiếp. Mảng mặc định kiểm bằng `gamekit validate`.
+- Worktree mảng `../<game>.worktrees/re-<id>`, nhánh `re/<id>`, merge `merge: re/<id> (mảng)`; module giữ nguyên định dạng cũ.
+- `links`: symlink vào worktree, thêm `/<tên>` vào `info/exclude` chung (git coi symlink là file nên mẫu `decompiled/` không phủ được); `--cleanup` gỡ symlink trước `worktree remove`.
+- Brief: mảng — targets, đơn vị chuẩn, đầu ra theo bố cục 4.3, luật `own`/`third-party`, tiêu chí xong; module có `buildModule` trỏ tới — ghi chú/params/spec của mảng và danh sách nghĩa vụ phải đóng.
+- Sửa kèm (xung đột W1 × W3): file params chưa nạp trong `src/core/params.ts` là cảnh báo trước P2, lỗi từ P2 — mảng P1 không sở hữu `src/core/params.ts`.
+- Chưa làm (để W6): test sau mỗi merge vẫn là toàn bộ (`--test` mặc định), chưa thu hẹp theo nghĩa vụ của module.
 
 ### 5.1 Tương thích ngược
 

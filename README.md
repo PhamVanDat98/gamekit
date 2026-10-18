@@ -56,9 +56,9 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | `provenance add <file…> --label …` | Nhãn `reference / generated / own / licensed / placeholder` |
 | `pack [--portal] [--all] [--version V] [--compress] [--zip]` | `builds/<YYMMDDNN>/<portal>/{index.html, preview.html, version.txt, <v>/…}` + `builds/<v>/manifest.json` (+ zip) |
 | `release-check [--version V] [--portal p]` | Mặc định bản mới nhất. Kiểm bố cục az-v1, footer bản quyền, chặn asset reference/placeholder, tên game gốc, link ngoài, đường dẫn tuyệt đối, vượt ngân sách tải |
-| `fanout --wave N` | Mỗi module một worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>` + `BRIEF.md` |
+| `fanout [--plan build\|re] [--wave N \| --ready]` | Mỗi module một worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>` (mảng phân tích: `re-<id>`, nhánh `re/<id>`) + `BRIEF.md`; symlink `node_modules` và `links` (tư liệu local). `--ready`: mọi đơn vị có phụ thuộc đã merge, tối đa `maxParallel` |
 | `check-ownership` | Module chỉ sửa trong thư mục được giao, không đụng vùng shared |
-| `integrate --wave N [--cleanup]` | Merge theo phụ thuộc, test sau mỗi merge, đỏ thì hoàn tác |
+| `integrate [--plan build\|re] [--wave N \| --ready] [--keep-going] [--cleanup]` | Merge theo phụ thuộc, test sau mỗi merge (mảng: `validate`), đỏ thì hoàn tác. `--ready` bỏ qua đơn vị chưa xong; `--keep-going` bỏ qua đơn vị lỗi và đơn vị phụ thuộc nó |
 | `precommit` | Git hook: chặn `reference/`, `decompiled/`, code decompile, asset chưa nhãn |
 
 ## Cấu trúc plugin

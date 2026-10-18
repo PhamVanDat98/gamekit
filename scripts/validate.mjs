@@ -134,7 +134,8 @@ function validateParams(root, st, pr) {
       else if (prev.where !== where && !(prev.nested && nested)) pr.error(where, `nhóm ${g} trùng với ${prev.where} — mỗi nhóm params chỉ nằm trong một file`);
     }
     if (!isRoot && loaderText !== null && !new RegExp(`['"][./]*params/${rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`).test(loaderText))
-      pr.error(where, `chưa được nạp trong ${PARAMS_LOADER} — thêm import và một dòng vào FILES (game không đọc được số này)`);
+      // P1 areas write params before any code reads them; the game must load every file from P2 on.
+      (strict ? pr.error : pr.warn).call(pr, where, `chưa được nạp trong ${PARAMS_LOADER} — thêm import và một dòng vào FILES (game không đọc được số này)`);
     for (const [key, p] of collectParams(data)) {
       const full = `${prefix}${key}`;
       if (owner.has(full) && owner.get(full) !== where) pr.error(where, `${full} đã có trong ${owner.get(full)}`);

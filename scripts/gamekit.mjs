@@ -22,14 +22,16 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   provenance list [--label]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
   release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)
-  fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
-  check-ownership [--module id]             Module chỉ sửa trong thư mục được giao
-  integrate --wave N [--test "cmd"] [--cleanup]   Merge theo phụ thuộc, test sau mỗi lần
+  fanout [--plan build|re] [--wave N | --ready] [--dry-run]   Tạo worktree + brief cho module (module-plan.yaml) hoặc mảng phân tích (re-plan.yaml).
+                                            --ready: mọi đơn vị có phụ thuộc đã merge, tối đa maxParallel
+  check-ownership [--plan] [--module id]    Module/mảng chỉ sửa trong phần được giao (nhận theo nhánh mod/… hoặc re/…)
+  integrate [--plan build|re] [--wave N | --ready] [--keep-going] [--test "cmd"] [--cleanup]
+                                            Merge theo phụ thuộc, test sau mỗi lần (mảng: validate); --keep-going bỏ qua đơn vị lỗi và phụ thuộc của nó
   precommit                                 (git hook) chặn asset gốc, code decompile, asset chưa nhãn
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'ready', 'keep-going']);
 
 export function parseArgs(argv) {
   const out = { _: [] };

@@ -140,8 +140,10 @@ test('params per area: params/<name>.json sits under its name, must be loaded by
   const speed = { value: 4, unit: 'px/frame', source: 'PlayerController.Update', confidence: 'observed' };
   write(dir, 'params/hero.json', JSON.stringify({ run: { speed } }));
   let r = gk(dir, 'validate');
-  assert.equal(r.code, 1, 'the usage example in the comment does not count as an import');
+  assert.equal(r.code, 0, 'P1 areas write params before the game reads them: a warning');
   assert.match(r.out, /params\/hero\.json.*chưa được nạp trong src\/core\/params\.ts/);
+  r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 1, 'from P2 the game must load it; the usage example in the comment does not count');
   write(dir, 'src/core/params.ts', read(dir, 'src/core/params.ts')
     .replace("import game from '../../params/game.json';", "import game from '../../params/game.json';\nimport hero from '../../params/hero.json';")
     .replace('const FILES = {};', 'const FILES = { hero };'));
@@ -311,6 +313,130 @@ modules:
   assert.ok(!fs.existsSync(wt('a')), 'worktree removed');
 });
 
+
+/** Commit `files` on the worktree's branch. */
+const commitIn = (wt, files, msg = 'work') => {
+  sh(wt, 'git', 'config', 'user.email', 't@e');
+  for (const [rel, text] of Object.entries(files)) write(wt, rel, text);
+  sh(wt, 'git', 'add', '-A');
+  sh(wt, 'git', 'commit', '-qm', msg);
+};
+
+test('re-plan: fanout --ready opens areas whose dependencies are merged, links local copies, integrate --keep-going', () => {
+  const dir = newGame('rep');
+  write(dir, 're-plan.yaml', `kind: re
+base: main
+shared: [DECISIONS.md, src/contracts/, game.yaml, re-plan.yaml]
+links: [decompiled/]
+units: { time: s }
+areas:
+  - { id: player, owns: [notes/player/, params/player.json], targets: [PlayerController], brief: Nhân vật }
+  - { id: audio, owns: [notes/audio/], brief: Âm thanh }
+  - { id: score, owns: [notes/score/], dependsOn: [player], brief: Điểm }
+`);
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  write(dir, 'decompiled/PlayerController.cs', 'class PlayerController {}'); // gitignored, local only
+  const wt = (id) => path.join(path.dirname(dir), 'rep.worktrees', `re-${id}`);
+
+  assert.equal(gk(dir, 'fanout', '--plan', 're', '--wave', '1').code, 1, 'areas have no waves');
+  const f = gk(dir, 'fanout', '--plan', 're', '--ready');
+  assert.equal(f.code, 0, f.out);
+  assert.ok(fs.existsSync(wt('player')) && fs.existsSync(wt('audio')));
+  assert.ok(!fs.existsSync(wt('score')), 'score waits for player');
+  assert.match(f.out, /score \(player\)/);
+  assert.equal(sh(wt('player'), 'git', 'branch', '--show-current').trim(), 're/player');
+  assert.ok(fs.existsSync(path.join(wt('player'), 'decompiled/PlayerController.cs')), 'local copy linked into the worktree');
+  assert.equal(sh(wt('player'), 'git', 'status', '--porcelain').trim(), '', 'the symlink is not an untracked file');
+  const brief = read(wt('player'), '.gamekit/local/BRIEF.md');
+  for (const want of [/notes\/player\/questions\.yaml/, /PlayerController/, /D-player-n/, /time: s/, /decompiled\//, /re\/player/]) assert.match(brief, want);
+
+  // player edits a shared file: rejected; audio is independent and still merges with --keep-going
+  commitIn(wt('player'), { 'notes/player/questions.yaml': 'questions: []\n', 'DECISIONS.md': '# x\n' });
+  commitIn(wt('audio'), { 'notes/audio/questions.yaml': 'questions:\n  - { id: audio.q1, question: Q, evidence: E, status: open }\n' });
+  const own = gk(wt('player'), 'check-ownership');
+  assert.equal(own.code, 1, 'branch re/player picks re-plan.yaml');
+  assert.match(own.out, /DECISIONS\.md thuộc vùng dùng chung/);
+  let r = gk(dir, 'integrate', '--plan', 're', '--ready', '--keep-going', '--cleanup');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /audio: merge xong/);
+  assert.match(r.out, /1 lỗi: player/);
+  assert.match(sh(dir, 'git', 'log', '-1', '--format=%s').trim(), /^merge: re\/audio \(mảng\)$/);
+  assert.ok(!fs.existsSync(wt('audio')), 'merged worktree removed');
+  assert.ok(fs.existsSync(path.join(dir, 'decompiled/PlayerController.cs')), 'removing the worktree keeps the original files');
+
+  // validate is the default check for areas: a broken questions file is undone
+  sh(wt('player'), 'git', 'reset', '-q', '--hard', 'HEAD~1');
+  commitIn(wt('player'), { 'notes/player/questions.yaml': 'questions:\n  - { id: player.q1, status: nope }\n' });
+  r = gk(dir, 'integrate', '--plan', 're', '--ready');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /player: test đỏ sau khi merge — đã hoàn tác/);
+  commitIn(wt('player'), { 'notes/player/questions.yaml': 'questions:\n  - { id: player.q1, question: Q, evidence: E, status: answered }\n' });
+  r = gk(dir, 'integrate', '--plan', 're', '--ready');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /fanout --plan re --ready/);
+  r = gk(dir, 'fanout', '--plan', 're', '--ready');
+  assert.equal(r.code, 0, r.out);
+  assert.ok(fs.existsSync(wt('score')), 'score opens once player is merged');
+});
+
+test('re-plan: maxParallel caps open worktrees, counting the ones already running', () => {
+  const dir = newGame('cap');
+  write(dir, 're-plan.yaml', `kind: re
+base: main
+maxParallel: 1
+shared: [re-plan.yaml]
+areas:
+  - { id: a, owns: [notes/a/], brief: A }
+  - { id: b, owns: [notes/b/], brief: B }
+`);
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  const wt = (id) => path.join(path.dirname(dir), 'cap.worktrees', `re-${id}`);
+  assert.equal(gk(dir, 'fanout', '--plan', 're', '--ready').code, 0);
+  assert.ok(fs.existsSync(wt('a')) && !fs.existsSync(wt('b')));
+  const again = gk(dir, 'fanout', '--plan', 're', '--ready');
+  assert.match(again.out, /Không có mảng nào sẵn sàng \(đang chạy: a\)/);
+  assert.ok(!fs.existsSync(wt('b')));
+});
+
+test('module-plan --ready: a module starts when its own dependencies merge, not the whole wave; briefs carry the area obligations', () => {
+  const dir = newGame('dag');
+  write(dir, 'module-plan.yaml', `base: main
+maxParallel: 2
+shared: [src/contracts/, params/, package.json, game.yaml, module-plan.yaml, re-plan.yaml]
+modules:
+  - { id: a, wave: 1, owns: [src/core/a/], brief: A }
+  - { id: slow, wave: 1, owns: [src/core/slow/], brief: S }
+  - { id: extra, wave: 1, owns: [src/core/extra/], brief: X }
+  - { id: c, wave: 2, owns: [src/core/c/], dependsOn: [a], brief: C }
+`);
+  write(dir, 're-plan.yaml', 'kind: re\nbase: main\nshared: [re-plan.yaml]\nareas:\n  - { id: hero, owns: [notes/hero/, spec/obligations/hero.yaml], buildModule: c, brief: H }\n');
+  write(dir, 'spec/obligations/hero.yaml', 'obligations:\n  - { id: hero.jump, title: Nhảy cao 3 ô, cases: [normal, edge] }\n');
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-qm', 'plan');
+  const wt = (id) => path.join(path.dirname(dir), 'dag.worktrees', id);
+  let r = gk(dir, 'fanout', '--wave', '1');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /maxParallel 2 — mở 2, còn extra/);
+  assert.ok(fs.existsSync(wt('a')) && fs.existsSync(wt('slow')) && !fs.existsSync(wt('extra')));
+  commitIn(wt('a'), { 'src/core/a/x.ts': 'export const x = 1;\n' });
+  r = gk(dir, 'integrate', '--ready', '--test', 'exit 0', '--cleanup');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /slow: chưa xong/, 'a running module without commits is skipped, not an error');
+  r = gk(dir, 'fanout', '--ready');
+  assert.equal(r.code, 0, r.out);
+  assert.ok(fs.existsSync(wt('extra')) && !fs.existsSync(wt('c')), 'one free slot (slow still runs): extra comes first in dependency order');
+  commitIn(wt('extra'), { 'src/core/extra/x.ts': 'export const x = 1;\n' });
+  assert.equal(gk(dir, 'integrate', '--ready', '--test', 'exit 0', '--cleanup').code, 0);
+  r = gk(dir, 'fanout', '--ready');
+  assert.equal(r.code, 0, r.out);
+  assert.ok(fs.existsSync(wt('c')), 'c starts although slow (same wave as a) is not merged');
+  const brief = read(wt('c'), '.gamekit/local/BRIEF.md');
+  assert.match(brief, /Đầu vào từ phân tích \(mảng hero\)/);
+  assert.match(brief, /`hero\.jump`: Nhảy cao 3 ô \(case: normal, edge\)/);
+  assert.match(sh(dir, 'git', 'log', '-1', '--format=%s').trim(), /^merge: extra \(đợt 1\)$/, 'module merge commits keep their format');
+});
 
 test('cli args: boolean flags never swallow positionals', () => {
   assert.deepEqual(parseArgs(['provenance', 'add', '--all', 'assets', '--label', 'own']), { _: ['provenance', 'add', 'assets'], all: true, label: 'own' });
