@@ -21,6 +21,10 @@ Lệnh:
   rig    <rig.json> --anim idle|walk|run|jump|attack|hit|<keys.json> --frames N --size WxH --out <png>
                                                   animation cắt rời: bộ phận (đầu, thân, tay, chân) quay quanh khớp
   guide  --frames N --cell WxH --out <png>         ảnh khung bố cục đính kèm khi tạo dải frame bằng image_gen
+  pose   --anim walk|run|idle|jump|attack|hit|<keys.json> --frames N --cell WxH --out <png>
+                                                  dải hình que đúng chu kỳ chuyển động — ảnh tư thế cho Codex vẽ theo
+  canvas --seed <sprite> --frames N --cell WxH --out <png>  ảnh để Codex SỬA: frame đã duyệt nằm sẵn ở ô 1
+  replace <strip.png> --frames N --frame K --with <ảnh> --out <png>  thay một frame hỏng, cùng cỡ và đường chân
   inspect <strip.png> --frames N --ref <sprite.png>  soi từng frame: lệch cỡ, lệch màu, trôi chân → frame nào phải làm lại
 
 Chỉ cần Python 3.9+ và Pillow (`python3 -m pip install pillow`).
@@ -819,12 +823,15 @@ def preset_keys(anim: str, n: int, size: float, amp: float = 1.0) -> dict:
         put("arm_front", "rot", [-70 * a * t for t in tuck]); put("arm_back", "rot", [-50 * a * t for t in tuck])
         put("body", "sy", [1 - 0.08 * a if (i == 0 or i == n - 1) else 1 for i in rng])
     elif anim == "attack":
-        # wind up → swing through → follow → recover
-        curve = [-60, -95, -40, 70, 85, 50, 0]
-        vals = [curve[min(len(curve) - 1, round(i * (len(curve) - 1) / max(1, n - 1)))] * a for i in rng]
-        put("arm_front", "rot", vals)
-        put("body", "rot", [v * 0.08 for v in vals])
-        put("body", "x", [0.04 * h * a * max(0.0, v) / 85 for v in vals])
+        # Angles: 0 = arm hanging down, +90 = pointing back, 180 = overhead, 270 = pointing forward.
+        # Wind up behind and over the head, strike down in front, recover to rest.
+        def sample(curve):
+            return [curve[min(len(curve) - 1, round(i * (len(curve) - 1) / max(1, n - 1)))] for i in rng]
+
+        put("arm_front", "rot", [v * a for v in sample([10, 100, 165, 215, 270, 300, 360])])
+        put("arm_back", "rot", [v * a for v in sample([0, 30, 45, -20, -40, -20, 0])])
+        put("body", "rot", [v * a for v in sample([0, -4, -6, 3, 9, 5, 0])])
+        put("body", "x", [v * h * a for v in sample([0, -0.01, -0.02, 0.02, 0.05, 0.03, 0])])
     elif anim == "hit":
         kick = [math.exp(-2.5 * (i - 1) / n) if i else 0.0 for i in rng]
         put("body", "x", [-0.1 * h * a * k for k in kick])
@@ -903,23 +910,146 @@ def save_gif(frames: list[Image.Image], path: str, fps: float, bg=(244, 241, 234
 
 
 # ---------- khung bố cục + soi frame cho dải frame vẽ bằng model ----------
+GROUND = 0.92  # ground line at 92% of a slot's height, in guide, pose and canvas alike
+
+
+def slot_scale(n: int, cell) -> int:
+    """Upscale so a strip is ~1536 px wide: big enough for the image model, same for guide/pose/canvas."""
+    return max(1, 1536 // (cell[0] * n))
+
+
 def layout_guide(n: int, cell, scale: int = 0, key=(255, 0, 255)) -> Image.Image:
     """N equal slots in one row with a ground line and center marks, sized for an image model (~1536 px
     wide). Attached as a layout-only reference so poses land one per slot, same scale, feet on the line."""
     cw, ch = cell
-    k = scale or max(1, 1536 // (cw * n))
+    k = scale or slot_scale(n, cell)
     W, H = cw * n * k, ch * k
     img = Image.new("RGB", (W, H), key)
     d = ImageDraw.Draw(img)
     line = (90, 90, 110)
     for i in range(n + 1):
         d.line([(i * cw * k, 0), (i * cw * k, H)], fill=line, width=max(2, k))
-    gy = int(H * 0.92)
+    gy = int(H * GROUND)
     d.line([(0, gy), (W, gy)], fill=(40, 40, 60), width=max(2, k))
     for i in range(n):
         cx = int((i + 0.5) * cw * k)
         d.line([(cx, gy - 6 * k), (cx, gy + 6 * k)], fill=(40, 40, 60), width=max(1, k // 2))
     return img
+
+
+# Pose strip colors: what the model needs to tell apart — front limbs warm, back limbs cool.
+POSE_COLORS = {"head": (150, 150, 160), "body": (120, 120, 132), "arm_front": (235, 110, 40), "leg_front": (220, 60, 50),
+               "arm_back": (60, 130, 230), "leg_back": (40, 80, 190), "tail": (150, 110, 200), "weapon": (90, 90, 90)}
+
+
+def stick_parts(proportions: str = "normal", tail: bool = False, weapon: bool = False) -> dict:
+    """A mannequin built from capsules, in the rig's part convention (side view, facing right)."""
+    u = 8  # supersampled unit; the strip is fitted to the slot afterwards
+    head = 9 * u if proportions == "normal" else 15 * u
+    body_h, limb = (16 * u, 15 * u) if proportions == "normal" else (12 * u, 10 * u)
+
+    def capsule(w, h, color):
+        im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        ImageDraw.Draw(im).rounded_rectangle([0, 0, w - 1, h - 1], radius=min(w, h) // 2, fill=color + (255,))
+        return im
+
+    def disc(dia, color):
+        im = Image.new("RGBA", (dia, dia), (0, 0, 0, 0))
+        d = ImageDraw.Draw(im)
+        d.ellipse([0, 0, dia - 1, dia - 1], fill=color + (255,))
+        # a nose on the facing side, so the direction reads at a glance
+        d.ellipse([int(dia * 0.72), int(dia * 0.42), dia - 1, int(dia * 0.62)], fill=(70, 70, 80, 255))
+        return im
+
+    names = ["body", "head", "arm_front", "arm_back", "leg_front", "leg_back"] + (["tail"] if tail else []) + (["weapon"] if weapon else [])
+    parts = {}
+    for n in names:
+        c = POSE_COLORS[n]
+        if n == "head":
+            img = disc(head, c)
+        elif n == "body":
+            img = capsule(7 * u, body_h, c)
+        elif n == "tail":
+            img = capsule(3 * u, 9 * u, c).rotate(60, expand=True)
+        elif n == "weapon":
+            img = capsule(2 * u, 14 * u, c)
+        else:
+            img = capsule(3 * u, limb, c)
+        fx, fy = PART_PIVOT.get(n, LIMB_PIVOT)
+        parts[n] = {"img": img, "pivot": (img.width * fx, img.height * fy), "parent": None if n == "body" else ("arm_front" if n == "weapon" else "body"),
+                    "z": PART_Z.get(n, 3), "at": None}
+    for n, pt in parts.items():
+        if pt["parent"]:
+            pw, ph = parts[pt["parent"]]["img"].size
+            fx, fy = PART_AT.get(n, (0.5, 0.5)) if n != "weapon" else (0.5, 0.92)
+            pt["at"] = (pw * fx, ph * fy)
+    return parts
+
+
+def place_in_slots(frames: list[Image.Image], n: int, cell, bg, keep_motion: bool = True, fill: float = 0.78) -> tuple[Image.Image, float]:
+    """Lay frames into the shared slot geometry: one shared scale, feet on the ground line, centered in
+    each slot. keep_motion keeps vertical moves (jump) relative to the ground line. Returns (strip, scale)."""
+    k = slot_scale(n, cell)
+    cw, ch = cell[0] * k, cell[1] * k
+    gy = int(ch * GROUND)
+    boxes = [alpha_bbox(f) for f in frames]
+    if not all(boxes):
+        raise UserError("có frame trống")
+    if keep_motion:
+        u = (min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes))
+        rest = max(b[3] for b in boxes)  # the ground: lowest feet over the cycle
+        sc = min(cw * fill / (u[2] - u[0]), gy * fill / (rest - u[1]))
+    else:
+        sc = min(cw * fill / max(b[2] - b[0] for b in boxes), gy * fill / max(b[3] - b[1] for b in boxes))
+    strip_img = Image.new("RGBA", (cw * n, ch), bg)
+    for i, (f, b) in enumerate(zip(frames, boxes)):
+        piece = f.crop(b)
+        piece = resize_rgba(piece, (max(1, round(piece.width * sc)), max(1, round(piece.height * sc))))
+        x = i * cw + (cw - piece.width) // 2
+        y = gy - piece.height - (round((rest - b[3]) * sc) if keep_motion else 0)
+        strip_img.alpha_composite(piece, (x, y))
+    return strip_img, sc
+
+
+def pose_strip(keys_or_anim, n: int, cell, proportions: str = "normal", amp: float = 1.0) -> Image.Image:
+    """Stick-figure poses for each frame, from the same motion math as `rig`: correct left/right
+    alternation, a closed loop, even spacing. Attached as the pose reference for image_gen."""
+    if isinstance(keys_or_anim, dict):
+        keys = keys_or_anim
+        parts = stick_parts(proportions, tail="tail" in keys, weapon="weapon" in keys)
+    else:
+        parts = stick_parts(proportions, weapon=keys_or_anim == "attack")
+        height = parts["body"]["img"].height + parts["head"]["img"].height + parts["leg_front"]["img"].height
+        keys = preset_keys(keys_or_anim, n, height, amp)
+    keys = {k: v for k, v in keys.items() if k in parts}
+    frames = rig_frames(parts, keys, n)
+    strip_img, _ = place_in_slots(frames, n, cell, (246, 246, 242, 255))
+    d = ImageDraw.Draw(strip_img)
+    k = slot_scale(n, cell)
+    cw, ch = cell[0] * k, cell[1] * k
+    gy = int(ch * GROUND)
+    for i in range(n + 1):
+        d.line([(i * cw, 0), (i * cw, ch)], fill=(200, 200, 205, 255), width=max(2, k))
+    d.line([(0, gy), (cw * n, gy)], fill=(120, 120, 130, 255), width=max(2, k))
+    return strip_img.convert("RGB")
+
+
+def edit_canvas(seed: Image.Image, n: int, cell, key=(255, 0, 255), fill: float = 0.78) -> tuple[Image.Image, dict]:
+    """The image Codex EDITS: flat key color, the approved frame already standing in slot 1 on the ground
+    line, the other slots empty. Seeing the exact character inside the image it edits keeps identity far
+    better than drawing a strip from a reference (OpenAI sprite-pipeline's edit-canvas idea)."""
+    bb = alpha_bbox(seed)
+    if not bb:
+        raise UserError("sprite trống — cần ảnh đã tách nền")
+    seed = seed.crop(bb)
+    k = slot_scale(n, cell)
+    cw, ch = cell[0] * k, cell[1] * k
+    gy = int(ch * GROUND)
+    sc = min(cw * fill / seed.width, gy * fill / seed.height)
+    piece = resize_rgba(seed, (max(1, round(seed.width * sc)), max(1, round(seed.height * sc))))
+    img = Image.new("RGBA", (cw * n, ch), key + (255,))
+    img.alpha_composite(piece, ((cw - piece.width) // 2, gy - piece.height))
+    return img.convert("RGB"), {"frames": n, "cell": list(cell), "slot_px": [cw, ch], "ground_y": gy, "seed_height_px": piece.height}
 
 
 def inspect_frames(frames: list[Image.Image], ref: Image.Image | None) -> list[dict]:
@@ -982,6 +1112,7 @@ def main(argv=None) -> int:
     p = sub.add_parser("anim"); p.add_argument("input"); p.add_argument("--out", required=True); p.add_argument("--size", required=True)
     p.add_argument("--frames", required=True, help="số frame, hoặc auto = lấy số hình tìm thấy"); p.add_argument("--rows", type=int, default=1)
     p.add_argument("--slots", action="store_true", help="cắt theo ô đều nhau (ảnh tạo với khung bố cục `guide`)")
+    p.add_argument("--lock-first", help="thay frame 1 bằng chính sprite đã duyệt (cùng cỡ, cùng chỗ) — dùng với `canvas`")
     p.add_argument("--pick", help="chọn/sắp xếp frame theo chỉ số, vd 0,1,2,4 (sau khi cắt)")
     p.add_argument("--anchor", choices=["bottom", "center", "slot"], default="bottom"); p.add_argument("--pad", type=int, default=2)
     p.add_argument("--keyed", action="store_true", help="ảnh đã trong suốt, bỏ bước tách nền")
@@ -1036,6 +1167,18 @@ def main(argv=None) -> int:
     p = sub.add_parser("guide"); p.add_argument("--frames", type=int, required=True); p.add_argument("--cell", required=True)
     p.add_argument("--out", required=True); p.add_argument("--key", default="#ff00ff")
 
+    p = sub.add_parser("pose"); p.add_argument("--anim", required=True); p.add_argument("--frames", type=int, default=6)
+    p.add_argument("--cell", required=True); p.add_argument("--out", required=True)
+    p.add_argument("--proportions", choices=["normal", "chibi"], default="normal"); p.add_argument("--amp", type=float, default=1.0)
+    p.add_argument("--gif", help="xem thử chuyển động của dải tư thế"); p.add_argument("--fps", type=float, default=8)
+
+    p = sub.add_parser("replace"); p.add_argument("input"); p.add_argument("--frames", type=int, required=True)
+    p.add_argument("--frame", type=int, required=True); p.add_argument("--with", dest="with_", required=True); p.add_argument("--out", required=True)
+    p.add_argument("--keyed", action="store_true"); keyopts(p)
+
+    p = sub.add_parser("canvas"); p.add_argument("--seed", required=True); p.add_argument("--frames", type=int, required=True)
+    p.add_argument("--cell", required=True); p.add_argument("--out", required=True); p.add_argument("--key", default="#ff00ff")
+
     p = sub.add_parser("inspect"); p.add_argument("input"); p.add_argument("--frames", type=int, required=True)
     p.add_argument("--ref", help="sprite đã duyệt của nhân vật")
 
@@ -1066,6 +1209,18 @@ def main(argv=None) -> int:
             if a.slots and want is None:
                 raise UserError("--slots cần --frames <số ô>")
             parts, how = split_frames(img, want, a.rows, a.slots)
+            if a.lock_first:
+                # the model redraws slot 1 slightly; put the approved pixels back at the size/spot it drew
+                seed = load(a.lock_first)
+                sb, fb = alpha_bbox(seed), alpha_bbox(parts[0])
+                if not sb or not fb:
+                    raise UserError("--lock-first: sprite hoặc frame 1 trống")
+                seed = seed.crop(sb)
+                th = fb[3] - fb[1]
+                seed = resize_rgba(seed, (max(1, round(seed.width * th / seed.height)), th))
+                slot = Image.new("RGBA", parts[0].size, (0, 0, 0, 0))
+                slot.alpha_composite(seed, (max(0, (fb[0] + fb[2]) // 2 - seed.width // 2), fb[3] - seed.height))
+                parts[0] = slot
             if a.pick:
                 idx = [int(v) for v in a.pick.split(",")]
                 bad = [i for i in idx if not 0 <= i < len(parts)]
@@ -1216,6 +1371,46 @@ def main(argv=None) -> int:
             g = layout_guide(a.frames, parse_size(a.cell), key=parse_hex(a.key))
             save(g, a.out)
             print(f"✔ {a.out} {g.width}×{g.height}: {a.frames} ô, đường đất ở 92% chiều cao — đính kèm làm ảnh bố cục, dặn model không vẽ các đường kẻ")
+        elif a.cmd == "pose":
+            cell = parse_size(a.cell)
+            src = json.loads(Path(a.anim).read_text(encoding="utf-8")).get("keys") if a.anim.endswith(".json") else a.anim
+            strip_img = pose_strip(src, a.frames, cell, a.proportions, a.amp)
+            save(strip_img, a.out)
+            if a.gif:
+                cw = strip_img.width // a.frames
+                save_gif([strip_img.crop((i * cw, 0, (i + 1) * cw, strip_img.height)).convert("RGBA") for i in range(a.frames)], a.gif, a.fps)
+            print(f"✔ {a.out} {strip_img.width}×{strip_img.height}: {a.frames} tư thế '{Path(a.anim).stem}' — tay/chân TRƯỚC màu cam-đỏ, SAU màu xanh")
+        elif a.cmd == "replace":
+            img = load(a.input)
+            n = a.frames
+            fw = img.width // n
+            if not 0 <= a.frame < n:
+                raise UserError(f"--frame phải trong 0–{n - 1}")
+            others = [alpha_bbox(img.crop((i * fw, 0, (i + 1) * fw, img.height))) for i in range(n) if i != a.frame]
+            others = [b for b in others if b]
+            if not others:
+                raise UserError("các frame khác đều trống — không biết cỡ để khớp")
+            th = sorted(b[3] - b[1] for b in others)[len(others) // 2]
+            foot = sorted(b[3] for b in others)[len(others) // 2]
+            new_img = load(a.with_)
+            if not a.keyed:
+                new_img, _ = key_out(new_img, parse_hex(a.bg) if a.bg else None, a.tol, a.soft)
+            bb = alpha_bbox(new_img)
+            if not bb:
+                raise UserError("ảnh thay thế trống")
+            piece = new_img.crop(bb)
+            piece = resize_rgba(piece, (max(1, round(piece.width * th / piece.height)), th))
+            if piece.width > fw:
+                piece = resize_rgba(piece, (fw, max(1, round(piece.height * fw / piece.width))))
+            img.paste((0, 0, 0, 0), (a.frame * fw, 0, (a.frame + 1) * fw, img.height))
+            img.alpha_composite(piece, (a.frame * fw + (fw - piece.width) // 2, max(0, foot - piece.height)))
+            save(img, a.out)
+            print(f"✔ {a.out}: frame {a.frame} đã thay (cao {piece.height}px, chân ở y={foot} như các frame khác)")
+        elif a.cmd == "canvas":
+            img, meta = edit_canvas(load(a.seed), a.frames, parse_size(a.cell), parse_hex(a.key))
+            save(img, a.out)
+            Path(a.out).with_suffix(".json").write_text(json.dumps(meta, indent=2))
+            print(f"✔ {a.out} {img.width}×{img.height}: sprite đã duyệt ở ô 1, {a.frames - 1} ô trống — ảnh để SỬA (Image 1)")
         elif a.cmd == "inspect":
             img = load(a.input)
             n = a.frames

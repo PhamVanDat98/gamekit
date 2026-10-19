@@ -6,7 +6,7 @@ Luật: **không API key** (ảnh tạo bằng `image_gen` của Codex trên tà
 
 | Skill | Làm gì |
 | --- | --- |
-| [`game-raster-art`](game-raster-art/SKILL.md) | Asset game raster bằng `image_gen` của Codex: khung hình concept → rút asset từ nó, mẫu prompt theo loại asset, 8 style game; `gameart.py` tạo ảnh qua Codex CLI (`gen`), tách nền, đúng cỡ cùng tỉ lệ và điểm neo, animation frame-by-frame từ ảnh đã duyệt (`tween`, `rig` cắt rời bộ phận), strip có khung bố cục + soi frame lệch, tách tấm nhiều asset, khớp màu với concept, ghép thử và so với concept, tile, nền parallax. Cần Python 3.9+ và Pillow |
+| [`game-raster-art`](game-raster-art/SKILL.md) | Asset game raster bằng `image_gen` của Codex: khung hình concept → rút asset từ nó, mẫu prompt theo loại asset, 8 style game; `gameart.py` tạo ảnh qua Codex CLI (`gen`), tách nền, đúng cỡ cùng tỉ lệ và điểm neo, animation frame-by-frame từ ảnh đã duyệt (`tween`, `rig` cắt rời bộ phận), Codex vẽ từng frame theo dải tư thế (`pose` + `canvas` có sẵn frame đã duyệt, `--lock-first`, `inspect`, `replace`), tách tấm nhiều asset, khớp màu với concept, ghép thử và so với concept, tile, nền parallax. Cần Python 3.9+ và Pillow |
 | [`voxel-art`](voxel-art/SKILL.md) | Voxel bằng code: model Python → sprite isometric pixel-perfect 1–4 hướng, strip animation, `.vox` cho MagicaVoxel. Cần Python 3.9+ và Pillow |
 
 ## Cài

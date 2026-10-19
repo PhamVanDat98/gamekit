@@ -343,3 +343,66 @@ ref = Image.new('RGBA', (40, 45), (0, 0, 0, 0)); ImageDraw.Draw(ref).ellipse([0,
   assert.match(r.out, /✖ frame 3: .*chân lệch/);
   assert.equal(ga(dir, 'anim', 'raw.png', '--frames', 'auto', '--slots', '--size', '64x64', '--out', 'x.png').code, 1);
 });
+
+test('gameart pose + canvas + anim --lock-first + replace: Codex edits a canvas holding the approved frame, guided by stick-figure poses', { skip: skipPy }, () => {
+  const dir = tmpDir();
+  let r = ga(dir, 'pose', '--anim', 'walk', '--frames', '6', '--cell', '128x128', '--out', 'pose.png', '--gif', 'pose.gif');
+  assert.equal(r.code, 0, r.out);
+  const pose = JSON.parse(py(dir, `
+import json
+im = Image.open('pose.png').convert('RGB'); w, h = im.size; cw = w // 6
+def has(c, i):
+    return any(abs(p[0]-c[0]) < 30 and abs(p[1]-c[1]) < 30 and abs(p[2]-c[2]) < 30 for p in im.crop((i*cw, 0, (i+1)*cw, h)).getdata())
+# front leg (red) x-position per slot: it swings forward and back over the cycle
+def front_x(i):
+    xs = [x for y in range(h) for x in range(cw) if (lambda p: p[0] > 190 and p[1] < 90 and p[2] < 80)(im.getpixel((i*cw + x, y)))]
+    return sum(xs) / len(xs)
+print(json.dumps({'size': [w, h], 'front': all(has((220, 60, 50), i) for i in range(6)), 'back': all(has((40, 80, 190), i) for i in range(6)), 'fx': [round(front_x(i)) for i in range(6)]}))`));
+  assert.deepEqual(pose.size, [1536, 256]);
+  assert.ok(pose.front && pose.back, 'mỗi ô có chân trước (đỏ) và chân sau (xanh)');
+  assert.ok(Math.max(...pose.fx) - Math.min(...pose.fx) > 10, `chân trước phải đánh qua lại: ${pose.fx}`);
+  assert.ok(fs.existsSync(path.join(dir, 'pose.gif')));
+
+  py(dir, `
+s = Image.new('RGBA', (60, 120), (0, 0, 0, 0)); ImageDraw.Draw(s).rounded_rectangle([0, 0, 59, 119], radius=20, fill=(40, 160, 90, 255)); s.save('hero.png')`);
+  r = ga(dir, 'canvas', '--seed', 'hero.png', '--frames', '6', '--cell', '128x128', '--out', 'canvas.png');
+  assert.equal(r.code, 0, r.out);
+  const meta = JSON.parse(fs.readFileSync(path.join(dir, 'canvas.json'), 'utf8'));
+  assert.deepEqual(meta.slot_px, [256, 256]);
+  const cv = JSON.parse(py(dir, `
+import json
+im = Image.open('canvas.png').convert('RGB')
+key = lambda p: p[0] > 240 and p[1] < 20 and p[2] > 240
+slot1 = [x for x in range(256) for y in range(256) if not key(im.getpixel((x, y)))]
+rest = sum(1 for x in range(256, 1536) for y in range(0, 256, 4) if not key(im.getpixel((x, y))))
+bottom = max(y for y in range(256) if not key(im.getpixel((128, y))))
+print(json.dumps({'size': im.size, 'slot1': len(slot1) > 1000, 'rest': rest, 'bottom': bottom}))`));
+  assert.deepEqual(cv.size, [1536, 256]);
+  assert.ok(cv.slot1, 'ô 1 có sprite đã duyệt');
+  assert.equal(cv.rest, 0, 'các ô khác trống (màu nền tách)');
+  assert.ok(Math.abs(cv.bottom - meta.ground_y) <= 1, `chân trên đường đất: ${cv.bottom} vs ${meta.ground_y}`);
+
+  // what Codex returns: slot 1 redrawn slightly off-colour, other slots filled; slot 4 drawn too big
+  py(dir, `
+out = Image.open('canvas.png').convert('RGB'); d = ImageDraw.Draw(out)
+d.rectangle([0, 0, 255, 255], fill=(250, 3, 248))
+d.rounded_rectangle([87, 70, 169, 235], radius=18, fill=(70, 120, 200))            # slot 1 redraw, wrong colour
+for i, (w, top) in enumerate([(82, 70), (84, 66), (80, 70), (150, 10), (82, 70)], start=1):  # sprite is 1:2
+    x = i * 256 + 128 - w // 2; d.rounded_rectangle([x, top, x + w, 235], radius=18, fill=(40, 160, 90))
+out.save('raw.png')`);
+  r = ga(dir, 'anim', 'raw.png', '--frames', '6', '--slots', '--anchor', 'slot', '--lock-first', 'hero.png', '--size', '64x96', '--out', 'walk.png');
+  assert.equal(r.code, 0, r.out);
+  assert.equal(py(dir, `
+im = Image.open('walk.png'); f0 = im.crop((0, 0, 64, 96)); bb = f0.getchannel('A').getbbox()
+p = f0.getpixel(((bb[0] + bb[2]) // 2, (bb[1] + bb[3]) // 2)); print(p[1] > p[2])`), 'True', 'frame 1 là màu của sprite đã duyệt (xanh lá), không phải bản model vẽ lại');
+  r = ga(dir, 'inspect', 'walk.png', '--frames', '6', '--ref', 'hero.png');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /✖ frame 4/);
+  py(dir, `
+im = Image.new('RGB', (300, 400), (250, 3, 248)); ImageDraw.Draw(im).rounded_rectangle([70, 60, 230, 380], radius=20, fill=(40, 160, 90)); im.save('fix.png')`);
+  r = ga(dir, 'replace', 'walk.png', '--frames', '6', '--frame', '4', '--with', 'fix.png', '--out', 'walk.png');
+  assert.equal(r.code, 0, r.out);
+  r = ga(dir, 'inspect', 'walk.png', '--frames', '6', '--ref', 'hero.png');
+  assert.equal(r.code, 0, r.out);
+  assert.equal(ga(dir, 'replace', 'walk.png', '--frames', '6', '--frame', '9', '--with', 'fix.png', '--out', 'x.png').code, 1);
+});

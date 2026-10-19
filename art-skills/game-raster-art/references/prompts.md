@@ -53,16 +53,28 @@ Detail level: readable at <cỡ hiển thị> px — outline at least <2> px at 
 ```
 Asset chưa có trong frame (kẻ địch mới): giữ Image 1 làm style, mô tả vật mới, thêm "drawn by the same artist in the same style as Image 1".
 
-## 5. Animation bằng dải frame (chỉ khi tween/rig không làm được)
-Tạo khung trước: `GA guide --frames <N> --cell <W>x<H> --out art/raw/guide-<N>.png`.
+## 5. Animation Codex vẽ từng frame (canvas + pose)
+Chuẩn bị (cùng `--frames` và `--cell` để các ô khớp nhau):
+```bash
+GA pose   --anim walk --frames 6 --cell 128x128 --out art/raw/walk-pose.png --gif .gamekit/local/walk-pose.gif
+GA canvas --seed assets/gfx/hero.png --frames 6 --cell 128x128 --out art/raw/walk-canvas.png
 ```
-Input images: Image 1: layout guide (positions only — do not draw its lines); Image 2: approved sprite of this character (identity); Image 3: approved style frame (style)
-Asset type: 2D sprite animation sheet
-Primary request: exactly <N> poses of the character in Image 2, one centered in each slot of Image 1, left to right: <tư thế 1>, <tư thế 2>, …
-Invariants: same character as Image 2 in every slot — same face, outfit, palette, outline, proportions and size; feet on the ground line of Image 1; nothing crosses into a neighboring slot
-+ [KEY-BLOCK]; no guide lines, slot borders or center marks in the output
+`--anim`: `idle`, `walk`, `run`, `jump`, `attack`, `hit`, hoặc `keys.json` (định dạng như `rig`). Xem GIF của dải tư thế trước: chuyển động sai thì sửa ở đây, đừng mong model tự sửa. Nhân vật đầu to: `--proportions chibi`.
 ```
-`GA anim raw.png --frames <N> --slots --anchor slot …` → `GA inspect strip.png --frames <N> --ref sprite.png`. Frame hỏng: sửa từ Image 2 — "same character as Image 2, only change the pose to <tư thế>" + [KEY-BLOCK], rồi thay frame đó.
+Input images: Image 1: edit target — a strip of 6 equal slots; slot 1 already holds the approved character; Image 2: pose guide — one stick figure per slot (orange/red = FRONT arm and leg, blue = BACK arm and leg; the gray dot shows the facing side); Image 3: approved style frame (style only)
+Primary request: fill slots 2–6 of Image 1 with the SAME character from slot 1, each slot copying the pose of the matching stick figure in Image 2; keep slot 1 unchanged
+Invariants: identical character in every slot — same face, hair, outfit, colors, outline thickness, proportions and size as slot 1; feet on the same ground line as slot 1; each character centered in its slot, nothing crossing into a neighboring slot
+Background: keep the flat KEY color of Image 1 everywhere outside the characters
+Constraints: no stick figures, guide lines, slot borders, numbers, text, shadows or floor in the output
+```
+Trong Codex: `view_image` canvas, pose, frame rồi gọi `image_gen` (sửa Image 1). Ngoài Codex: `GA gen --prompt-file art/prompts/hero-walk.md --ref art/raw/walk-canvas.png --ref art/raw/walk-pose.png --ref art/style/frame.png --out art/raw/hero-walk-v1.png`.
+
+Sau đó:
+```bash
+GA anim raw.png --frames 6 --slots --anchor slot --lock-first assets/gfx/hero.png --size 64x64 --out walk.png --gif .gamekit/local/walk.gif
+GA inspect walk.png --frames 6 --ref assets/gfx/hero.png
+```
+Frame bị `inspect` đánh dấu (hoặc mắt thấy sai chân): sửa **từ sprite đã duyệt**, không từ frame trước — "Image 1: approved character; Image 2: one stick figure. Redraw the character from Image 1 in exactly the pose of Image 2, same size, facing right" + [KEY-BLOCK] → `GA replace walk.png --frames 6 --frame <K> --with fixed-raw.png --out walk.png` (tách nền, khớp cỡ và đường chân với các frame khác) → chạy lại `inspect`.
 
 ## 6. Vật phẩm, icon, UI
 ```
