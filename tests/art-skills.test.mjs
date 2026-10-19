@@ -4,15 +4,26 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ROOT, tmpDir } from './helpers.mjs';
-import { lintSvg, loadStyle, listStyles, findChrome, render, pngSize } from '../art-skills/svg-game-art/scripts/svgart.mjs';
 
 const ART = path.join(ROOT, 'art-skills');
-const SKILL = path.join(ART, 'svg-game-art');
-const CLI = path.join(SKILL, 'scripts', 'svgart.mjs');
-const svg = (body, attrs = '') => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"${attrs}>${body}</svg>`;
+const GA = path.join(ART, 'game-raster-art', 'scripts', 'gameart.py');
+const PY = process.platform === 'win32' ? 'python' : 'python3';
+const hasPillow = spawnSync(PY, ['-c', 'import PIL'], { encoding: 'utf8' }).status === 0;
+const ga = (cwd, ...args) => {
+  const r = spawnSync(PY, ['-I', GA, ...args], { cwd, encoding: 'utf8' });
+  return { code: r.status, out: `${r.stdout}${r.stderr}` };
+};
+/** Run a Python snippet with Pillow; prints are returned. */
+const py = (cwd, code) => {
+  const r = spawnSync(PY, ['-I', '-c', `from PIL import Image, ImageDraw\n${code}`], { cwd, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout.trim();
+};
 
-test('art-skills: each skill has frontmatter name = folder, a description, and agents/openai.yaml for Codex', () => {
-  for (const d of fs.readdirSync(ART).filter((d) => fs.statSync(path.join(ART, d)).isDirectory())) {
+test('art-skills: each skill has frontmatter name = folder, a description, agents/openai.yaml and working links', () => {
+  const dirs = fs.readdirSync(ART).filter((d) => fs.statSync(path.join(ART, d)).isDirectory());
+  assert.ok(dirs.includes('game-raster-art'));
+  for (const d of dirs) {
     const text = fs.readFileSync(path.join(ART, d, 'SKILL.md'), 'utf8');
     const m = text.match(/^---\n([\s\S]*?)\n---/);
     assert.ok(m, `${d}/SKILL.md thiếu frontmatter`);
@@ -23,62 +34,98 @@ test('art-skills: each skill has frontmatter name = folder, a description, and a
   }
 });
 
-test('svg-game-art: every style is valid and its example passes lint', () => {
-  const styles = listStyles();
-  assert.deepEqual(styles.map((s) => s.name).sort(), ['doodle', 'flat', 'neon', 'paper', 'sticker']);
-  for (const s of styles) {
-    assert.ok(fs.existsSync(path.join(SKILL, 'styles', `${s.name}.json`)), `${s.name}: tên khác tên file`);
-    for (const [k, c] of Object.entries(s.colors)) assert.match(c, /^#[0-9a-f]{6}$/, `${s.name}.${k}`);
-    const examples = fs.readdirSync(path.join(SKILL, 'examples')).filter((f) => f.startsWith(`${s.name}-`));
-    assert.ok(examples.length, `${s.name} không có ví dụ`);
-    for (const f of examples) assert.deepEqual(lintSvg(fs.readFileSync(path.join(SKILL, 'examples', f), 'utf8'), s), [], f);
-  }
-});
+const skipPy = !hasPillow && 'không có python3 + Pillow';
 
-test('svg-game-art lint: palette, stroke widths, round joins, forbidden elements, opacity, viewBox', () => {
-  const doodle = loadStyle('doodle');
-  const ok = svg('<g stroke="#151515" stroke-linejoin="round"><circle cx="50" cy="50" r="20" fill="#f08a6c" stroke-width="3.2"/></g>');
-  assert.deepEqual(lintSvg(ok, doodle), []);
-  assert.match(lintSvg(ok.replace('#f08a6c', '#123456'), doodle).join(), /ngoài palette.*#123456/);
-  assert.match(lintSvg(ok.replace('3.2', '5'), doodle).join(), /stroke-width 5/);
-  assert.match(lintSvg(ok.replace(' stroke-linejoin="round"', ''), doodle).join(), /linejoin/);
-  assert.match(lintSvg(ok.replace('<g ', '<linearGradient id="a"/><g '), doodle).join(), /linearGradient/);
-  assert.match(lintSvg(ok.replace('<g ', '<text>Hi</text><g '), doodle).join(), /<text>/);
-  assert.match(lintSvg(ok.replace('fill="#f08a6c"', 'fill="#f08a6c" opacity="0.5"'), doodle).join(), /opacity/);
-  assert.match(lintSvg(ok.replace(' viewBox="0 0 100 100"', ' viewBox="0 0 64 64"'), doodle).join(), /viewBox/);
-  // comments are not checked; shorthand hex matches the palette
-  assert.deepEqual(lintSvg(ok.replace('<g ', '<!-- stroke: #000 --><g ').replace('#151515', '#151515'), doodle), []);
-  assert.deepEqual(lintSvg(svg('<rect width="10" height="10" fill="#FFF"/>'), loadStyle('flat')), []);
-  assert.match(lintSvg(svg('<rect width="10" height="10" fill="#fff" stroke="#fff" stroke-width="2"/>'), loadStyle('flat')).join(), /không có nét viền/);
-  const neon = loadStyle('neon');
-  assert.deepEqual(lintSvg(svg('<filter id="g"><feGaussianBlur stdDeviation="2"/></filter><path d="M0 0" stroke="#00f0ff" stroke-width="3" stroke-linejoin="round"/>'), neon), []);
-  assert.match(lintSvg(svg('<filter id="g"><feTurbulence/></filter>'), neon).join(), /feTurbulence/);
-  assert.match(lintSvg(svg('<filter id="g"/>'), doodle).join(), /<filter>/);
-});
-
-test('svgart CLI: lint exit code, unknown style lists the styles', () => {
+test('gameart key: flat magenta background → transparent, trimmed, no magenta left at the edges', { skip: skipPy }, () => {
   const dir = tmpDir();
-  fs.writeFileSync(path.join(dir, 'bad.svg'), svg('<rect width="1" height="1" fill="#123456"/>'));
-  let r = spawnSync(process.execPath, [CLI, 'lint', path.join(dir, 'bad.svg'), '--style', 'flat'], { encoding: 'utf8' });
-  assert.equal(r.status, 1);
-  assert.match(r.stdout, /#123456/);
-  r = spawnSync(process.execPath, [CLI, 'lint', path.join(dir, 'bad.svg'), '--style', 'nope'], { encoding: 'utf8' });
-  assert.equal(r.status, 1);
-  assert.match(r.stderr, /doodle.*sticker|sticker.*doodle/);
-  r = spawnSync(process.execPath, [CLI, 'styles'], { encoding: 'utf8' });
-  assert.match(r.stdout, /neon/);
+  py(dir, `
+im = Image.new('RGB', (400, 300), (250, 3, 248))
+d = ImageDraw.Draw(im)
+d.ellipse([120, 60, 280, 260], fill=(40, 160, 220), outline=(20, 20, 30), width=6)
+d.rectangle([180, 120, 220, 200], fill=(250, 3, 248))  # enclosed pocket of key color
+im = im.resize((800, 600)).resize((400, 300), Image.Resampling.LANCZOS)  # anti-aliased edges like a model
+im.save('src.png')`);
+  const r = ga(dir, 'key', 'src.png', '--out', 'out.png');
+  assert.equal(r.code, 0, r.out);
+  const info = JSON.parse(py(dir, `
+import json
+im = Image.open('out.png').convert('RGBA'); w, h = im.size
+px = im.load()
+pink = sum(1 for y in range(h) for x in range(w) if px[x,y][3] > 24 and px[x,y][0] > 200 and px[x,y][2] > 200 and px[x,y][1] < 80)
+print(json.dumps({'size': [w, h], 'corner': px[0,0][3], 'pocket': px[w//2, h//2][3], 'pink': pink}))`));
+  assert.ok(Math.abs(info.size[0] - 161) <= 3 && Math.abs(info.size[1] - 201) <= 3, JSON.stringify(info));
+  assert.equal(info.corner, 0);
+  assert.equal(info.pocket, 0);
+  assert.equal(info.pink, 0);
+  assert.equal(ga(dir, 'check', 'out.png', '--alpha', '--key', '#fa03f8').code, 0);
 });
 
-test('svgart render: transparent PNG at the exact size; several frames make a horizontal strip', { skip: !findChrome() && 'không có Chromium/Chrome trên máy' }, async () => {
+test('gameart anim: N poses → strip with one shared scale and feet on one line; wrong count is an error; --pick', { skip: skipPy }, () => {
   const dir = tmpDir();
-  const f0 = path.join(dir, 'f0.svg');
-  const f1 = path.join(dir, 'f1.svg');
-  fs.writeFileSync(f0, svg('<circle cx="50" cy="80" r="14" fill="#ff5a5f"/>'));
-  fs.writeFileSync(f1, svg('<circle cx="50" cy="70" r="14" fill="#ff5a5f"/>'));
-  const one = path.join(dir, 'one.png');
-  await render([f0], one, '48x40');
-  assert.deepEqual(pngSize(one), { width: 48, height: 40, alpha: true });
-  const strip = path.join(dir, 'strip.png');
-  await render([f0, f1, f0], strip, '64x64');
-  assert.deepEqual(pngSize(strip), { width: 192, height: 64, alpha: true });
+  // 4 poses with uneven spacing; pose 2 is taller (arm up) and pose 3 jumps (higher on the canvas)
+  py(dir, `
+im = Image.new('RGB', (900, 300), (4, 250, 8))
+d = ImageDraw.Draw(im)
+for x, top, bottom in [(60, 100, 260), (290, 60, 260), (480, 100, 260), (700, 80, 240)]:
+    d.rectangle([x, top, x + 80, bottom], fill=(200, 60, 40), outline=(20, 20, 20), width=4)
+im.save('strip.png')`);
+  let r = ga(dir, 'anim', 'strip.png', '--frames', '4', '--size', '48x64', '--out', 'anim.png', '--gif', 'anim.gif');
+  assert.equal(r.code, 0, r.out);
+  const boxes = JSON.parse(py(dir, `
+import json
+im = Image.open('anim.png').convert('RGBA'); print(json.dumps([im.crop((i*48, 0, i*48+48, 64)).getchannel('A').getbbox() for i in range(4)]) if im.size == (192, 64) else 'null')`));
+  assert.ok(boxes, 'strip phải là 192×64');
+  assert.ok(boxes.every((b) => b[3] === boxes[0][3]), `chân phải cùng một đường: ${JSON.stringify(boxes)}`);
+  assert.ok(boxes[1][3] - boxes[1][1] > boxes[0][3] - boxes[0][1], 'cùng tỉ lệ: tư thế cao hơn vẫn cao hơn');
+  assert.ok(fs.existsSync(path.join(dir, 'anim.gif')));
+  // slot anchor keeps the jump: the last pose ends higher than the others
+  r = ga(dir, 'anim', 'strip.png', '--frames', '4', '--size', '48x64', '--out', 'slot.png', '--anchor', 'slot');
+  assert.equal(r.code, 0, r.out);
+  r = ga(dir, 'anim', 'strip.png', '--frames', '5', '--size', '48x64', '--out', 'x.png');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /có 4 hình, cần 5/);
+  r = ga(dir, 'anim', 'strip.png', '--frames', 'auto', '--pick', '0,2', '--size', '48x64', '--out', 'pick.png');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /96×64 \(2 frame/);
+});
+
+test('gameart pixel, tile, bg, fit, check', { skip: skipPy }, () => {
+  const dir = tmpDir();
+  py(dir, `
+im = Image.new('RGB', (512, 512), (250, 3, 248))
+d = ImageDraw.Draw(im)
+for i in range(40):
+    d.ellipse([100 + i * 4, 100 + i * 3, 300 + i * 2, 420], fill=(30 + i * 5, 120 + i * 2, 60 + i))
+im.save('char.png')
+t = Image.new('RGB', (300, 300))
+t.putdata([(80 + x // 4, 140 + y // 6, 60) for y in range(300) for x in range(300)])  # gradient: edges don't match
+t.save('tex.png')`);
+  let r = ga(dir, 'pixel', 'char.png', '--out', 'px.png', '--size', '32x32', '--colors', '8');
+  assert.equal(r.code, 0, r.out);
+  const px = JSON.parse(py(dir, `
+import json
+im = Image.open('px.png').convert('RGBA')
+alphas = sorted(set(a for a in im.getchannel('A').getdata()))
+print(json.dumps({'size': im.size, 'colors': len(set(p[:3] for p in im.getdata() if p[3])), 'alphas': alphas}))`));
+  assert.deepEqual(px.size, [32, 32]);
+  assert.ok(px.colors <= 8, `${px.colors} màu`);
+  assert.deepEqual(px.alphas, [0, 255], 'alpha cứng');
+
+  r = ga(dir, 'tile', 'tex.png', '--out', 'tile.png', '--size', '64x64', '--preview', 'tile3.png');
+  assert.equal(r.code, 0, r.out);
+  const [, before, after] = r.out.match(/ngang (\d+)→(\d+)/);
+  assert.ok(Number(after) < Number(before) / 3, r.out);
+  assert.ok(fs.existsSync(path.join(dir, 'tile3.png')));
+
+  assert.equal(ga(dir, 'bg', 'tex.png', '--out', 'bg.png', '--size', '320x180', '--seamless-x').code, 0);
+  assert.equal(ga(dir, 'key', 'char.png', '--out', 'k.png').code, 0);
+  assert.equal(ga(dir, 'fit', 'k.png', '--out', 'f.png', '--size', '96x96').code, 0);
+  assert.equal(ga(dir, 'check', 'f.png', '--size', '96x96', '--alpha').code, 0);
+  r = ga(dir, 'check', 'f.png', '--size', '64x64');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /96×96, spec cần 64×64/);
+  r = ga(dir, 'check', 'bg.png', '--alpha');
+  assert.match(r.out, /không có pixel trong suốt/);
+  assert.equal(ga(dir, 'sheet', 'f.png', 'px.png', '--out', 'sheet.png').code, 0);
+  assert.equal(ga(dir, 'fit', 'k.png', '--out', 'x.png', '--size', '9').code, 1);
 });

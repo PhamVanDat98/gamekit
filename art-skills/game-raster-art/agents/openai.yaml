@@ -1,0 +1,4 @@
+interface:
+  display_name: "Game Raster Art"
+  short_description: "Tạo asset game raster bằng image_gen, tách nền, đúng cỡ, strip animation, giữ một style"
+  default_prompt: "Chốt style bằng ảnh neo, rồi tạo nhân vật chính 96x96 và strip idle 4 frame 64x64, tách nền trong suốt và cho tôi xem contact sheet."

@@ -68,7 +68,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 hooks/            SessionStart → using-gamekit + gamekit status
 commands/         /gamekit:status, /gamekit:next
 skills/           using-gamekit, re-notes, rebuild-game, module-plan, integrate, parity-check, platform-sdk, replace-graphics, package-web-build, release-check
-art-skills/       skill vẽ art độc lập cho Codex/Claude Code: svg-game-art (5 style game, render PNG, strip anim)
+art-skills/       skill vẽ art độc lập cho Codex: game-raster-art (image_gen + hậu xử lý: tách nền, đúng cỡ, strip anim, pixel, tile)
 portals/          vỏ portal dùng chung: azgames, dev-mock (portal.yaml, kit.mjs, shell.html, loader.entry.js, Icons/), shared/
 scripts/          CLI gamekit.mjs + lệnh; lib/
 schemas/          game, params, provenance, module-plan, asset-manifest (JSON Schema)

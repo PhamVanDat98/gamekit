@@ -4,5 +4,5 @@
 - Skill: chép hoặc symlink thư mục `skills/` của plugin vào thư mục skill Codex dùng (tuỳ phiên bản Codex), hoặc mở `SKILL.md` tương ứng khi cần.
 - Không có hook: đầu mỗi session chạy `npm run gk -- status`.
 - Dựng song song: mỗi worktree do `gamekit fanout` tạo mở một session Codex riêng, nhập: "Đọc .gamekit/local/BRIEF.md và làm theo."
-- Tạo ảnh (P3, skill `replace-graphics`): Codex nhận art brief từ `asset-manifest.json`; style pixel art dùng pxl (`make: pixel-code`), còn lại dùng skill `imagegen` có sẵn của Codex (`make: image-gen`), anim qua `sprite-pipeline` của plugin Game Studio (cài từ `/plugins`); kết quả qua hậu xử lý và `validate`. Danh sách skill art cho Codex: `skills/replace-graphics/references/art-tools.md`.
-- Skill vẽ art của GameKit cho Codex: `cp -r art-skills/svg-game-art ~/.codex/skills/` (xem `art-skills/README.md`), gọi `$svg-game-art`.
+- Tạo ảnh (P3, skill `replace-graphics`): Codex nhận art brief từ `asset-manifest.json`; style pixel art dùng pxl (`make: pixel-code`), còn lại dùng skill `game-raster-art` của GameKit (`make: image-gen`: `image_gen` có sẵn của Codex + hậu xử lý `gameart.py`); kết quả qua hậu xử lý và `validate`. Danh sách skill art cho Codex: `skills/replace-graphics/references/art-tools.md`.
+- Skill vẽ art của GameKit cho Codex: `cp -r art-skills/game-raster-art ~/.codex/skills/` + `pip install pillow` (xem `art-skills/README.md`), gọi `$game-raster-art`.
