@@ -17,7 +17,7 @@
           "id": { "type": "string" },
           "path": { "type": "string", "description": "File @1x" },
           "kind": { "enum": ["sprite", "ui", "anim", "background", "tile", "icon", "texture", "model", "audio"] },
-          "make": { "enum": ["vector", "image-gen", "own", "licensed"], "description": "UI nên là vector (SVG/CSS)" },
+          "make": { "enum": ["vector", "pixel-code", "image-gen", "own", "licensed"], "description": "vector: SVG/CSS (UI nên dùng); pixel-code: pixel art viết bằng code (pxl); image-gen: model tạo ảnh" },
           "width": { "type": "integer", "minimum": 1 },
           "height": { "type": "integer", "minimum": 1 },
           "scales": { "type": "array", "items": { "type": "number" } },

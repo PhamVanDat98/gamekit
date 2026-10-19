@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
+import { gk, newGame, token, sh, write, read, editJson, editYaml, solidPng } from './helpers.mjs';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
 import { ownershipProblems, topo } from '../scripts/parallel.mjs';
@@ -622,6 +622,20 @@ test('validate: Icons/web.png must be PNG, loading.webp must be WebP; builds/ mu
   assert.match(gk(dir, 'validate').out, /WebP/);
   fs.rmSync(path.join(dir, 'public/Icons/web.png'));
   assert.match(gk(dir, 'validate').out, /web\.png/);
+});
+
+test('validate: asset-manifest — make pixel-code accepted, anim strip is frames side by side, unknown make fails', () => {
+  const dir = newGame('vman');
+  const man = (make, w) => JSON.stringify({ assets: [{ id: 'cat', path: 'assets/gfx/cat.png', kind: 'anim', make, width: w, height: 12, alpha: true, frames: { count: 4, width: 16, height: 12, fps: 8 } }] });
+  fs.mkdirSync(path.join(dir, 'assets/gfx'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'assets/gfx/cat.png'), solidPng(64, 12));
+  write(dir, 'asset-manifest.json', man('pixel-code', 16));
+  const ok = gk(dir, 'validate');
+  assert.doesNotMatch(ok.out, /asset-manifest/, ok.out);
+  fs.writeFileSync(path.join(dir, 'assets/gfx/cat.png'), solidPng(16, 12));
+  assert.match(gk(dir, 'validate').out, /cat: assets\/gfx\/cat\.png là 16×12, spec cần 64×12/);
+  write(dir, 'asset-manifest.json', man('ai-magic', 16));
+  assert.match(gk(dir, 'validate').out, /asset-manifest\.json.*make/s);
 });
 
 test('release-check command: bad --version is an error', () => {

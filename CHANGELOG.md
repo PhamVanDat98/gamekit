@@ -1,5 +1,9 @@
 # Changelog
 
+## Chưa phát hành
+- Skill `replace-graphics` (P3, game làm lại của người khác): chọn cách làm từng asset theo `make` — `vector`, `pixel-code`, `image-gen`, `licensed` —, duyệt style theo đợt, hậu xử lý ảnh từ model, gắn nhãn, `validate`. Kèm hướng dẫn [pxl](https://github.com/crsolver/claude-pxl) (pixel art bằng code, không cần API key) và bảng công cụ tạo art cho Claude Code/Codex.
+- `asset-manifest.json`: `make` nhận thêm `pixel-code`.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.
