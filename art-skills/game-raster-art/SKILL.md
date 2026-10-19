@@ -1,6 +1,6 @@
 ---
 name: game-raster-art
-description: Tạo asset game raster (nhân vật, kẻ địch, vật phẩm, icon, UI, tile, nền/parallax, hiệu ứng, animation) bằng image_gen của Codex — không cần API key — rồi hậu xử lý thành file dùng được trong game: tách nền trong suốt, đúng cỡ, cùng tỉ lệ và điểm neo, strip animation, tile liền mạch. Asset được rút ra từ một khung hình concept đã duyệt để ghép vào game vẫn giống concept. Dùng khi làm art game theo style ảnh (cartoon, sticker, anime, vẽ tay, 3D render, phẳng, neon — pixel art và voxel thì dùng skill vẽ bằng code), hoặc khi người dùng đưa ảnh mẫu style và muốn asset giống như vậy.
+description: Tạo asset game raster (nhân vật, kẻ địch, vật phẩm, icon, UI, tile, nền/parallax, hiệu ứng, animation) bằng image_gen của Codex — không cần API key — rồi hậu xử lý thành file dùng được trong game: tách nền trong suốt, đúng cỡ, cùng tỉ lệ và điểm neo, animation frame-by-frame không trôi nét (tween/rig từ ảnh đã duyệt), tile liền mạch. Asset được rút ra từ một khung hình concept đã duyệt để ghép vào game vẫn giống concept. Dùng khi làm art game theo style ảnh (cartoon, sticker, anime, vẽ tay, 3D render, phẳng, neon — pixel art và voxel thì dùng skill vẽ bằng code), hoặc khi người dùng đưa ảnh mẫu style và muốn asset giống như vậy.
 ---
 
 # Art game raster bằng Codex
@@ -31,7 +31,7 @@ Concept vẽ kiểu poster (to, ánh sáng điện ảnh, nền bận) rồi t�
 Mọi lần tạo đều đính kèm `art/style/frame.png` là **Image 1** (Codex: `view_image` trước; `GA gen --ref art/style/frame.png`).
 - **Nền**: sửa từ frame — "remove every character, item and HUD element from Image 1, keep the background exactly" → `GA bg … --size <màn hình>`. Nền trùng khớp concept vì chính là concept.
 - **Nhân vật, kẻ địch, vật phẩm**: "recreate the <vật> exactly as it appears in Image 1 — same design, colors, outline thickness, shading — alone on a flat KEY background". Gom nhóm cùng loại vào **một tấm** (mọi kẻ địch một lần gọi) để chúng cùng một lượt vẽ → `GA split tấm.png --out-dir … --index index.png` (xem `index.png` để biết thứ tự rồi `--names`).
-- **Animation**: Image 1 = frame, Image 2 = sprite đã duyệt của nhân vật; cả dải tư thế trong một lần gọi → `GA anim`.
+- **Animation**: xem mục 3b — đừng bắt `image_gen` vẽ từng frame.
 - Nhắc trong prompt độ dày viền và mức chi tiết ở **cỡ hiển thị**: asset 64 px thì viền ≥ 2 px sau khi thu nhỏ, không chi tiết nhỏ hơn ~1/16 cạnh.
 
 ## 3. Hậu xử lý
@@ -39,13 +39,34 @@ Mọi lần tạo đều đính kèm `art/style/frame.png` là **Image 1** (Code
 | --- | --- |
 | Sprite, vật phẩm, icon | `GA key raw.png --out k.png` → `GA fit k.png --out out.png --size 96x96 [--anchor center]` |
 | Tấm nhiều asset | `GA split sheet.png --out-dir parts --index .gamekit/local/index.png --names hero,slime,bat` |
-| Animation | `GA anim raw.png --frames 6 --size 64x64 --out strip.png --gif .gamekit/local/preview.gif`; sai số tư thế → `--frames auto --pick 0,1,2,4,5,6`; `--anchor slot` giữ độ cao nhảy |
 | Khớp màu với concept | `GA grade parts/hero.png --ref art/style/frame.png --ref-box <x,y,w,h của hero trên frame> --out-dir graded` (`--strength 0.4–1`; luôn chọn vùng của đúng vật đó, so với cả khung hình sẽ kéo vật về màu nền) |
 | Pixel art do model vẽ | `GA pixel raw.png --out out.png --size 32x32 --colors 16 [--palette "#hex,…"]` |
 | Tile lặp | `GA tile raw.png --out tile.png --size 64x64 --preview .gamekit/local/tile-3x3.png` |
 | Nền, parallax | `GA bg raw.png --out bg.png --size 1280x720 [--seamless-x]`; lớp gần có chỗ trống: tạo trên KEY → `GA key` → `GA fit --anchor bottom` |
 
 `key` đoán màu nền từ viền ảnh; viền còn ám màu → tăng `--soft`; vật bị khoét → giảm `--tol` hoặc tạo lại với màu nền khác.
+
+## 3b. Animation: frame-by-frame từ ảnh đã duyệt
+`image_gen` là model ảnh tĩnh: mỗi frame nó **vẽ lại** nhân vật, nên dải nhiều frame bị trôi mặt, trôi cỡ, trôi trang phục. Các showcase mượt trên GitHub dùng model **video** (agent-sprite-forge: ảnh → video → cắt frame) hoặc ô nhỏ + khung bố cục + bỏ frame hỏng (hatch-pet). Ở đây chọn theo loại chuyển động:
+
+| Chuyển động | Cách | Lệnh |
+| --- | --- | --- |
+| Nhún, thở, lắc lư, nảy, nhấp nháy, xoay đồng xu, đập nhịp | **tween** — cả sprite đã duyệt di chuyển/co giãn; frame nào cũng đúng từng pixel của bản duyệt | `GA tween hero.png --anim bob\|breathe\|sway\|wobble\|hop\|spin\|pulse --frames 8 --size 96x96 --out idle.png --gif …` |
+| Đi, chạy, nhảy, đánh, trúng đòn của nhân vật có tay chân | **rig cắt rời** — `image_gen` vẽ nhân vật thành từng bộ phận một lần (mẫu §9 trong prompts.md), `GA split` tách ra, `rig.json` khai báo khớp; script quay bộ phận quanh khớp | `GA rig rig.json --anim idle\|walk\|run\|jump\|attack\|hit --frames 8 --size 96x96 --out walk.png --gif …` |
+| Biến hình, lộn nhào, áo choàng bay, hiệu ứng | **dải frame có khung bố cục** — `GA guide` tạo ảnh ô đều; đính kèm guide + sprite đã duyệt; cắt bằng ô; `GA inspect` chỉ ra frame trôi → tạo lại đúng frame đó bằng **sửa từ sprite đã duyệt** (không sửa từ frame trước) | `GA guide --frames 6 --cell 64x64 --out guide.png` → `GA anim raw.png --frames 6 --slots --anchor slot --size 64x64 --out strip.png` → `GA inspect strip.png --frames 6 --ref hero.png` |
+| Chuyển động mượt cần model video | agent-sprite-forge `video2dsprite` qua **Grok CLI** đã đăng nhập (không API key) — Codex không có video | `route_media.py video … --route grok-acp` |
+| Pixel art, voxel | vẽ bằng code: pxl `anim(...)`, voxel-art `FRAMES` | — |
+
+`rig.json` (tọa độ là pixel trong ảnh từng bộ phận; bỏ trống thì lấy mặc định theo tên — đầu xoay quanh cổ, tay/chân quanh đầu trên, gắn vào `body`):
+```json
+{"parts": {
+  "body": {"file": "parts/body.png"},
+  "head": {"file": "parts/head.png", "pivot": [40, 70], "at": [30, 6]},
+  "arm_front": {"file": "parts/arm_front.png"}, "arm_back": {"file": "parts/arm_back.png"},
+  "leg_front": {"file": "parts/leg_front.png"}, "leg_back": {"file": "parts/leg_back.png"},
+  "weapon": {"file": "parts/sword.png", "parent": "arm_front", "pivot": [6, 60], "at": [10, 44]}}}
+```
+Tên chuẩn: `body` (gốc), `head`, `arm_front`, `arm_back`, `leg_front`, `leg_back`, `tail`, `weapon`. Xem `--gif` để chỉnh khớp (`pivot`/`at`) và độ mạnh (`--amp 0.6`). Chuyển động riêng: `--anim keys.json` với `{"keys": {"arm_front": {"rot": [0, 30, 60, 30]}, "body": {"y": [0, -3]}}}` (giá trị ít hơn số frame được nội suy vòng).
 
 ## 4. Ghép thử và so với concept (bắt buộc trước khi giao)
 1. Viết `art/style/layout.json`: vị trí và cỡ từng asset như trong game (số px của game):

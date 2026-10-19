@@ -53,15 +53,16 @@ Detail level: readable at <cỡ hiển thị> px — outline at least <2> px at 
 ```
 Asset chưa có trong frame (kẻ địch mới): giữ Image 1 làm style, mô tả vật mới, thêm "drawn by the same artist in the same style as Image 1".
 
-## 5. Animation
+## 5. Animation bằng dải frame (chỉ khi tween/rig không làm được)
+Tạo khung trước: `GA guide --frames <N> --cell <W>x<H> --out art/raw/guide-<N>.png`.
 ```
-Input images: Image 1: approved style frame (style); Image 2: approved sprite of this character (identity)
+Input images: Image 1: layout guide (positions only — do not draw its lines); Image 2: approved sprite of this character (identity); Image 3: approved style frame (style)
 Asset type: 2D sprite animation sheet
-Primary request: exactly <N> poses of the character in Image 2 in ONE horizontal row, left to right: <tư thế 1>, <tư thế 2>, …
-Invariants: same character as Image 2, same size in every pose, same facing direction, same palette and outline; feet on one ground line; poses evenly spaced, not touching
-+ [KEY-BLOCK]
+Primary request: exactly <N> poses of the character in Image 2, one centered in each slot of Image 1, left to right: <tư thế 1>, <tư thế 2>, …
+Invariants: same character as Image 2 in every slot — same face, outfit, palette, outline, proportions and size; feet on the ground line of Image 1; nothing crosses into a neighboring slot
++ [KEY-BLOCK]; no guide lines, slot borders or center marks in the output
 ```
-`GA anim raw.png --frames <N> …`; sai số tư thế → `--frames auto --pick`. Chu kỳ: idle 4, walk 6–8, run 6, jump 4 (lấy đà, bay, đỉnh, rơi), attack 4–6, hit 2, death 4–6.
+`GA anim raw.png --frames <N> --slots --anchor slot …` → `GA inspect strip.png --frames <N> --ref sprite.png`. Frame hỏng: sửa từ Image 2 — "same character as Image 2, only change the pose to <tư thế>" + [KEY-BLOCK], rồi thay frame đó.
 
 ## 6. Vật phẩm, icon, UI
 ```
@@ -91,3 +92,13 @@ Primary request: exactly <N> frames of a <explosion | hit spark | dust puff | co
 + [KEY-BLOCK] (hiệu ứng phát sáng: nền đen phẳng thay cho KEY, dùng blend cộng trong game)
 ```
 `GA anim raw.png --frames <N> --anchor center --size 64x64 …`.
+
+## 9. Bộ phận để rig (animation cắt rời)
+```
+Input images: Image 1: approved sprite of this character; Image 2: approved style frame
+Asset type: cut-out animation parts sheet
+Primary request: the character from Image 1, side view facing right, separated into body parts laid out apart in one row: head, torso, front arm, back arm, front leg, back leg<, tail, weapon>
+Invariants: identical design, colors, outline and scale to Image 1; each part complete with the hidden area painted in (shoulder and hip ends rounded so they rotate cleanly); arms and legs straight and hanging down
++ [KEY-BLOCK]
+```
+`GA split parts-raw.png --out-dir parts --index .gamekit/local/parts-index.png --names head,body,arm_front,arm_back,leg_front,leg_back` (theo thứ tự trong ảnh index), rồi viết `rig.json` (SKILL.md §3b) và `GA rig rig.json --anim idle --gif …`. Muốn tay sau/chân sau tối hơn một chút (cho có chiều sâu): thêm "back arm and back leg slightly darker" vào prompt.

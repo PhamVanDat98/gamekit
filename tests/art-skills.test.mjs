@@ -274,3 +274,72 @@ im = Image.open('bob.png'); print(json.dumps([im.size, [im.crop((i*56, 0, i*56+5
   r = vx(dir, 'info', 'boom.vox.py');
   assert.match(r.out, /boom\.vox\.py:5: ZeroDivisionError/);
 });
+
+test('gameart tween + rig: every frame built from the approved pixels; motion kept, feet on one line; custom keys', { skip: skipPy }, () => {
+  const dir = tmpDir();
+  py(dir, `
+import os
+os.makedirs('parts', exist_ok=True)
+def part(w, h, fill):
+    im = Image.new('RGBA', (w, h), (0, 0, 0, 0)); ImageDraw.Draw(im).rounded_rectangle([0, 0, w - 1, h - 1], radius=min(w, h) // 3, fill=fill); return im
+part(60, 80, (200, 80, 60, 255)).save('sprite.png')
+part(34, 44, (70, 130, 200, 255)).save('parts/body.png')
+part(40, 38, (250, 210, 170, 255)).save('parts/head.png')
+for n, c in (('arm_front', (60, 110, 180, 255)), ('arm_back', (45, 85, 140, 255)), ('leg_front', (70, 60, 60, 255)), ('leg_back', (50, 45, 45, 255))):
+    part(12, 32, c).save(f'parts/{n}.png')`);
+  let r = ga(dir, 'tween', 'sprite.png', '--anim', 'hop', '--frames', '8', '--size', '64x96', '--out', 'hop.png', '--gif', 'hop.gif');
+  assert.equal(r.code, 0, r.out);
+  const hop = JSON.parse(py(dir, `
+import json
+im = Image.open('hop.png'); print(json.dumps([im.size, [im.crop((i*64, 0, i*64+64, 96)).getchannel('A').getbbox() for i in range(8)]]))`));
+  assert.deepEqual(hop[0], [512, 96]);
+  const bottoms = hop[1].map((b) => b[3]);
+  assert.ok(Math.min(...bottoms) < Math.max(...bottoms) - 10, `hop phải bay lên: ${bottoms}`);
+  assert.equal(bottoms[0], Math.max(...bottoms), 'frame 0 đứng trên mặt đất');
+  r = ga(dir, 'tween', 'sprite.png', '--anim', 'dance', '--frames', '4', '--size', '64x64', '--out', 'x.png');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /không có animation 'dance'/);
+
+  fs.writeFileSync(path.join(dir, 'rig.json'), JSON.stringify({ parts: Object.fromEntries(['body', 'head', 'arm_front', 'arm_back', 'leg_front', 'leg_back'].map((n) => [n, { file: `parts/${n}.png` }])) }));
+  r = ga(dir, 'rig', 'rig.json', '--anim', 'walk', '--frames', '8', '--size', '96x96', '--out', 'walk.png', '--frames-dir', 'wf');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /8 frame 'walk', 6 phần/);
+  assert.doesNotMatch(r.out, /tail/, 'preset bỏ qua bộ phận rig không có, không cảnh báo');
+  const walk = JSON.parse(py(dir, `
+import json
+im = Image.open('walk.png'); fr = [im.crop((i*96, 0, i*96+96, 96)) for i in range(8)]
+print(json.dumps({'size': im.size, 'bottom': [f.getchannel('A').getbbox()[3] for f in fr], 'same': fr[0].tobytes() == fr[2].tobytes()}))`));
+  assert.deepEqual(walk.size, [768, 96]);
+  assert.equal(walk.same, false, 'các frame phải khác nhau (chân tay chuyển động)');
+  assert.ok(Math.max(...walk.bottom) - Math.min(...walk.bottom) <= 6, `chân gần một đường: ${walk.bottom}`);
+  fs.writeFileSync(path.join(dir, 'wave.json'), JSON.stringify({ keys: { arm_front: { rot: [0, -120] } } }));
+  assert.equal(ga(dir, 'rig', 'rig.json', '--anim', 'wave.json', '--frames', '6', '--size', '96x96', '--out', 'wave.png').code, 0);
+  fs.writeFileSync(path.join(dir, 'bad.json'), JSON.stringify({ parts: { head: { file: 'parts/head.png', parent: 'neck' }, body: { file: 'parts/body.png' } } }));
+  r = ga(dir, 'rig', 'bad.json', '--anim', 'idle', '--size', '64x64', '--out', 'x.png');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /gắn vào 'neck'/);
+});
+
+test('gameart guide + anim --slots + inspect: equal slots, drifting frames flagged', { skip: skipPy }, () => {
+  const dir = tmpDir();
+  let r = ga(dir, 'guide', '--frames', '4', '--cell', '64x64', '--out', 'guide.png');
+  assert.equal(r.code, 0, r.out);
+  assert.equal(py(dir, `print(Image.open('guide.png').size)`), '(1536, 384)');
+  // 4 slots; slot 2 is a different, bigger subject (identity/size drift); slot 3 slid up off the ground line
+  py(dir, `
+im = Image.new('RGB', (400, 100), (250, 3, 248)); d = ImageDraw.Draw(im)
+d.ellipse([30, 50, 70, 95], fill=(60, 160, 60)); d.ellipse([130, 50, 170, 95], fill=(60, 160, 60))
+d.rectangle([215, 20, 290, 95], fill=(40, 40, 200)); d.ellipse([330, 30, 370, 75], fill=(60, 160, 60))
+im.save('raw.png')
+ref = Image.new('RGBA', (40, 45), (0, 0, 0, 0)); ImageDraw.Draw(ref).ellipse([0, 0, 39, 44], fill=(60, 160, 60, 255)); ref.save('ref.png')`);
+  r = ga(dir, 'anim', 'raw.png', '--frames', '4', '--slots', '--anchor', 'slot', '--size', '64x64', '--out', 'strip.png');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /ô đều nhau/);
+  r = ga(dir, 'inspect', 'strip.png', '--frames', '4', '--ref', 'ref.png');
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /✔ frame 0/);
+  assert.match(r.out, /✔ frame 1/);
+  assert.match(r.out, /✖ frame 2: .*(diện tích|màu)/);
+  assert.match(r.out, /✖ frame 3: .*chân lệch/);
+  assert.equal(ga(dir, 'anim', 'raw.png', '--frames', 'auto', '--slots', '--size', '64x64', '--out', 'x.png').code, 1);
+});

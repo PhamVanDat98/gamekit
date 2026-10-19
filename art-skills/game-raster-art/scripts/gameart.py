@@ -16,6 +16,12 @@ Lệnh:
   grade  <png…> --ref <concept.png> --ref-box x,y,w,h --out-dir <thư mục>  kéo màu asset về màu của vật đó trên concept
   compose --bg <png> --layout <layout.json> --out <png>  ghép asset cuối lên nền đúng vị trí/cỡ trong game
   compare <concept.png> <ghép.png> --out <png>     đặt cạnh nhau + độ lệch màu (ΔE) để biết còn khác bao nhiêu
+  tween  <sprite> --anim bob|breathe|sway|hop|spin|pulse|wobble --frames N --size WxH --out <png>
+                                                  animation mượt frame-by-frame từ MỘT sprite đã duyệt
+  rig    <rig.json> --anim idle|walk|run|jump|attack|hit|<keys.json> --frames N --size WxH --out <png>
+                                                  animation cắt rời: bộ phận (đầu, thân, tay, chân) quay quanh khớp
+  guide  --frames N --cell WxH --out <png>         ảnh khung bố cục đính kèm khi tạo dải frame bằng image_gen
+  inspect <strip.png> --frames N --ref <sprite.png>  soi từng frame: lệch cỡ, lệch màu, trôi chân → frame nào phải làm lại
 
 Chỉ cần Python 3.9+ và Pillow (`python3 -m pip install pillow`).
 """
@@ -23,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -256,7 +263,7 @@ def strip(frames: list[Image.Image]) -> Image.Image:
 
 
 # ---------- tách frame từ một ảnh dải ----------
-def split_frames(img: Image.Image, n: int | None, rows: int = 1) -> tuple[list[Image.Image], str]:
+def split_frames(img: Image.Image, n: int | None, rows: int = 1, slots: bool = False) -> tuple[list[Image.Image], str]:
     """Cut frames out of a generated sheet.
 
     One row: subjects separated by transparent columns. Fragments much narrower than the others (a hand
@@ -265,7 +272,7 @@ def split_frames(img: Image.Image, n: int | None, rows: int = 1) -> tuple[list[I
     n=None takes whatever was found. Several rows: an equal grid (n required).
     """
     w, h = img.size
-    if rows == 1:
+    if rows == 1 and not slots:
         a = img.getchannel("A").point(lambda v: 255 if v > 24 else 0)
         col = [a.crop((x, 0, x + 1, h)).getbbox() is not None for x in range(w)]
         runs, start = [], None
@@ -667,6 +674,294 @@ def side_by_side(a: Image.Image, b: Image.Image, labels=("concept", "ghép trong
     return out
 
 
+
+# ---------- animation từ sprite đã duyệt (frame-by-frame không lệch) ----------
+# A still-image model redraws the character every frame, so long strips drift (face, size, outfit).
+# These build every frame from the SAME approved pixels: one sprite moved as a whole (tween), or a
+# character cut into parts that turn around joints (rig, the Spine/cut-out way).
+def _mat_mul(a, b):
+    return (a[0] * b[0] + a[1] * b[3], a[0] * b[1] + a[1] * b[4], a[0] * b[2] + a[1] * b[5] + a[2],
+            a[3] * b[0] + a[4] * b[3], a[3] * b[1] + a[4] * b[4], a[3] * b[2] + a[4] * b[5] + a[5])
+
+
+def _T(x, y):
+    return (1, 0, x, 0, 1, y)
+
+
+def _R(deg):
+    r = math.radians(deg)
+    return (math.cos(r), -math.sin(r), 0, math.sin(r), math.cos(r), 0)
+
+
+def _S(sx, sy):
+    return (sx, 0, 0, 0, sy, 0)
+
+
+def _inv(m):
+    a, b, c, d, e, f = m
+    det = a * e - b * d
+    if abs(det) < 1e-9:
+        return None
+    ia, ib, id_, ie = e / det, -b / det, -d / det, a / det
+    return (ia, ib, -(ia * c + ib * f), id_, ie, -(id_ * c + ie * f))
+
+
+# Defaults by part name (side view facing right). pivot/at as fractions of the part's / parent's size.
+PART_PIVOT = {"head": (0.5, 0.9), "body": (0.5, 0.95), "tail": (0.85, 0.5), "weapon": (0.2, 0.8)}
+LIMB_PIVOT = (0.5, 0.1)
+PART_AT = {"head": (0.5, 0.12), "arm_front": (0.55, 0.28), "arm_back": (0.45, 0.28), "leg_front": (0.6, 0.92),
+           "leg_back": (0.4, 0.92), "tail": (0.12, 0.75), "weapon": (0.5, 0.9)}
+PART_Z = {"arm_back": 0, "leg_back": 1, "tail": 1, "body": 2, "leg_front": 3, "head": 4, "arm_front": 5, "weapon": 6}
+
+
+def load_rig(path: str) -> dict:
+    """rig.json: {"parts": {"body": {"file": "parts/body.png"}, "head": {"file": …, "pivot": [x, y],
+    "at": [x, y], "parent": "body", "z": 4}, …}}. pivot = joint inside the part's own image (px);
+    at = where that joint sits inside the parent's image (px). Omitted values follow the part name."""
+    base = Path(path).resolve().parent
+    spec = json.loads(Path(path).read_text(encoding="utf-8"))
+    parts = {}
+    for name, ps in spec.get("parts", {}).items():
+        f = base / ps["file"]
+        if not f.exists():
+            raise UserError(f"rig: không có {ps['file']}")
+        img = Image.open(f).convert("RGBA")
+        bb = alpha_bbox(img)
+        if bb and ps.get("trim", True) and "pivot" not in ps:
+            img = img.crop(bb)
+        fx, fy = PART_PIVOT.get(name, LIMB_PIVOT)
+        parts[name] = {"img": img, "pivot": tuple(ps.get("pivot") or (img.width * fx, img.height * fy)),
+                       "parent": ps.get("parent", None if name == "body" else "body"),
+                       "z": ps.get("z", PART_Z.get(name, 3)), "at": ps.get("at")}
+    if "body" not in parts and len(parts) != 1:
+        raise UserError("rig cần một phần tên 'body' (gốc), hoặc chỉ một phần")
+    for name, pt in parts.items():
+        par = pt["parent"]
+        if par is not None and par not in parts:
+            raise UserError(f"rig: '{name}' gắn vào '{par}' nhưng không có phần đó")
+        if pt["at"] is None and par is not None:
+            pw, ph = parts[par]["img"].size
+            fx, fy = PART_AT.get(name, (0.5, 0.5))
+            pt["at"] = (pw * fx, ph * fy)
+    return parts
+
+
+def _wave(i, n, phase=0.0):
+    return math.sin(2 * math.pi * (i / n) + phase)
+
+
+def preset_keys(anim: str, n: int, size: float, amp: float = 1.0) -> dict:
+    """Per-frame offsets for a side-view character facing right: {part: {"x","y","rot","sx","sy": [..n]}}.
+    size = height of the character in px (amplitudes scale with it)."""
+    a = amp
+    h = size
+    k: dict[str, dict[str, list[float]]] = {}
+
+    def put(part, ch, vals):
+        k.setdefault(part, {})[ch] = [round(v, 3) for v in vals]
+
+    rng = range(n)
+    if anim == "bob":
+        put("body", "y", [-0.035 * h * a * (1 - math.cos(2 * math.pi * i / n)) / 2 for i in rng])
+    elif anim == "breathe":
+        put("body", "sy", [1 + 0.035 * a * (1 - math.cos(2 * math.pi * i / n)) / 2 for i in rng])
+        put("body", "sx", [1 - 0.015 * a * (1 - math.cos(2 * math.pi * i / n)) / 2 for i in rng])
+    elif anim == "sway":
+        put("body", "rot", [4 * a * _wave(i, n) for i in rng])
+    elif anim == "wobble":
+        put("body", "sx", [1 + 0.06 * a * _wave(i, n) for i in rng])
+        put("body", "sy", [1 - 0.06 * a * _wave(i, n) for i in rng])
+    elif anim == "hop":
+        ys, sx, sy = [], [], []
+        for i in rng:
+            t = i / n
+            air = math.sin(math.pi * t / 0.7) if t < 0.7 else 0.0
+            squash = 0.0 if t < 0.7 else math.sin(math.pi * (t - 0.7) / 0.3)
+            ys.append(-0.22 * h * a * air)
+            sy.append(1 - 0.12 * a * squash + 0.05 * a * air)
+            sx.append(1 + 0.1 * a * squash - 0.03 * a * air)
+        put("body", "y", ys); put("body", "sx", sx); put("body", "sy", sy)
+    elif anim == "spin":
+        put("body", "sx", [max(0.06, abs(math.cos(math.pi * i / n))) * (1 if math.cos(math.pi * i / n) >= 0 else -1) for i in rng])
+    elif anim == "pulse":
+        put("body", "sx", [1 + 0.08 * a * (1 - math.cos(2 * math.pi * i / n)) / 2 for i in rng])
+        put("body", "sy", [1 + 0.08 * a * (1 - math.cos(2 * math.pi * i / n)) / 2 for i in rng])
+    elif anim == "idle":
+        put("body", "y", [-0.012 * h * a * (1 - math.cos(2 * math.pi * i / n)) / 2 for i in rng])
+        put("head", "rot", [2 * a * _wave(i, n, 0.6) for i in rng])
+        put("arm_front", "rot", [4 * a * _wave(i, n, 0.3) for i in rng])
+        put("arm_back", "rot", [-4 * a * _wave(i, n, 0.3) for i in rng])
+        put("tail", "rot", [8 * a * _wave(i, n) for i in rng])
+    elif anim in ("walk", "run"):
+        leg, arm, bob, lean = (28, 24, 0.025, 0) if anim == "walk" else (45, 50, 0.05, 8)
+        put("leg_front", "rot", [-leg * a * _wave(i, n) for i in rng])
+        put("leg_back", "rot", [leg * a * _wave(i, n) for i in rng])
+        put("arm_front", "rot", [arm * a * _wave(i, n) for i in rng])
+        put("arm_back", "rot", [-arm * a * _wave(i, n) for i in rng])
+        put("body", "y", [-bob * h * a * abs(_wave(i, n)) for i in rng])
+        put("body", "rot", [lean * a for _ in rng])
+        put("head", "rot", [1.5 * a * _wave(i, n / 2) - lean * a * 0.5 for i in rng])
+        put("tail", "rot", [10 * a * _wave(i, n / 2) for i in rng])
+    elif anim == "jump":
+        # crouch → launch → rise → apex → fall → land
+        curve = [(0.0, 0.0), (0.18, -0.06), (0.35, 0.35), (0.55, 0.55), (0.75, 0.3), (0.9, -0.05), (1.0, 0.0)]
+
+        def at(t):
+            for (t0, v0), (t1, v1) in zip(curve, curve[1:]):
+                if t <= t1:
+                    return v0 + (v1 - v0) * (t - t0) / (t1 - t0)
+            return 0.0
+
+        ys = [-at(i / max(1, n - 1)) * h * 0.6 * a for i in rng]
+        put("body", "y", ys)
+        tuck = [max(0.0, -y) / (0.33 * h * a + 1e-6) for y in ys]
+        put("leg_front", "rot", [-30 * a * t for t in tuck]); put("leg_back", "rot", [25 * a * t for t in tuck])
+        put("arm_front", "rot", [-70 * a * t for t in tuck]); put("arm_back", "rot", [-50 * a * t for t in tuck])
+        put("body", "sy", [1 - 0.08 * a if (i == 0 or i == n - 1) else 1 for i in rng])
+    elif anim == "attack":
+        # wind up → swing through → follow → recover
+        curve = [-60, -95, -40, 70, 85, 50, 0]
+        vals = [curve[min(len(curve) - 1, round(i * (len(curve) - 1) / max(1, n - 1)))] * a for i in rng]
+        put("arm_front", "rot", vals)
+        put("body", "rot", [v * 0.08 for v in vals])
+        put("body", "x", [0.04 * h * a * max(0.0, v) / 85 for v in vals])
+    elif anim == "hit":
+        kick = [math.exp(-2.5 * (i - 1) / n) if i else 0.0 for i in rng]
+        put("body", "x", [-0.1 * h * a * k for k in kick])
+        put("body", "rot", [-14 * a * k for k in kick])
+        put("head", "rot", [-10 * a * k for k in kick])
+        put("arm_front", "rot", [-25 * a * k for k in kick])
+        put("arm_back", "rot", [-25 * a * k for k in kick])
+    else:
+        raise UserError(f"không có animation '{anim}' (có: bob, breathe, sway, wobble, hop, spin, pulse, idle, walk, run, jump, attack, hit, hoặc file keys .json)")
+    return k
+
+
+def _expand(vals, n):
+    """A channel given as fewer keyframes than frames is spread over the loop with linear blending."""
+    if not isinstance(vals, list):
+        return [float(vals)] * n
+    if len(vals) == n:
+        return [float(v) for v in vals]
+    if len(vals) == 1:
+        return [float(vals[0])] * n
+    out = []
+    for i in range(n):
+        t = i / n * len(vals)
+        k = int(t)
+        f = t - k
+        out.append(vals[k % len(vals)] * (1 - f) + vals[(k + 1) % len(vals)] * f)
+    return out
+
+
+def rig_frames(parts: dict, keys: dict, n: int, ss: int = 2) -> list[Image.Image]:
+    """Render n frames. Every part: parent transform · at · offset · rotate/scale about its pivot."""
+    for name in keys:
+        if name not in parts:
+            print(f"⚠ animation có '{name}' nhưng rig không có phần đó — bỏ qua", file=sys.stderr)
+    root = "body" if "body" in parts else next(iter(parts))
+    rw, rh = parts[root]["img"].size
+    span = max(rw, rh) + sum(max(p["img"].size) for k, p in parts.items() if k != root)
+    W = H = int(span * 2.2) + 16
+    origin = (W / 2, H * 0.75)
+    order = sorted(parts, key=lambda k: parts[k]["z"])
+    frames = []
+    for i in range(n):
+        mats = {}
+
+        def mat(name):
+            if name in mats:
+                return mats[name]
+            pt = parts[name]
+            kv = keys.get(name, {})
+            ch = {c: _expand(kv[c], n)[i] if c in kv else (1.0 if c in ("sx", "sy") else 0.0) for c in ("x", "y", "rot", "sx", "sy")}
+            base = _T(*origin) if pt["parent"] is None else _mat_mul(mat(pt["parent"]), _T(*pt["at"]))
+            m = _mat_mul(base, _T(ch["x"], ch["y"]))
+            m = _mat_mul(m, _R(ch["rot"]))
+            m = _mat_mul(m, _S(ch["sx"], ch["sy"]))
+            m = _mat_mul(m, _T(-pt["pivot"][0], -pt["pivot"][1]))
+            mats[name] = m
+            return m
+
+        canvas = Image.new("RGBA", (W * ss, H * ss), (0, 0, 0, 0))
+        for name in order:
+            inv = _inv(_mat_mul(_S(ss, ss), mat(name)))
+            if inv is None:
+                continue
+            # premultiplied while resampling so edges don't pick up dark fringes
+            layer = parts[name]["img"].convert("RGBa").transform(canvas.size, Image.Transform.AFFINE, inv, resample=Image.Resampling.BICUBIC)
+            canvas.alpha_composite(layer.convert("RGBA"))
+        frames.append(resize_rgba(canvas, (W, H)))
+    return frames
+
+
+def save_gif(frames: list[Image.Image], path: str, fps: float, bg=(244, 241, 234, 255)) -> None:
+    bgc = Image.new("RGBA", frames[0].size, bg)
+    g = [Image.alpha_composite(bgc, f).convert("P", palette=Image.Palette.ADAPTIVE) for f in frames]
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    g[0].save(path, save_all=True, append_images=g[1:], duration=round(1000 / fps), loop=0, disposal=2)
+
+
+# ---------- khung bố cục + soi frame cho dải frame vẽ bằng model ----------
+def layout_guide(n: int, cell, scale: int = 0, key=(255, 0, 255)) -> Image.Image:
+    """N equal slots in one row with a ground line and center marks, sized for an image model (~1536 px
+    wide). Attached as a layout-only reference so poses land one per slot, same scale, feet on the line."""
+    cw, ch = cell
+    k = scale or max(1, 1536 // (cw * n))
+    W, H = cw * n * k, ch * k
+    img = Image.new("RGB", (W, H), key)
+    d = ImageDraw.Draw(img)
+    line = (90, 90, 110)
+    for i in range(n + 1):
+        d.line([(i * cw * k, 0), (i * cw * k, H)], fill=line, width=max(2, k))
+    gy = int(H * 0.92)
+    d.line([(0, gy), (W, gy)], fill=(40, 40, 60), width=max(2, k))
+    for i in range(n):
+        cx = int((i + 0.5) * cw * k)
+        d.line([(cx, gy - 6 * k), (cx, gy + 6 * k)], fill=(40, 40, 60), width=max(1, k // 2))
+    return img
+
+
+def inspect_frames(frames: list[Image.Image], ref: Image.Image | None) -> list[dict]:
+    """Per frame: opaque area and height vs the reference sprite (size drift), color distance (identity
+    drift), feet line (sliding). Frames outside the gates should be regenerated as an edit of the ref."""
+    def measure(im):
+        a = im.getchannel("A").point(lambda v: 255 if v > 128 else 0)
+        bb = a.getbbox()
+        area = sum(1 for v in _pixels(a) if v)
+        return a, bb, area
+
+    _, rb, rarea = measure(ref) if ref else (None, None, None)
+    base = []
+    for f in frames:
+        base.append(measure(f))
+    if not ref:
+        rb = max((b for _, b, _ in base if b), key=lambda b: b[3] - b[1], default=None)
+        rarea = sorted(ar for _, _, ar in base)[len(base) // 2]
+    rh = (rb[3] - rb[1]) if rb else 1
+    feet = sorted(b[3] for _, b, _ in base if b)
+    foot = feet[len(feet) // 2] if feet else 0
+    out = []
+    for i, (f, (a, bb, area)) in enumerate(zip(frames, base)):
+        if not bb:
+            out.append({"frame": i, "ok": False, "why": ["trống"]})
+            continue
+        why = []
+        ar = area / max(1, rarea)
+        hr = (bb[3] - bb[1]) / max(1, rh)
+        de = delta_e(f.crop(bb), ref)["mean"] if ref else 0.0
+        if not 0.72 <= ar <= 1.32:
+            why.append(f"diện tích ×{ar:.2f}")
+        if ref is not None and not 0.8 <= hr <= 1.2:
+            why.append(f"chiều cao ×{hr:.2f}")
+        if de > 12:
+            why.append(f"màu lệch ΔE {de:.0f}")
+        if abs(bb[3] - foot) > max(2, 0.04 * f.height):
+            why.append(f"chân lệch {bb[3] - foot:+d}px")
+        out.append({"frame": i, "ok": not why, "area": round(ar, 2), "height": round(hr, 2), "dE": round(de, 1), "why": why})
+    return out
+
+
 # ---------- CLI ----------
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="gameart", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -686,6 +981,7 @@ def main(argv=None) -> int:
 
     p = sub.add_parser("anim"); p.add_argument("input"); p.add_argument("--out", required=True); p.add_argument("--size", required=True)
     p.add_argument("--frames", required=True, help="số frame, hoặc auto = lấy số hình tìm thấy"); p.add_argument("--rows", type=int, default=1)
+    p.add_argument("--slots", action="store_true", help="cắt theo ô đều nhau (ảnh tạo với khung bố cục `guide`)")
     p.add_argument("--pick", help="chọn/sắp xếp frame theo chỉ số, vd 0,1,2,4 (sau khi cắt)")
     p.add_argument("--anchor", choices=["bottom", "center", "slot"], default="bottom"); p.add_argument("--pad", type=int, default=2)
     p.add_argument("--keyed", action="store_true", help="ảnh đã trong suốt, bỏ bước tách nền")
@@ -726,6 +1022,23 @@ def main(argv=None) -> int:
 
     p = sub.add_parser("compare"); p.add_argument("concept"); p.add_argument("candidate"); p.add_argument("--out")
 
+    def animopts(p):
+        p.add_argument("--anim", required=True); p.add_argument("--frames", type=int, default=8)
+        p.add_argument("--size", required=True); p.add_argument("--out", required=True)
+        p.add_argument("--amp", type=float, default=1.0, help="độ mạnh chuyển động (mặc định 1)")
+        p.add_argument("--pad", type=int, default=2); p.add_argument("--gif"); p.add_argument("--fps", type=float, default=10)
+        p.add_argument("--frames-dir")
+
+    p = sub.add_parser("tween"); p.add_argument("input"); animopts(p)
+    p.add_argument("--pivot", choices=["bottom", "center"], help="điểm xoay/co giãn (mặc định: bottom; spin/pulse: center)")
+    p = sub.add_parser("rig"); p.add_argument("rig"); animopts(p)
+
+    p = sub.add_parser("guide"); p.add_argument("--frames", type=int, required=True); p.add_argument("--cell", required=True)
+    p.add_argument("--out", required=True); p.add_argument("--key", default="#ff00ff")
+
+    p = sub.add_parser("inspect"); p.add_argument("input"); p.add_argument("--frames", type=int, required=True)
+    p.add_argument("--ref", help="sprite đã duyệt của nhân vật")
+
     a = ap.parse_args(argv)
     try:
         if a.cmd == "key":
@@ -750,7 +1063,9 @@ def main(argv=None) -> int:
             if not a.keyed:
                 img, _ = key_out(img, parse_hex(a.bg) if a.bg else None, a.tol, a.soft)
             want = None if a.frames == "auto" else int(a.frames)
-            parts, how = split_frames(img, want, a.rows)
+            if a.slots and want is None:
+                raise UserError("--slots cần --frames <số ô>")
+            parts, how = split_frames(img, want, a.rows, a.slots)
             if a.pick:
                 idx = [int(v) for v in a.pick.split(",")]
                 bad = [i for i in idx if not 0 <= i < len(parts)]
@@ -764,9 +1079,7 @@ def main(argv=None) -> int:
                 for i, f in enumerate(frames):
                     save(f, str(Path(a.frames_dir) / f"{Path(a.out).stem}_{i:02d}.png"))
             if a.gif:
-                bgc = Image.new("RGBA", frames[0].size, (244, 241, 234, 255))
-                g = [Image.alpha_composite(bgc, f).convert("P", palette=Image.Palette.ADAPTIVE) for f in frames]
-                g[0].save(a.gif, save_all=True, append_images=g[1:], duration=round(1000 / a.fps), loop=0, disposal=2)
+                save_gif(frames, a.gif, a.fps)
             print(f"✔ {a.out} {out.width}×{out.height} ({len(frames)} frame, cắt {how}, neo {a.anchor})")
         elif a.cmd == "pixel":
             img = load(a.input)
@@ -865,6 +1178,65 @@ def main(argv=None) -> int:
                 save(side_by_side(c, g), a.out)
             print(f"{'✔' if verdict == 'giống' else '✖'} lệch màu trung bình ΔE {d['mean']}, độ tương phản {d['spread']} → {verdict}" + (f" · {a.out}" if a.out else ""))
             return 0 if verdict == "giống" else 1
+        elif a.cmd in ("tween", "rig"):
+            if a.frames < 2:
+                raise UserError("--frames ≥ 2")
+            if a.cmd == "tween":
+                img = load(a.input)
+                bb = alpha_bbox(img)
+                if not bb:
+                    raise UserError("sprite trống — cần ảnh đã tách nền")
+                img = img.crop(bb)
+                piv = a.pivot or ("center" if a.anim in ("spin", "pulse") else "bottom")
+                parts = {"body": {"img": img, "pivot": (img.width / 2, img.height if piv == "bottom" else img.height / 2),
+                                  "parent": None, "z": 0, "at": None}}
+            else:
+                parts = load_rig(a.rig)
+            root = "body" if "body" in parts else next(iter(parts))
+            if a.anim.endswith(".json"):
+                spec = json.loads(Path(a.anim).read_text(encoding="utf-8"))
+                keys = spec.get("keys", spec)
+            else:
+                height = parts[root]["img"].height + sum(p["img"].height for k, p in parts.items() if k in ("head", "leg_front"))
+                keys = preset_keys(a.anim, a.frames, height, a.amp)
+                if root != "body" and "body" in keys:
+                    keys[root] = keys.pop("body")
+                keys = {k: v for k, v in keys.items() if k in parts}  # presets cover parts a rig may not have
+            raw = rig_frames(parts, keys, a.frames)
+            frames = fit_frames(raw, parse_size(a.size), "slot", a.pad)
+            out = strip(frames)
+            save(out, a.out)
+            if a.frames_dir:
+                for i, f in enumerate(frames):
+                    save(f, str(Path(a.frames_dir) / f"{Path(a.out).stem}_{i:02d}.png"))
+            if a.gif:
+                save_gif(frames, a.gif, a.fps)
+            print(f"✔ {a.out} {out.width}×{out.height} ({a.frames} frame '{Path(a.anim).stem}', {len(parts)} phần)")
+        elif a.cmd == "guide":
+            g = layout_guide(a.frames, parse_size(a.cell), key=parse_hex(a.key))
+            save(g, a.out)
+            print(f"✔ {a.out} {g.width}×{g.height}: {a.frames} ô, đường đất ở 92% chiều cao — đính kèm làm ảnh bố cục, dặn model không vẽ các đường kẻ")
+        elif a.cmd == "inspect":
+            img = load(a.input)
+            n = a.frames
+            fw = img.width // n
+            frames = [img.crop((i * fw, 0, (i + 1) * fw, img.height)) for i in range(n)]
+            ref = load(a.ref) if a.ref else None
+            if ref is not None:
+                bb = alpha_bbox(ref)
+                ref = ref.crop(bb) if bb else ref
+                # compare at the strip's scale: the reference resized to the tallest frame's height
+                hs = [b[3] - b[1] for b in (alpha_bbox(f) for f in frames) if b]
+                if hs:
+                    th = sorted(hs)[len(hs) // 2]
+                    ref = resize_rgba(ref, (max(1, round(ref.width * th / ref.height)), th))
+            rows = inspect_frames(frames, ref)
+            for r in rows:
+                if r["ok"]:
+                    print(f"✔ frame {r['frame']}: diện tích ×{r['area']}, màu ΔE {r['dE']}")
+                else:
+                    print(f"✖ frame {r['frame']}: {', '.join(r['why'])} — làm lại frame này bằng sửa ảnh từ sprite đã duyệt")
+            return 0 if all(r["ok"] for r in rows) else 1
         elif a.cmd == "check":
             errs = check(load(a.input), parse_size(a.size) if a.size else None, a.alpha, parse_hex(a.key) if a.key else None)
             for e in errs:
