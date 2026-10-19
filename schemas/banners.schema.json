@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gamekit/banners.schema.json",
+  "title": "store/banners.yaml — tuỳ chỉnh bộ banner store",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "source": { "enum": ["wide", "square", "tall", "icon"] },
+    "fraction": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+  },
+  "properties": {
+    "focus": {
+      "description": "Điểm cần giữ khi cắt ảnh nguồn (0..1 theo chiều ngang/dọc). Mặc định giữa ảnh",
+      "type": "object",
+      "additionalProperties": false,
+      "propertyNames": { "$ref": "#/definitions/source" },
+      "patternProperties": {
+        ".*": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "x": { "type": "number", "minimum": 0, "maximum": 1 }, "y": { "type": "number", "minimum": 0, "maximum": 1 } }
+        }
+      }
+    },
+    "sizes": {
+      "description": "Thêm kích thước mới hoặc sửa kích thước có sẵn (trùng name)",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$", "description": "Tên file, không có .png" },
+          "width": { "type": "integer", "minimum": 1, "maximum": 8192 },
+          "height": { "type": "integer", "minimum": 1, "maximum": 8192 },
+          "from": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/source" } },
+          "logo": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "required": ["at", "w", "h"],
+                "additionalProperties": false,
+                "properties": {
+                  "at": { "enum": ["top", "bottom"] },
+                  "w": { "$ref": "#/definitions/fraction" },
+                  "h": { "$ref": "#/definitions/fraction" },
+                  "margin": { "type": "number", "minimum": 0, "maximum": 0.5 }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "skip": { "description": "Kích thước không cần (theo name)", "type": "array", "items": { "type": ["string", "number"] } }
+  }
+}

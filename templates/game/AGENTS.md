@@ -18,7 +18,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 - `src/view/` render và input thiết bị; chỉ đọc state. Kiểm tra bằng screenshot/checklist, không unit test.
 - `src/platform/` interface chung cho mọi portal. Gameplay chỉ gọi `Platform`; adapter nằm trong `src/platform/adapters/`. Event analytics chỉ dùng tên trong `src/platform/events.ts`.
 - `src/contracts/` type dùng chung giữa các module — chỉ agent chính sửa.
-- `Language/` mỗi ngôn ngữ một file (`en.json` bắt buộc) · `public/Icons/` (`web.png`, `loading.webp`) · `builds/` đầu ra của pack (gitignored, không commit).
+- `Language/` mỗi ngôn ngữ một file (`en.json` bắt buộc) · `public/Icons/` (`web.png`, `loading.webp`) · `builds/` đầu ra của pack (gitignored, không commit). · `store/` ảnh nguồn (`art/`) và banner store (`banners/`), commit cùng game.
 - `params/` số liệu có nguồn và `confidence` · `spec/` gameplay spec, `obligations.yaml`, `oracles/` · `notes/` ghi chú RE, `QUESTIONS.md` · `gates/` checklist cổng · `DECISIONS.md` lý do và sai khác.
 
 ## Lệnh
@@ -32,6 +32,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Dựng song song | `npm run gk -- fanout --wave N` → subagent làm theo `.gamekit/local/BRIEF.md` → `npm run gk -- integrate --wave N` |
 | Thông tin portal còn thiếu | `npm run gk -- config --portal <id>` |
 | Đóng gói, kiểm tra phát hành | `npm run gk -- pack --all` → `builds/<v>/<portal>/` (`--zip`, `--compress`, `--version`) · `npm run gk -- release-check` |
+| Banner store (15 kích thước + Logo) | `store/art/{wide,square,tall,icon,logo}.png` → `npm run gk -- banners` → `store/banners/` · `--check` · `--list` |
 | Chơi thử bản build | `npm run preview` → `http://localhost:4173/<v>/dev-mock/<v>/index.html` |
 
 ## Nếu bạn là subagent trong một worktree

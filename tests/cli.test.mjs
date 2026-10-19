@@ -10,6 +10,8 @@ import { ownershipProblems, topo } from '../scripts/parallel.mjs';
 import { parseArgs } from '../scripts/gamekit.mjs';
 import { evaluateParity, testsFromVitestReport } from '../scripts/parity.mjs';
 import YAML from 'yaml';
+import { decodePng, encodePng } from '../scripts/lib/png.mjs';
+import { BANNERS, bannerSpecs, coverCrop } from '../scripts/lib/banners.mjs';
 
 test('init creates a valid game with git, hook and schemas', () => {
   const dir = newGame();
@@ -716,4 +718,76 @@ test('ownership: game.yaml without the field counts as own; unknown values are r
   const r = gk(dir, 'validate');
   assert.equal(r.code, 1);
   assert.match(r.out, /ownership/);
+});
+
+/** w×h RGBA image: `fill(x, y)` → [r, g, b, a]. */
+function image(w, h, fill) {
+  const data = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) data.set(fill(x, y), (y * w + x) * 4);
+  return { width: w, height: h, data };
+}
+const pixel = (img, x, y) => [...img.data.subarray((y * img.width + x) * 4, (y * img.width + x) * 4 + 4)];
+
+test('png: decode(encode(x)) is lossless, with and without alpha', () => {
+  const rgb = image(7, 5, (x, y) => [x * 30, y * 40, 200, 255]);
+  const rgba = image(6, 4, (x, y) => [x * 40, 10, y * 60, (x + y) * 30]);
+  for (const img of [rgb, rgba]) {
+    const back = decodePng(encodePng(img));
+    assert.deepEqual([back.width, back.height], [img.width, img.height]);
+    assert.deepEqual([...back.data], [...img.data]);
+  }
+  assert.throws(() => decodePng(Buffer.from('not a png')), /PNG/);
+});
+
+test('banners: specs from store/banners.yaml add, replace and skip; cover crop keeps the focus inside the source', () => {
+  const specs = bannerSpecs({ sizes: [{ name: '1280x720', logo: null }, { name: '630x500', width: 630, height: 500 }], skip: ['1280x2560'] });
+  assert.equal(specs.find((s) => s.name === '1280x720').logo, null);
+  assert.deepEqual(specs.find((s) => s.name === '1280x720').from, ['wide']);
+  assert.deepEqual(specs.find((s) => s.name === '960x1200').from, ['tall', 'square', 'wide']);
+  assert.ok(specs.some((s) => s.name === '630x500'));
+  assert.ok(!specs.some((s) => s.name === '1280x2560'));
+  assert.equal(BANNERS.length, 15);
+  const c = coverCrop({ width: 1920, height: 1080 }, 512, 512, { x: 1, y: 0.5 });
+  assert.deepEqual([c.x, c.y, c.w, c.h], [840, 0, 1080, 1080]);
+});
+
+test('banners command: every standard size from key art + logo, logo where the spec puts it, --check guards the set', () => {
+  const dir = newGame();
+  let r = gk(dir, 'banners');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /store\/art\/wide\.png/);
+
+  fs.mkdirSync(path.join(dir, 'store/art'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'store/art/wide.png'), encodePng(image(1920, 1080, () => [20, 120, 240, 255])));
+  // Logo: red block inside a transparent border, so trimming and placement are visible.
+  fs.writeFileSync(path.join(dir, 'store/art/logo.png'), encodePng(image(320, 120, (x, y) => (x >= 10 && x < 310 && y >= 10 && y < 110 ? [255, 0, 0, 255] : [0, 0, 0, 0]))));
+  r = gk(dir, 'banners');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /tall\.png: chưa có/, 'portrait banners cut from wide art are flagged');
+  for (const b of BANNERS) {
+    const img = decodePng(fs.readFileSync(path.join(dir, 'store/banners', `${b.name}.png`)));
+    assert.deepEqual([img.width, img.height], [b.width, b.height], b.name);
+    const hasRed = (y) => pixel(img, img.width >> 1, y)[0] > 200;
+    if (!b.logo) assert.ok(!hasRed(img.height >> 3) && !hasRed(img.height - 1 - (img.height >> 3)), `${b.name}: không có logo`);
+    else if (b.logo.at === 'top') assert.ok(hasRed(Math.round(img.height * (b.logo.margin + 0.02))), `${b.name}: logo ở trên`);
+    else assert.ok(hasRed(Math.round(img.height * (1 - b.logo.margin - 0.02))), `${b.name}: logo ở dưới`);
+  }
+  const logo = decodePng(fs.readFileSync(path.join(dir, 'store/banners/Logo.png')));
+  assert.deepEqual([logo.width, logo.height], [300, 100], 'Logo.png is trimmed to its opaque area');
+  assert.equal(gk(dir, 'banners', '--check').code, 0);
+
+  fs.rmSync(path.join(dir, 'store/banners/64x64.png'));
+  fs.writeFileSync(path.join(dir, 'store/banners/200x120.png'), encodePng(image(10, 10, () => [0, 0, 0, 255])));
+  r = gk(dir, 'banners', '--check');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /64x64\.png: thiếu/);
+  assert.match(r.out, /200x120\.png: kích thước 10×10, cần 200×120/);
+
+  write(dir, 'store/banners.yaml', 'sizes:\n  - { name: tiny }\n');
+  r = gk(dir, 'banners', '--list');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /cần width và height/);
+  write(dir, 'store/banners.yaml', 'skip: [64x64, 200x120]\n');
+  assert.equal(gk(dir, 'banners', '--check').code, 0);
+  assert.match(gk(dir, 'banners', '--only', '9x9').out, /Không có kích thước: 9x9/);
 });

@@ -78,6 +78,7 @@ function runAuto(root, name, phase) {
     lint: ['npm', ['run', 'lint', '--silent']],
     pack: [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'pack', '--all']],
     'release-check': [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'release-check']],
+    banners: [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'banners', '--check']],
   };
   const cmd = cmds[name];
   if (!cmd) return { ok: false, detail: `không biết kiểm tra tự động "${name}"` };

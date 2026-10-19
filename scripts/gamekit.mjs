@@ -25,11 +25,14 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
   check-ownership [--module id]             Module chỉ sửa trong thư mục được giao
   integrate --wave N [--test "cmd"] [--cleanup]   Merge theo phụ thuộc, test sau mỗi lần
+  banners [--only a,b] [--wide f] [--square f] [--tall f] [--icon f] [--logo f] [--out dir]
+                                            Banner store đủ kích thước chuẩn từ key art + logo (store/art → store/banners)
+  banners --list | --check                  Liệt kê kích thước chuẩn | kiểm bộ banner đã có đủ và đúng kích thước
   precommit                                 (git hook) chặn asset gốc, code decompile, asset chưa nhãn
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'list', 'check']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -61,6 +64,7 @@ const COMMANDS = {
   fanout: () => import('./parallel.mjs').then((m) => m.fanout),
   'check-ownership': () => import('./parallel.mjs').then((m) => m.checkOwnership),
   integrate: () => import('./parallel.mjs').then((m) => m.integrate),
+  banners: () => import('./banners.mjs').then((m) => m.run),
   precommit: () => import('./precommit.mjs').then((m) => m.run),
 };
 

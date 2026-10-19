@@ -1,5 +1,9 @@
 # Changelog
 
+## Chưa phát hành
+- Lệnh `banners` + skill `store-assets` (P5): từ key art (`store/art/wide.png`, tuỳ chọn `square`, `tall`, `icon`) và logo nền trong suốt, tạo bộ banner store 15 kích thước chuẩn (64×64 … 1920×1080, 1280×2560, `512x512_logo`) + `Logo.png` trong `store/banners/`. Cắt cover theo `focus`, logo trên/dưới giữa theo từng kích thước, cảnh báo khi phải phóng to hoặc cắt nhiều; `store/banners.yaml` thêm/sửa/bỏ kích thước. Đọc/ghi PNG không cần thư viện ngoài.
+- `banners --check` kiểm đủ file, đúng kích thước; cổng P5 của template có mục `{auto: banners}`.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.
