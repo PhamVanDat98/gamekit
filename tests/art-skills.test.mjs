@@ -129,3 +129,148 @@ print(json.dumps({'size': im.size, 'colors': len(set(p[:3] for p in im.getdata()
   assert.equal(ga(dir, 'sheet', 'f.png', 'px.png', '--out', 'sheet.png').code, 0);
   assert.equal(ga(dir, 'fit', 'k.png', '--out', 'x.png', '--size', '9').code, 1);
 });
+
+test('gameart gen: runs Codex CLI (no API key), picks the image from $CODEX_HOME/generated_images/<thread>, attaches refs', { skip: (skipPy || process.platform === 'win32') && 'cần python3 + Pillow, không chạy trên Windows' }, () => {
+  const dir = tmpDir();
+  const home = path.join(dir, 'codex-home');
+  fs.mkdirSync(home);
+  const fake = path.join(dir, 'fake-codex');
+  fs.writeFileSync(
+    fake,
+    `#!${spawnSync(PY, ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8' }).stdout.trim()}
+import json, os, sys
+from pathlib import Path
+from PIL import Image
+argv = sys.argv[1:]
+prompt = sys.stdin.read()
+home = Path(os.environ["CODEX_HOME"])
+(home / "call.json").write_text(json.dumps({"argv": argv, "prompt": prompt}))
+if "FAIL" in prompt:
+    print(json.dumps({"type": "thread.started", "thread_id": "t-fail"}))
+    print(json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": "IMAGE_UNAVAILABLE"}}))
+    sys.exit(0)
+print(json.dumps({"type": "thread.started", "thread_id": "t-1"}))
+out = home / "generated_images" / "t-1"
+out.mkdir(parents=True)
+Image.new("RGB", (40, 30), (250, 3, 248)).save(out / "ig_1.png")
+print(json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": str(out / "ig_1.png")}}))
+`,
+  );
+  fs.chmodSync(fake, 0o755);
+  py(dir, `Image.new('RGB', (8, 8)).save('frame.png')`);
+  const env = { ...process.env, CODEX_HOME: home };
+  delete env.OPENAI_API_KEY;
+  const run = (...args) => {
+    const r = spawnSync(PY, ['-I', GA, ...args], { cwd: dir, encoding: 'utf8', env });
+    return { code: r.status, out: `${r.stdout}${r.stderr}` };
+  };
+  let r = run('gen', '--prompt', 'a slime enemy', '--ref', 'frame.png', '--out', 'raw/slime.png', '--codex', fake);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Codex CLI/);
+  assert.equal(py(dir, `print(Image.open('raw/slime.png').size)`), '(40, 30)');
+  const call = JSON.parse(fs.readFileSync(path.join(home, 'call.json'), 'utf8'));
+  assert.equal(call.argv[0], 'exec');
+  assert.equal(call.argv.at(-1), '-');
+  assert.ok(call.argv.includes('--image') && call.argv[call.argv.indexOf('--image') + 1].endsWith('frame.png'));
+  assert.ok(call.argv.includes('features.image_generation=true'));
+  assert.ok(call.argv.includes('features.shell_tool=false'), 'tắt shell: Codex chỉ được tạo ảnh');
+  assert.match(call.prompt, /a slime enemy/);
+  r = run('gen', '--prompt', 'FAIL', '--out', 'raw/x.png', '--codex', fake);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /IMAGE_UNAVAILABLE.*codex login/);
+  r = run('gen', '--prompt', 'x', '--out', 'raw/x.png', '--codex', path.join(dir, 'missing'));
+  assert.equal(r.code, 1);
+});
+
+test('gameart split, grade, compose, compare: assets from one sheet, pulled toward the concept, checked in the scene', { skip: skipPy }, () => {
+  const dir = tmpDir();
+  py(dir, `
+im = Image.new('RGB', (600, 200), (250, 3, 248))
+d = ImageDraw.Draw(im)
+d.ellipse([20, 40, 140, 160], fill=(60, 160, 60))            # slime
+d.rectangle([220, 50, 320, 170], fill=(200, 60, 40))         # crate
+d.ellipse([420, 60, 500, 140], fill=(240, 200, 40))          # coin
+d.ellipse([505, 60, 515, 70], fill=(255, 255, 255))          # sparkle next to the coin (same object)
+im.save('sheet.png')
+# "concept": warm, darker scene; the asset is a cool, bright version of the same thing
+c = Image.new('RGB', (320, 180), (90, 60, 40)); ImageDraw.Draw(c).ellipse([120, 60, 200, 140], fill=(200, 120, 40)); c.save('frame.png')
+a = Image.new('RGBA', (80, 80), (0, 0, 0, 0)); ImageDraw.Draw(a).ellipse([0, 0, 79, 79], fill=(120, 200, 255, 255)); a.save('asset.png')
+Image.new('RGB', (320, 180), (90, 60, 40)).save('bg.png')`);
+  let r = ga(dir, 'split', 'sheet.png', '--out-dir', 'parts', '--names', 'slime,crate,coin', '--index', 'index.png');
+  assert.equal(r.code, 0, r.out);
+  for (const n of ['slime', 'crate', 'coin']) assert.ok(fs.existsSync(path.join(dir, 'parts', `${n}.png`)), n);
+  assert.ok(fs.existsSync(path.join(dir, 'index.png')));
+  assert.equal(py(dir, `print(Image.open('parts/coin.png').size[0] > 90)`), 'True', 'tia lấp lánh sát đồng xu thuộc cùng một vật');
+  r = ga(dir, 'split', 'sheet.png', '--out-dir', 'p2', '--names', 'a,b');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /3 vật nhưng --names có 2 tên/);
+
+  r = ga(dir, 'grade', 'asset.png', '--ref', 'frame.png', '--ref-box', '120,60,80,80', '--out-dir', 'graded', '--strength', '1');
+  assert.equal(r.code, 0, r.out);
+  const [, before, after] = r.out.match(/lệch màu với concept ([\d.]+) → ([\d.]+)/);
+  assert.ok(Number(after) < Number(before) / 2, r.out);
+  assert.equal(py(dir, `print(Image.open('graded/asset.png').getpixel((0, 0))[3])`), '0', 'giữ alpha');
+
+  fs.writeFileSync(path.join(dir, 'layout.json'), JSON.stringify({ size: [320, 180], items: [{ file: 'graded/asset.png', x: 160, y: 140, anchor: 'bottom' }] }));
+  r = ga(dir, 'compose', '--bg', 'bg.png', '--layout', 'layout.json', '--out', 'mock.png');
+  assert.equal(r.code, 0, r.out);
+  r = ga(dir, 'compare', 'frame.png', 'mock.png', '--out', 'cmp.png');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /giống/);
+  assert.ok(fs.existsSync(path.join(dir, 'cmp.png')));
+  r = ga(dir, 'compare', 'frame.png', 'asset.png');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /lệch/);
+});
+
+const VX = path.join(ART, 'voxel-art', 'scripts', 'voxel.py');
+const vx = (cwd, ...args) => {
+  const r = spawnSync(PY, ['-I', VX, ...args], { cwd, encoding: 'utf8' });
+  return { code: r.status, out: `${r.stdout}${r.stderr}` };
+};
+
+test('voxel-art: examples render; directions and frames make strips with feet on one line; .vox export; model errors point at the file', { skip: skipPy }, () => {
+  const dir = tmpDir();
+  for (const f of fs.readdirSync(path.join(ART, 'voxel-art', 'examples'))) {
+    const r = vx(dir, 'render', path.join(ART, 'voxel-art', 'examples', f), '--out', `${f}.png`, '--dirs', '4', '--outline', '#1b1630');
+    assert.equal(r.code, 0, `${f}: ${r.out}`);
+  }
+  fs.writeFileSync(
+    path.join(dir, 'bob.vox.py'),
+    `PALETTE = {"g": "#5fa85b", "k": "#1b1630"}
+SIZE = (8, 8, 10)
+FRAMES = 2
+def build(v, frame=0):
+    v.box(1, 1, 0, 7, 7, 8, "g")
+    v.set(2, 0, 6, "k")
+    if frame:
+        v.shift(dz=-1, where=lambda x, y, z: z >= 5)
+`,
+  );
+  let r = vx(dir, 'render', 'bob.vox.py', '--out', 'bob.png', '--canvas', '56x64');
+  assert.equal(r.code, 0, r.out);
+  const boxes = JSON.parse(py(dir, `
+import json
+im = Image.open('bob.png'); print(json.dumps([im.size, [im.crop((i*56, 0, i*56+56, 64)).getchannel('A').getbbox() for i in range(2)]]))`));
+  assert.deepEqual(boxes[0], [112, 64]);
+  assert.equal(boxes[1][0][3], boxes[1][1][3], 'đáy hai frame thẳng hàng');
+  assert.ok(boxes[1][1][1] > boxes[1][0][1], 'frame 2 nhún xuống');
+  r = vx(dir, 'render', 'bob.vox.py', '--out', 'x.png', '--canvas', '10x10');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /lớn hơn canvas/);
+  r = vx(dir, 'render', 'bob.vox.py', '--out', 'x.png', '--px', '3');
+  assert.match(r.out, /số chẵn/);
+  r = vx(dir, 'export', 'bob.vox.py', '--out', 'bob.vox');
+  assert.equal(r.code, 0, r.out);
+  const vox = fs.readFileSync(path.join(dir, 'bob.vox'));
+  assert.equal(vox.subarray(0, 4).toString(), 'VOX ');
+  assert.equal(vox.readInt32LE(4), 150);
+  assert.ok(vox.includes(Buffer.from('XYZI')) && vox.includes(Buffer.from('RGBA')));
+  fs.writeFileSync(path.join(dir, 'bad.vox.py'), `PALETTE = {"g": "#00ff00"}\nSIZE = (4, 4, 4)\ndef build(v):\n    v.box(0, 0, 0, 2, 2, 2, "q")\n`);
+  r = vx(dir, 'info', 'bad.vox.py');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /màu 'q' không có trong PALETTE/);
+  fs.writeFileSync(path.join(dir, 'boom.vox.py'), `PALETTE = {"g": "#00ff00"}\nSIZE = (4, 4, 4)\ndef build(v):\n    v.box(0, 0, 0, 2, 2, 2, "g")\n    1 / 0\n`);
+  r = vx(dir, 'info', 'boom.vox.py');
+  assert.match(r.out, /boom\.vox\.py:5: ZeroDivisionError/);
+});

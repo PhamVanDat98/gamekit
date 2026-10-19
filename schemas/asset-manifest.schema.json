@@ -17,7 +17,7 @@
           "id": { "type": "string" },
           "path": { "type": "string", "description": "File @1x" },
           "kind": { "enum": ["sprite", "ui", "anim", "background", "tile", "icon", "texture", "model", "audio"] },
-          "make": { "enum": ["vector", "pixel-code", "image-gen", "own", "licensed"], "description": "vector: SVG/CSS (UI nên dùng); pixel-code: pixel art viết bằng code (pxl); image-gen: model tạo ảnh" },
+          "make": { "enum": ["vector", "pixel-code", "voxel-code", "image-gen", "own", "licensed"], "description": "image-gen: Codex image_gen (không API key); pixel-code: pixel art viết bằng code (pxl); voxel-code: voxel viết bằng code (voxel-art); vector: UI CSS/SVG" },
           "width": { "type": "integer", "minimum": 1 },
           "height": { "type": "integer", "minimum": 1 },
           "scales": { "type": "array", "items": { "type": "number" } },

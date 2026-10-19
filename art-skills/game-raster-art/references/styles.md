@@ -19,10 +19,8 @@ Mô tả ảnh mẫu của người dùng bằng 6 mục: **nét viền** (khôn
 - Hợp: RPG, gacha, idle, pet, nhập vai nhẹ. Vật phẩm: viền vàng kim, đá quý phát sáng.
 - Key: `#FF00FF`; tránh khi nhân vật mặc hồng → `#00FF00`.
 
-## pixel-16bit — pixel art
-- Dòng style: `16-bit pixel art game sprite, crisp pixels, limited palette, 1-pixel dark outline, no anti-aliasing, no blur, side view`
-- Hợp: platformer, roguelike, retro arcade. Model vẽ "giả pixel" (lưới không đều): **luôn** chạy `GA pixel … --size <cỡ thật> --colors 16` để ép về lưới và palette.
-- Key: `#FF00FF`.
+## Pixel art và voxel
+Không làm bằng `image_gen`: pixel art dùng skill `pxl-pixel-art` (agent viết code, đúng lưới, đúng palette), voxel dùng skill `voxel-art`. Chỉ khi người dùng muốn model vẽ pixel thì tạo bằng `image_gen` rồi ép lưới bằng `GA pixel … --colors 16`.
 
 ## painted-fantasy — vẽ tay gouache/màu nước
 - Dòng style: `hand-painted fantasy game art, gouache and watercolor texture, soft brush strokes, warm light from top left, storybook feel, clear silhouette`
@@ -49,7 +47,7 @@ Mô tả ảnh mẫu của người dùng bằng 6 mục: **nét viền** (khôn
 - Key: `#FF00FF`; vật đen trên nền hồng tách rất sạch.
 
 ## Giữ đồng nhất cả bộ
-- Một ảnh neo cho cả game; nhân vật đã duyệt làm tham chiếu cho frame và biến thể của nó.
+- Một khung hình concept cho cả game (`art/style/frame.png`), đính kèm làm Image 1 ở mọi lần tạo; nhân vật đã duyệt làm Image 2 cho frame và biến thể của nó.
 - Cùng góc nhìn, cùng hướng sáng (trên-trái), cùng độ dày viền trong mọi prompt.
 - Cùng `--size`/tỉ lệ cho asset cùng loại (`GA fit` nhiều file một lần dùng chung tỉ lệ).
 - Không ghép style: nền painterly với sprite sticker được (khác lớp), nhưng hai nhân vật khác style thì không.

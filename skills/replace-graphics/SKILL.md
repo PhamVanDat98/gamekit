@@ -1,6 +1,6 @@
 ---
 name: replace-graphics
-description: Dùng ở P3 khi làm lại game người khác (third-party) để thay đồ hoạ — chọn cách làm từng asset theo `make` trong asset-manifest.json (vector, pixel-code bằng pxl, image-gen, licensed), giữ một style thống nhất, xuất đúng spec, gắn nhãn provenance và kiểm bằng validate.
+description: Dùng ở P3 khi làm lại game người khác (third-party) để thay đồ hoạ — chọn cách làm từng asset theo `make` trong asset-manifest.json (image-gen qua Codex không API key, pixel-code, voxel-code, vector cho UI, licensed), rút asset từ khung hình concept để ghép vào game vẫn giống concept, xuất đúng spec, gắn nhãn provenance và kiểm bằng validate.
 ---
 
 # Thay đồ hoạ (P3, `third-party`)
@@ -8,41 +8,36 @@ description: Dùng ở P3 khi làm lại game người khác (third-party) để
 Đầu vào: style người dùng đã chọn (ghi trong `DECISIONS.md`) và `asset-manifest.json` (mỗi asset có `kind`, kích thước, `frames`, `alpha`, `brief`). Đầu ra: file đúng `path` của spec, nhãn trong `provenance.json`, `gamekit validate` sạch. Asset gốc trong `reference/` chỉ để xem bố cục và kích thước, không tô lại, không trace.
 
 ## 1. Chọn cách làm (`make`)
-| `make` | Hợp với | Công cụ | Ghi chú |
-| --- | --- | --- | --- |
-| `vector` | UI: nút, popup, thanh, icon, bộ icon; logo, icon portal; style phẳng | CSS, SVG viết tay; logo/icon: skill `illustrate` (xem [công cụ](references/art-tools.md)) | Mặc định cho UI. Sắc ở mọi cỡ, không cần ảnh. Kiểm icon ở `minDisplayPx` |
-| `pixel-code` | Style pixel art: nhân vật, item, tile, anim, sprite sheet | [pxl](references/pxl.md) | Agent viết code `.px.js`, cùng file ra cùng ảnh, không cần API key. Claude Code và Codex đều dùng được |
-| `image-gen` | Nhân vật, kẻ địch, vật phẩm, nền, hiệu ứng theo mọi style ảnh: cartoon, anime, vẽ tay, 3D render, pixel | Codex: skill **`game-raster-art`** của GameKit (`art-skills/`, dùng `image_gen` có sẵn + `gameart.py` hậu xử lý). Claude Code: MCP của dịch vụ người dùng có (xem [công cụ](references/art-tools.md)) | Cần hậu xử lý (mục 3). Kiểm điều khoản thương mại của dịch vụ |
-| `licensed` | Gói asset mua/miễn phí có giấy phép | — | `provenance add … --label licensed --license …` |
+Hai luật (chi tiết và rà soát công cụ: [công cụ](references/art-tools.md)): **không dùng API key** — ảnh tạo bằng `image_gen` của Codex (ngoài Codex: Codex CLI); **agent chỉ tự vẽ bằng code khi là pixel art hoặc voxel**.
 
-Một game nên dùng **một** cách chính cho đồ hoạ trong màn chơi để style đồng nhất; UI có thể là `vector` bên cạnh. Style pixel art → `pixel-code` cho mọi sprite/tile/anim. Ghi lựa chọn vào `DECISIONS.md`. Khi đưa người dùng chọn style, nêu cách làm đi kèm (miễn phí/trả phí, cần cài gì) — danh sách ở [công cụ](references/art-tools.md).
+| `make` | Hợp với | Công cụ |
+| --- | --- | --- |
+| `image-gen` | Mọi style ảnh: cartoon, sticker, chibi anime, vẽ tay, 3D, phẳng, neon… — nhân vật, kẻ địch, vật phẩm, icon, logo, nền, hiệu ứng | skill **`game-raster-art`** (`art-skills/`) |
+| `pixel-code` | Pixel art | [pxl](references/pxl.md) |
+| `voxel-code` | Voxel (khối lập phương, isometric) | skill **`voxel-art`** (`art-skills/`) |
+| `vector` | UI dựng trong DOM bằng CSS/SVG đơn giản (nút, khung, thanh) | code UI |
+| `licensed` | Gói asset có giấy phép | `provenance add … --label licensed --license …` |
+
+Một game dùng **một** cách chính cho đồ hoạ màn chơi; UI CSS đi kèm được. Ghi lựa chọn vào `DECISIONS.md`.
 
 ### Người dùng đưa ảnh mẫu style
-Mỗi skill/công cụ chỉ vẽ được style của nó; chọn sai công cụ thì ảnh ra không giống mẫu dù prompt kỹ. Nhìn ảnh mẫu, gọi tên đặc điểm (viền, cách tô, chất liệu, palette) rồi chọn:
+Pixel art → `pixel-code`; voxel → `voxel-code`; mọi ảnh mẫu khác → `image-gen`: mô tả ảnh mẫu bằng 6 mục trong `styles.md` của `game-raster-art`, chọn dòng style gần nhất. Ảnh mẫu lấy từ game người khác chỉ để học style (viền, palette, tỉ lệ); không chép nhân vật, bố cục hay chi tiết nhận diện, và không đính kèm nó vào `image_gen`.
 
-| Ảnh mẫu trông như | Cách làm |
-| --- | --- |
-| Cartoon, sticker, doodle, chibi anime, vẽ tay, 3D đất sét, neon… | `image-gen`: `game-raster-art` — ảnh mẫu thành ảnh neo style, chọn dòng style gần nhất trong `styles.md` của skill |
-| Pixel art | `pixel-code` (pxl) |
-| Nét nguệch ngoạc, tô gạch chéo kiểu bút sáp | `vector` bằng skill claudedraw — chỉ ra đúng style đó |
+## 2. Concept trước, asset rút từ concept
+1. Tạo **khung hình concept** — ảnh chụp màn hình giả của chính game, đúng tỉ lệ màn hình, nhân vật/kẻ địch/vật phẩm/HUD đúng cỡ hiển thị (pixel/voxel: một cảnh dựng từ asset thật). Người dùng chọn → `art/style/frame.png`.
+2. Asset rút từ khung hình đó (`image-gen`: đính kèm frame làm Image 1 ở mọi lần tạo, nền sửa từ chính frame); không vẽ lại từ mô tả chữ — vẽ lại là nguồn chính của chuyện "concept một kiểu, ghép vào một kiểu".
+3. Làm 3–5 asset tiêu biểu trước → **ghép thử vào cảnh** bằng `gameart.py compose` rồi `gameart.py compare` với frame → người dùng xem ảnh so sánh → sửa tới khi khớp, rồi mới làm phần còn lại.
+4. Mỗi asset đọc `brief` và tín hiệu gameplay nó mang (nguy hiểm, nhặt được, trạng thái): phải nhận ra được khi tắt tiếng và ở `minDisplayPx`.
 
-Ảnh mẫu lấy từ game người khác chỉ để học style (viền, palette, tỉ lệ); không chép nhân vật, bố cục hay chi tiết nhận diện.
-
-## 2. Làm theo đợt, duyệt sớm
-1. Làm 3–5 asset tiêu biểu trước (nhân vật chính, một kẻ địch, một tile/nền, một nút) → cho người dùng xem cạnh nhau trên nền game → sửa style tới khi họ đồng ý.
-2. Chốt palette/khung hình chung từ đợt đầu (pxl: `pal(...)`; image-gen: prompt gốc + ảnh tham chiếu của chính asset đã duyệt) rồi mới làm phần còn lại.
-3. Mỗi asset đọc `brief` và tín hiệu gameplay nó mang (nguy hiểm, nhặt được, trạng thái): phải nhận ra được khi tắt tiếng và ở `minDisplayPx`.
-
-## 3. Hậu xử lý cho `image-gen`
-- Tách nền thành trong suốt khi spec có `alpha: true`: tạo ảnh trên nền một màu phẳng không có trong vật (vd `#FF00FF`; vật có màu hồng thì dùng `#00FF00`), rồi xoá màu đó (`gameart.py key` của `game-raster-art`). Soi viền xem còn ám màu nền không. Cắt sát rồi đặt vào canvas đúng `width × height` (căn theo `pivot`).
-- Anim: tạo **cả strip trong một lần** từ một frame đã duyệt (tạo từng frame riêng sẽ lệch dáng); chuẩn hoá cùng tỉ lệ, cùng điểm neo (thường giữa-đáy); ghép thành strip ngang `frames.width × frames.count`. `gameart.py anim` cắt và chuẩn hoá đúng cách này.
-- Style pixel từ model tạo ảnh: thu nhỏ về đúng lưới, giảm màu về palette đã chốt. Nếu cần sửa nhiều, làm lại bằng `pixel-code`.
+## 3. Hậu xử lý
+- `image-gen`: theo `game-raster-art` — `key` (tách nền), `fit` (đúng cỡ, cùng tỉ lệ, neo giữa-đáy), `anim` (strip một lần gọi), `split` (tấm nhiều asset), `grade` (khớp màu với frame).
+- `pixel-code`/`voxel-code`: xuất đúng cỡ từ công cụ, không co giãn ảnh.
 - Không có chữ trong ảnh (`noText`): chữ đi qua `t()`.
 
 ## 4. Đưa vào game
-- File theo `path` của spec. Nguồn để dựng lại (file `.px.js`, prompt) commit trong `art/`; ảnh nháp, preview để trong `.gamekit/local/`.
+- File theo `path` của spec. Nguồn để dựng lại (`.px.js`, `.vox.py`, prompt, `art/style/frame.png`) commit trong `art/`; ảnh nháp, preview để trong `.gamekit/local/`.
 - `gamekit provenance add <file|thư mục> --label generated --source <file nguồn hoặc tên công cụ>`; gói mua dùng `licensed`.
-- `view/` vẽ đúng tỉ lệ; pixel art phóng to theo số nguyên, tắt làm mịn (xem [pxl](references/pxl.md)).
+- `view/` vẽ đúng tỉ lệ; pixel art và voxel phóng to theo số nguyên, tắt làm mịn (xem [pxl](references/pxl.md)).
 
 ## 5. Kết thúc
 `gamekit validate` (kích thước, alpha khớp spec) · `npm test` · chạy `npm run dev` xem từng màn · không còn file nhãn `reference` trong `assets/`, `public/`. Báo người dùng để họ tick mục "(bạn)" ở `gates/P3.md`.

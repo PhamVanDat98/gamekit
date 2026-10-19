@@ -1,0 +1,4 @@
+interface:
+  display_name: "Voxel Art"
+  short_description: "Dựng model voxel bằng code, render sprite isometric và xuất .vox"
+  default_prompt: "Dựng nhân vật chính voxel cao 16 khối, render 4 hướng 64x80 có viền và cho tôi xem sheet."
