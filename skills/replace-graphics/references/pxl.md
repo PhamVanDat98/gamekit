@@ -4,7 +4,8 @@
 
 ## Cài (một lần trên máy, không vào repo game)
 - Claude Code: `git clone https://github.com/crsolver/claude-pxl.git ~/.claude/skills/pxl-pixel-art` → có skill `pxl-pixel-art`, đọc nó để biết cú pháp đầy đủ (`SKILL.md`, `reference.md`).
-- Codex / agent khác: clone về một chỗ cố định, đọc `SKILL.md` của pxl. Lệnh: `node <pxl>/bin/pxl.js …`.
+- Codex: `git clone https://github.com/crsolver/claude-pxl.git ~/.codex/skills/pxl-pixel-art` (thư mục skill của Codex là `$CODEX_HOME/skills`), mở session mới → có skill `pxl-pixel-art`.
+- Agent khác: clone về một chỗ cố định, đọc `SKILL.md` của pxl. Lệnh: `node <pxl>/bin/pxl.js …`.
 - Không clone: `npx github:crsolver/claude-pxl build <file>`.
 
 Dưới đây `PXL` = `node <pxl>/bin/pxl.js`.

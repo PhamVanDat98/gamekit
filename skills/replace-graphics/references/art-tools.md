@@ -2,6 +2,17 @@
 
 Chỉ là gợi ý; dùng cái người dùng đã có hoặc đồng ý trả phí. Mọi asset tạo ra gắn nhãn `generated`, `--source` ghi tên công cụ (và file nguồn nếu có). Dịch vụ trả phí: kiểm điều khoản dùng thương mại trước khi phát hành.
 
+## `vector`: SVG/CSS viết tay, không cần API
+| Công cụ | Làm gì | Cần | Agent |
+| --- | --- | --- | --- |
+| [claude-illustrate-skill](https://github.com/code-katz/claude-illustrate-skill) (MIT), skill `illustrate` | Logo, icon, bộ icon UI, favicon viết thẳng bằng SVG; 3–5 concept khác nhau; render cả dãy cỡ (16→512) trên nền sáng/tối thành một contact sheet, tự xem rồi sửa (tối đa 3 lượt); bộ icon được duyệt chung một sheet để đồng bộ | Chromium hoặc `rsvg-convert` để render (Playwright Chromium dùng được). Ảnh raster mới cần backend (Recraft, Hugging Face…) | Claude Code: `git clone https://github.com/code-katz/claude-illustrate-skill.git ~/.claude/skills/illustrate`. Codex: clone vào `~/.codex/skills/illustrate` |
+
+Dùng `illustrate` trong game GameKit:
+- Hợp với: icon UI (`kind: icon`/`ui`), logo game, icon portal `public/Icons/web.png`, ảnh cửa hàng. Brief lấy từ `asset-manifest.json`: `minDisplayPx` là cỡ nhỏ nhất phải đọc được, palette hex từ style đã chốt.
+- File nguồn `.svg` và contact sheet để ngoài thư mục phát hành (`art/` commit, sheet trong `.gamekit/local/`); chỉ đưa vào `assets/`/`public/` file game dùng (SVG hoặc PNG đúng cỡ spec).
+- Skill tự ghi nguồn gốc vào `assets/MANIFEST.md`: trong game GameKit **không** tạo file đó (mọi file trong `assets/` phải có nhãn). Ghi bằng `gamekit provenance add <file> --label generated --source "illustrate: SVG viết tay"` (ảnh từ backend: ghi tên model và giấy phép vào `--source`/`--license`).
+- Không in chữ vào icon gameplay (`noText`); wordmark tên game chỉ dùng ở logo, và với game `third-party` không dùng tên gốc.
+
 ## `pixel-code`: art bằng code, không cần API
 | Công cụ | Làm gì | Cần | Agent |
 | --- | --- | --- | --- |
@@ -19,6 +30,21 @@ Chỉ là gợi ý; dùng cái người dùng đã có hoặc đồng ý trả p
 | Scenario MCP (`https://mcp.scenario.com/mcp`) | Nhiều model, có model style tự train | Tài khoản trả phí | MCP HTTP |
 | [nano-banana-mcp](https://github.com/conechoai/nano-banana-mcp) (MIT) | Tạo/sửa ảnh bằng Gemini Flash Image | Gemini API key | MCP |
 | [fal-mcp-server](https://github.com/raveenb/fal-mcp-server) (MIT, cộng đồng) | Flux/SDXL, img2img, `remove_background`, upscale | `FAL_KEY` | MCP |
+
+## Skill có sẵn hoặc chính thức cho Codex
+Codex đọc skill trong `$CODEX_HOME/skills` (mặc định `~/.codex/skills`); plugin chính thức cài từ `/plugins` trong Codex (marketplace "Codex official", nguồn [openai/plugins](https://github.com/openai/plugins)). Cài xong mở session mới.
+
+| Skill | Nguồn | Dùng cho | Ghi chú |
+| --- | --- | --- | --- |
+| `imagegen` | Có sẵn (skill hệ thống) | Tạo/sửa ảnh, nền trong suốt, biến thể từ ảnh tham chiếu | Công cụ `image_gen` không cần API key. Ảnh nằm ở `$CODEX_HOME/generated_images/…`, chép sang `.gamekit/local/` rồi hậu xử lý |
+| `sprite-pipeline` | Plugin **Game Studio** (OpenAI, MIT) | Anim 2D: từ một frame đã duyệt → tạo cả strip một lần qua `imagegen` → chuẩn hoá cùng tỉ lệ, cùng điểm neo | Script Python cần Pillow. `normalize_sprite_strip.py` ra từng frame riêng: ghép lại thành strip ngang theo `frames` của spec |
+| `game-ui-frontend` | Game Studio | HUD, menu, overlay không che vùng chơi | Hợp với `make: vector` |
+| `game-playtest` | Game Studio | Chạy game trên trình duyệt, chụp màn hình, soát HUD | Duyệt art trong game thật |
+| `screenshot`, `playwright` | Curated (`$skill-installer screenshot`) | Chụp màn hình để so style giữa các màn | |
+| `hatch-pet` | Curated | Đóng atlas pet của Codex | Không dùng cho asset game; tham khảo cách giữ một nhân vật đồng nhất qua nhiều trạng thái |
+| `pxl-pixel-art` | `git clone https://github.com/crsolver/claude-pxl.git ~/.codex/skills/pxl-pixel-art` | `make: pixel-code` | Xem [pxl](pxl.md) |
+| `illustrate` | `git clone https://github.com/code-katz/claude-illustrate-skill.git ~/.codex/skills/illustrate` | `make: vector`: logo, icon, bộ icon UI | Viết cho Claude Code nhưng chỉ là `SKILL.md` + file tham khảo, Codex đọc được; cần Chromium để render |
+| agent-sprite-forge | `git clone` repo → `pip install -r requirements.txt` → `python tools/install_skills.py --apply --host codex` | Sprite, map, tile; dùng `image_gen` của Codex khi không có API key | Asset từ model theo điều khoản của nhà cung cấp, không theo MIT |
 
 Không hợp làm asset game: skill `algorithmic-art`, `canvas-design` của [anthropics/skills](https://github.com/anthropics/skills) (hướng tranh/poster, không có nền trong suốt hay sheet).
 
