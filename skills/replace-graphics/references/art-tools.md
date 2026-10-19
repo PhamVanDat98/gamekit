@@ -5,11 +5,12 @@ Chỉ là gợi ý; dùng cái người dùng đã có hoặc đồng ý trả p
 ## `vector`: SVG/CSS viết tay, không cần API
 | Công cụ | Làm gì | Cần | Agent |
 | --- | --- | --- | --- |
+| **`svg-game-art`** (của GameKit, `art-skills/`) | Asset game bằng SVG theo 5 style (`doodle`, `sticker`, `flat`, `neon`, `paper`): lint palette/nét, render PNG trong suốt đúng cỡ, strip anim giữ điểm neo, contact sheet | Node ≥ 20, Chrome/Chromium/Edge | Codex và Claude Code: chép `art-skills/svg-game-art` vào `~/.codex/skills/` hoặc `~/.claude/skills/`. Xem [cách dùng](vector-cartoon.md) |
 | [claude-illustrate-skill](https://github.com/code-katz/claude-illustrate-skill) (MIT), skill `illustrate` | Logo, icon, bộ icon UI, favicon viết thẳng bằng SVG; 3–5 concept khác nhau; render cả dãy cỡ (16→512) trên nền sáng/tối thành một contact sheet, tự xem rồi sửa (tối đa 3 lượt); bộ icon được duyệt chung một sheet để đồng bộ | Chromium hoặc `rsvg-convert` để render (Playwright Chromium dùng được). Ảnh raster mới cần backend (Recraft, Hugging Face…) | Claude Code: `git clone https://github.com/code-katz/claude-illustrate-skill.git ~/.claude/skills/illustrate`. Codex: clone vào `~/.codex/skills/illustrate` |
 
 | [claudedraw](https://github.com/Griffin2/claudedraw) (MIT), skill `draw` | Agent viết SVG đơn giản, `draw.py` (Python thuần) biến thành **một style cố định**: tô gạch chéo 45° kiểu bút sáp, viền run tay, hạt nhiễu, 21 màu cố định, tối đa 15 mảng | Python 3 | Claude Code: `/plugin marketplace add Griffin2/claudedraw` → `/plugin install draw@claudedraw`. Codex: chép `draw/skills/draw` vào `~/.codex/skills/draw` |
 
-claudedraw không vẽ được cartoon phẳng viền đen hay nền vẽ tay: renderer luôn thay mảng tô bằng nét gạch chéo. Muốn kiểu doodle phẳng: [vector-cartoon](vector-cartoon.md). Viền run tay của nó dùng riêng được (mảng không gắn class giữ phẳng, viền gắn `class="stroke-sil"` + `stroke="…"`) nhưng trái luật của skill; chỉ thử khi người dùng muốn nét run.
+claudedraw không vẽ được cartoon phẳng viền đen hay nền vẽ tay: renderer luôn thay mảng tô bằng nét gạch chéo. Muốn kiểu doodle phẳng: `svg-game-art` style `doodle`. Viền run tay của nó dùng riêng được (mảng không gắn class giữ phẳng, viền gắn `class="stroke-sil"` + `stroke="…"`) nhưng trái luật của skill; chỉ thử khi người dùng muốn nét run.
 
 Dùng `illustrate` trong game GameKit:
 - Hợp với: icon UI (`kind: icon`/`ui`), logo game, icon portal `public/Icons/web.png`, ảnh cửa hàng. Brief lấy từ `asset-manifest.json`: `minDisplayPx` là cỡ nhỏ nhất phải đọc được, palette hex từ style đã chốt.
@@ -46,6 +47,7 @@ Codex đọc skill trong `$CODEX_HOME/skills` (mặc định `~/.codex/skills`);
 | `game-playtest` | Game Studio | Chạy game trên trình duyệt, chụp màn hình, soát HUD | Duyệt art trong game thật |
 | `screenshot`, `playwright` | Curated (`$skill-installer screenshot`) | Chụp màn hình để so style giữa các màn | |
 | `hatch-pet` | Curated | Đóng atlas pet của Codex | Không dùng cho asset game; tham khảo cách giữ một nhân vật đồng nhất qua nhiều trạng thái |
+| `svg-game-art` | GameKit: `cp -r art-skills/svg-game-art ~/.codex/skills/` | `make: vector`: nhân vật, kẻ địch, đạo cụ theo 5 style game | Gọi `$svg-game-art`; xem [cách dùng](vector-cartoon.md) |
 | `pxl-pixel-art` | `git clone https://github.com/crsolver/claude-pxl.git ~/.codex/skills/pxl-pixel-art` | `make: pixel-code` | Xem [pxl](pxl.md) |
 | `illustrate` | `git clone https://github.com/code-katz/claude-illustrate-skill.git ~/.codex/skills/illustrate` | `make: vector`: logo, icon, bộ icon UI | Viết cho Claude Code nhưng chỉ là `SKILL.md` + file tham khảo, Codex đọc được; cần Chromium để render |
 | `transparent-visual-assets` | [codex-visual-asset-skills](https://github.com/DwDestiny/codex-visual-asset-skills) (MIT): `npx skills add DwDestiny/codex-visual-asset-skills --skill '*' -g -a codex -y` | Tách nền: tạo ảnh trên nền `#FF00FF` qua `imagegen`, script xoá màu nền ra PNG trong suốt + báo cáo | Cần Pillow. Đã thử: nền trong suốt sạch, viền tối có thể ám màu nền một chút; tăng `--feather-threshold` hoặc đổi màu nền |

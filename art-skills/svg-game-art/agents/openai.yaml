@@ -1,0 +1,4 @@
+interface:
+  display_name: "SVG Game Art"
+  short_description: "Vẽ asset game 2D bằng SVG theo style có sẵn, xuất PNG trong suốt và strip anim"
+  default_prompt: "Vẽ asset game theo style doodle: nhân vật chính 96x96 và strip idle 3 frame, kiểm style, xem contact sheet rồi xuất PNG."

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" stroke-linejoin="round" stroke-linecap="round">
+  <defs>
+    <!-- hình khối không đặt stroke: hai lần <use> bên dưới vẽ viền trắng rồi viền tối -->
+    <g id="body">
+      <path fill="#b8c1cc" d="M28 54 L9 59 L28 66 Z"/>
+      <path fill="#b8c1cc" d="M50 26 L55 6 L62 25 Z"/>
+      <path fill="#7d8896" d="M80 40 L96 37 L80 50 Z"/>
+      <path fill="#7d8896" d="M44 84 L47 98 L56 84 Z"/>
+      <path fill="#f07a7a" d="M27 36 Q27 30 33 30 L66 30 Q72 30 72 36 L72 79 Q72 85 66 85 L33 85 Q27 85 27 79 Z"/>
+      <path fill="#f07a7a" d="M31 30 L41 20 L80 20 L71 31 Z"/>
+      <path fill="#c4545e" d="M71 31 L80 20 Q82 19 82 22 L82 68 Q82 71 80 73 L72 82 Z"/>
+    </g>
+  </defs>
+  <use href="#body" stroke="#ffffff" stroke-width="7"/>
+  <use href="#body" stroke="#3a2a33" stroke-width="2.6"/>
+  <g stroke="#3a2a33" fill="none" stroke-width="1.5">
+    <path d="M36 50 L44 53 M63 50 L55 53"/>
+    <ellipse cx="42" cy="59" rx="2.2" ry="3" fill="#3a2a33"/>
+    <ellipse cx="57" cy="59" rx="2.2" ry="3" fill="#3a2a33"/>
+    <path d="M42 73 Q49.5 66 57 73"/>
+    <path d="M32 40 Q34 36 38 36" stroke="#ffffff"/>
+  </g>
+</svg>

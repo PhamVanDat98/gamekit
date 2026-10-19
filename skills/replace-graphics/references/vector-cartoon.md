@@ -1,26 +1,21 @@
-# Cartoon phẳng viền đen bằng SVG (`make: vector`)
+# Nhân vật, đạo cụ bằng SVG (`make: vector`)
 
-Style "doodle": mảng màu phẳng, viền đen dày đều, góc bo tròn, mắt to, không đổ bóng mềm. Agent viết thẳng SVG ra được, không cần model tạo ảnh hay API key, sửa từng chi tiết được.
+Dùng skill **`svg-game-art`** của GameKit (`art-skills/svg-game-art/`, cài theo `art-skills/README.md` cho Codex hoặc Claude Code). Skill có 5 style hợp với game, mỗi style có palette và độ dày nét cố định để cả bộ asset đồng bộ:
 
-## Quy tắc style (chép vào `DECISIONS.md` khi người dùng chọn)
-- Mảng màu: `fill` phẳng, không gradient, không blur. Mỗi vật 1 màu chính + tối đa 1 màu sáng/tối (vd má, bụng).
-- Viền: `stroke` gần đen (vd `#151515`), `stroke-linejoin="round"`, `stroke-linecap="round"`, độ dày **cùng một giá trị cho cả bộ** tính theo cỡ hiển thị (khoảng 3–4% cạnh asset; chi tiết bên trong mảnh hơn khoảng 60%).
-- Hình: đường cong (`C`/`Q`), tránh cạnh thẳng tuyệt đối; vật hơi lệch, không đối xứng hoàn toàn cho tự nhiên.
-- Palette: 8–12 màu tươi, ghi hex vào `DECISIONS.md`; mọi asset dùng đúng các hex đó.
-- Mặt: mắt trắng + đồng tử đen, miệng mảng tối + lưỡi hồng/răng trắng; biểu cảm rõ ở `minDisplayPx`.
+| Style | Hợp với |
+| --- | --- |
+| `doodle` | Cartoon phẳng viền đen dày: casual, party, trẻ em |
+| `sticker` | Tô 2 tông + viền trắng kiểu sticker: platformer, puzzle, casual mobile |
+| `flat` | Khối hình học không viền: hypercasual, idle |
+| `neon` | Nét phát sáng trên nền tối: shooter, arcade |
+| `paper` | Giấy cắt chồng lớp: puzzle, cốt truyện, giáo dục |
 
-## Ra PNG đúng spec
-Game dùng SVG trực tiếp được (UI, DOM). Cần PNG cho canvas/atlas: render bằng Chromium (Playwright có sẵn ở `/opt/pw-browsers` hoặc `npx playwright`), nền trong suốt, đúng `width × height`:
+Lệnh (`ART` = `node <svg-game-art>/scripts/svgart.mjs`):
+- `ART lint art/hero.svg --style doodle` — kiểm palette, nét, phần tử cấm.
+- `ART sheet art/*.svg --out .gamekit/local/sheet.png` — xem cả bộ ở 32/64/128 px, nền sáng và tối.
+- `ART render art/hero.svg --out assets/gfx/hero.png --size 96x96` — PNG trong suốt đúng `width × height` của spec.
+- Anim: `ART render art/hero-idle-0.svg art/hero-idle-1.svg art/hero-idle-2.svg --out assets/gfx/hero-idle.png --size 64x64` — strip ngang khớp `frames`, giữ điểm neo.
 
-```bash
-printf '<html><body style="margin:0;background:transparent"><img src="hero.svg" style="width:96px;height:96px;display:block"></body></html>' > .gamekit/local/r.html
-chrome --headless --no-sandbox --hide-scrollbars --default-background-color=00000000 \
-  --window-size=96,96 --screenshot=assets/gfx/hero.png "file://$PWD/.gamekit/local/r.html"
-```
+SVG nguồn commit trong `art/`; `gamekit provenance add <png> --label generated --source art/<tên>.svg`.
 
-- Bọc SVG trong HTML và đặt cỡ bằng CSS; chụp thẳng file `.svg` có `width`/`height` sẽ bị cắt chứ không co.
-- Anim: mỗi frame một SVG (cùng `viewBox`, cùng điểm đặt chân), render từng frame rồi ghép strip ngang theo `frames`.
-- SVG nguồn commit trong `art/`; `provenance add … --label generated --source art/hero.svg`.
-
-## Khi nào không hợp
-Nền vẽ tay có chất liệu (mây loang, màu nước, ánh sáng mềm), nhân vật tô bóng nhiều lớp: dùng `image-gen` với ảnh mẫu style, rồi tách nền.
+Không hợp: nền vẽ tay có chất liệu (mây loang, màu nước, ánh sáng mềm), nhân vật tô bóng nhiều lớp — dùng `image-gen` với ảnh mẫu style, rồi tách nền.

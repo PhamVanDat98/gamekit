@@ -1,0 +1,13 @@
+{
+  "name": "neon",
+  "title": "Neon arcade",
+  "fits": "shooter, arcade, không gian, rhythm; nét sáng phát quang trên nền tối",
+  "viewBox": "0 0 100 100",
+  "ink": "#ffffff",
+  "colors": {
+    "void": "#0b0820", "deep": "#1a1438", "cyan": "#00f0ff", "magenta": "#ff2bd6",
+    "yellow": "#fff04a", "green": "#39ff14", "orange": "#ff7a1a", "violet": "#9d4dff"
+  },
+  "stroke": { "line": 3, "core": 1.2 },
+  "allow": { "filter": ["feGaussianBlur", "feMerge", "feMergeNode"] }
+}

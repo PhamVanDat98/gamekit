@@ -1,0 +1,12 @@
+{
+  "name": "paper",
+  "title": "Paper cut",
+  "fits": "puzzle, cốt truyện, trẻ em, giáo dục; lớp giấy cắt chồng nhau, bóng đổ lệch, không viền",
+  "viewBox": "0 0 100 100",
+  "colors": {
+    "paper": "#fbf4e6", "kraft": "#e9d7b7", "peach": "#f4b9a5", "coral": "#e98a7a", "sage": "#a8d5ba",
+    "teal": "#6fb7a8", "butter": "#f9d77e", "sky": "#9bb7e0", "indigo": "#5d6d9e", "plum": "#8e5d7f",
+    "shadow": "#2e2a3a"
+  },
+  "allow": { "opacity": true }
+}

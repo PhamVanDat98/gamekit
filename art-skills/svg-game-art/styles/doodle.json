@@ -1,0 +1,15 @@
+{
+  "name": "doodle",
+  "title": "Doodle cartoon",
+  "fits": "casual, party, trẻ em, quái vật vui nhộn; mảng phẳng + viền đen dày",
+  "viewBox": "0 0 100 100",
+  "ink": "#151515",
+  "colors": {
+    "white": "#ffffff", "salmon": "#f08a6c", "coral": "#ef6a5a", "red": "#e8432e", "orange": "#f5a04a",
+    "mustard": "#e6b54a", "yellow": "#f7e77a", "lime": "#c9e39a", "mint": "#7fe3c9", "teal": "#3e9fb0",
+    "sky": "#a9d8f0", "blue": "#3f7fd6", "purple": "#5b2d82", "pink": "#f2a7c6", "magenta": "#e0197a",
+    "maroon": "#8b3a3a", "tongue": "#f06c93", "stone": "#d6d2bf", "mauve": "#9c7b7b"
+  },
+  "stroke": { "outline": 3.2, "inner": 2, "detail": 1.2 },
+  "allow": {}
+}
