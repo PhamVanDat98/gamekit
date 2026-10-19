@@ -21,7 +21,7 @@ Lệnh:
   rig    <rig.json> --anim idle|walk|run|jump|attack|hit|<keys.json> --frames N --size WxH --out <png>
                                                   animation cắt rời: bộ phận (đầu, thân, tay, chân) quay quanh khớp
   guide  --frames N --cell WxH --out <png>         ảnh khung bố cục đính kèm khi tạo dải frame bằng image_gen
-  pose   --anim walk|run|idle|jump|attack|hit|<keys.json> --frames N --cell WxH --out <png>
+  pose   --anim walk|run|idle|jump|attack|hit --frames N --cell WxH --out <png>
                                                   dải hình que đúng chu kỳ chuyển động — ảnh tư thế cho Codex vẽ theo
   canvas --seed <sprite> --frames N --cell WxH --out <png>  ảnh để Codex SỬA: frame đã duyệt nằm sẵn ở ô 1
   replace <strip.png> --frames N --frame K --with <ảnh> --out <png>  thay một frame hỏng, cùng cỡ và đường chân
@@ -714,8 +714,12 @@ def _inv(m):
 PART_PIVOT = {"head": (0.5, 0.9), "body": (0.5, 0.95), "tail": (0.85, 0.5), "weapon": (0.2, 0.8)}
 LIMB_PIVOT = (0.5, 0.1)
 PART_AT = {"head": (0.5, 0.12), "arm_front": (0.55, 0.28), "arm_back": (0.45, 0.28), "leg_front": (0.6, 0.92),
-           "leg_back": (0.4, 0.92), "tail": (0.12, 0.75), "weapon": (0.5, 0.9)}
-PART_Z = {"arm_back": 0, "leg_back": 1, "tail": 1, "body": 2, "leg_front": 3, "head": 4, "arm_front": 5, "weapon": 6}
+           "leg_back": (0.4, 0.92), "tail": (0.12, 0.75), "weapon": (0.5, 0.9),
+           "shin_front": (0.5, 0.92), "shin_back": (0.5, 0.92), "forearm_front": (0.5, 0.92), "forearm_back": (0.5, 0.92)}
+PART_Z = {"arm_back": 0, "forearm_back": 0, "leg_back": 1, "shin_back": 1, "tail": 1, "body": 2, "leg_front": 3, "shin_front": 3,
+          "head": 4, "arm_front": 5, "forearm_front": 5, "weapon": 6}
+# second bones hang from the end of the first: shin_* under leg_*, forearm_* under arm_*
+PART_PARENT = {"shin_front": "leg_front", "shin_back": "leg_back", "forearm_front": "arm_front", "forearm_back": "arm_back"}
 
 
 def load_rig(path: str) -> dict:
@@ -735,7 +739,7 @@ def load_rig(path: str) -> dict:
             img = img.crop(bb)
         fx, fy = PART_PIVOT.get(name, LIMB_PIVOT)
         parts[name] = {"img": img, "pivot": tuple(ps.get("pivot") or (img.width * fx, img.height * fy)),
-                       "parent": ps.get("parent", None if name == "body" else "body"),
+                       "parent": ps.get("parent", None if name == "body" else PART_PARENT.get(name, "body")),
                        "z": ps.get("z", PART_Z.get(name, 3)), "at": ps.get("at")}
     if "body" not in parts and len(parts) != 1:
         raise UserError("rig cần một phần tên 'body' (gốc), hoặc chỉ một phần")
@@ -915,7 +919,7 @@ GROUND = 0.92  # ground line at 92% of a slot's height, in guide, pose and canva
 
 def slot_scale(n: int, cell) -> int:
     """Upscale so a strip is ~1536 px wide: big enough for the image model, same for guide/pose/canvas."""
-    return max(1, 1536 // (cell[0] * n))
+    return max(1, round(1536 / (cell[0] * n)))
 
 
 def layout_guide(n: int, cell, scale: int = 0, key=(255, 0, 255)) -> Image.Image:
@@ -937,100 +941,284 @@ def layout_guide(n: int, cell, scale: int = 0, key=(255, 0, 255)) -> Image.Image
     return img
 
 
-# Pose strip colors: what the model needs to tell apart — front limbs warm, back limbs cool.
-POSE_COLORS = {"head": (150, 150, 160), "body": (120, 120, 132), "arm_front": (235, 110, 40), "leg_front": (220, 60, 50),
-               "arm_back": (60, 130, 230), "leg_back": (40, 80, 190), "tail": (150, 110, 200), "weapon": (90, 90, 90)}
+# ---------- chuyển động nhân vật: dáng đi IK + tư thế chính ----------
+# Angles: 0 = limb hanging straight down, positive = swung backward (clockwise on screen, character faces
+# right), negative = forward. Body lean positive = top tipped forward. Lengths in any unit (px for a rig).
+SKELETON_ANIMS = ("idle", "walk", "run", "jump", "attack", "hit")
+PROPORTIONS = {
+    "normal": {"thigh": 1.0, "shin": 1.0, "torso": 1.45, "head": 0.5, "upper": 0.8, "fore": 0.75, "foot": 0.36},
+    "chibi": {"thigh": 0.55, "shin": 0.55, "torso": 0.95, "head": 0.85, "upper": 0.55, "fore": 0.5, "foot": 0.3},
+}
+# reach/lift as a fraction of leg length; duty = share of the cycle a foot is on the ground;
+# low = when the hips are lowest (just after heel strike in a walk, mid-stance in a run)
+GAITS = {
+    "walk": {"reach": 0.33, "lift": 0.14, "bob": 0.04, "duty": 0.62, "lean": 4, "arm": 26, "elbow": 22, "low": 0.08, "stand": 0.955},
+    "run": {"reach": 0.45, "lift": 0.38, "bob": 0.07, "duty": 0.36, "lean": 12, "arm": 50, "elbow": 88, "low": 0.18, "stand": 0.93},
+}
 
 
-def stick_parts(proportions: str = "normal", tail: bool = False, weapon: bool = False) -> dict:
-    """A mannequin built from capsules, in the rig's part convention (side view, facing right)."""
-    u = 8  # supersampled unit; the strip is fitted to the slot afterwards
-    head = 9 * u if proportions == "normal" else 15 * u
-    body_h, limb = (16 * u, 15 * u) if proportions == "normal" else (12 * u, 10 * u)
+def _ang(dx, dy):
+    """Limb angle of a bone vector in the 0 = down convention."""
+    return math.degrees(math.atan2(-dx, dy))
 
-    def capsule(w, h, color):
-        im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        ImageDraw.Draw(im).rounded_rectangle([0, 0, w - 1, h - 1], radius=min(w, h) // 2, fill=color + (255,))
-        return im
 
-    def disc(dia, color):
-        im = Image.new("RGBA", (dia, dia), (0, 0, 0, 0))
-        d = ImageDraw.Draw(im)
-        d.ellipse([0, 0, dia - 1, dia - 1], fill=color + (255,))
-        # a nose on the facing side, so the direction reads at a glance
-        d.ellipse([int(dia * 0.72), int(dia * 0.42), dia - 1, int(dia * 0.62)], fill=(70, 70, 80, 255))
-        return im
+def _dir(a):
+    r = math.radians(a)
+    return -math.sin(r), math.cos(r)
 
-    names = ["body", "head", "arm_front", "arm_back", "leg_front", "leg_back"] + (["tail"] if tail else []) + (["weapon"] if weapon else [])
-    parts = {}
-    for n in names:
-        c = POSE_COLORS[n]
-        if n == "head":
-            img = disc(head, c)
-        elif n == "body":
-            img = capsule(7 * u, body_h, c)
-        elif n == "tail":
-            img = capsule(3 * u, 9 * u, c).rotate(60, expand=True)
-        elif n == "weapon":
-            img = capsule(2 * u, 14 * u, c)
+
+def two_bone(hip, ankle, a, b):
+    """Knee for a thigh of length a and shin b reaching from hip toward ankle, bending forward (+x)."""
+    dx, dy = ankle[0] - hip[0], ankle[1] - hip[1]
+    d = max(1e-6, min(math.hypot(dx, dy), a + b - 1e-4))
+    alpha = math.degrees(math.acos(max(-1.0, min(1.0, (a * a + d * d - b * b) / (2 * a * d)))))
+    thigh = _ang(dx, dy) - alpha  # negative turn = knee out in front
+    ux, uy = _dir(thigh)
+    knee = (hip[0] + a * ux, hip[1] + a * uy)
+    reach = (hip[0] + dx * d / math.hypot(dx, dy), hip[1] + dy * d / math.hypot(dx, dy)) if math.hypot(dx, dy) > 1e-6 else ankle
+    shin = _ang(reach[0] - knee[0], reach[1] - knee[1])
+    return knee, thigh, shin
+
+
+def _smooth(x):
+    return x * x * (3 - 2 * x)
+
+
+def _lerp_keys(keys, t):
+    """keys: [(t, {name: value or (x, y)})]; linear between neighbors, values held at the ends."""
+    for (t0, k0), (t1, k1) in zip(keys, keys[1:]):
+        if t <= t1:
+            f = 0 if t1 == t0 else _smooth((t - t0) / (t1 - t0))
+            out = {}
+            for name, v0 in k0.items():
+                v1 = k1.get(name, v0)
+                out[name] = tuple(p + (q - p) * f for p, q in zip(v0, v1)) if isinstance(v0, tuple) else v0 + (v1 - v0) * f
+            return out
+    return dict(keys[-1][1])
+
+
+def motion_frames(anim: str, n: int, L: dict, amp: float = 1.0) -> list[dict]:
+    """Per frame: hip, lean, head tilt, ankle/toe targets and arm angles. Ground is y = 0, up is negative."""
+    leg = L["thigh"] + L["shin"]
+    stand = leg * 0.985
+    frames = []
+    for i in range(n):
+        t = i / n
+        if anim in GAITS:
+            g = GAITS[anim]
+            R, lift, duty = g["reach"] * leg * amp, g["lift"] * leg * amp, g["duty"]
+
+            fl = L["foot"]
+
+            def foot(p):
+                """Ankle target and toe angle (positive = toe down / heel up) at phase p of one leg."""
+                p %= 1.0
+                if p < duty:  # stance: the foot stays put on the ground while the body passes over it
+                    s = p / duty
+                    x = R - 2 * R * s
+                    if s < 0.12:  # heel strike: toe still up, rolling down onto the sole
+                        return (x, 0.0), -18 * (1 - s / 0.12)
+                    if s > 0.7 and fl:  # heel off: the foot pivots on the toe, which stays planted
+                        phi = 38 * (s - 0.7) / 0.3
+                        r = math.radians(phi)
+                        return (x + fl - fl * math.cos(r), -fl * math.sin(r)), phi
+                    return (x, 0.0), 0.0
+                s = (p - duty) / (1 - duty)  # swing: push off, lift, carry forward on an arc, toe up to land
+                e = _smooth(s)
+                x0 = -R + (fl - fl * math.cos(math.radians(38)) if fl else 0)
+                return (x0 + (R - x0) * e, -lift * math.sin(math.pi * s)), 38 * (1 - e) - 18 * e
+            ff, ftoe = foot(t)
+            bf, btoe = foot(t + 0.5)
+            hip_y = -leg * g["stand"] + g["bob"] * leg * amp * math.cos(4 * math.pi * (t - g["low"]))
+            if anim == "run":  # both feet off the ground mid-cycle: hips higher there
+                hip_y -= 0.04 * leg * amp * max(0.0, -math.cos(4 * math.pi * (t - g["low"])))
+            swing = g["arm"] * amp * math.cos(2 * math.pi * t)  # front arm back while front leg is forward
+            el = g["elbow"]
+            frames.append({"hip": (0.0, hip_y), "lean": g["lean"] * amp, "head": -0.4 * g["lean"] * amp + 2 * math.sin(4 * math.pi * t),
+                           "ankle_front": ff, "ankle_back": bf, "toe_front": ftoe, "toe_back": btoe,
+                           "arm_front": swing, "arm_back": -swing,
+                           "elbow_front": -(el * 0.6 + el * 0.4 * max(0.0, -math.cos(2 * math.pi * t))),
+                           "elbow_back": -(el * 0.6 + el * 0.4 * max(0.0, math.cos(2 * math.pi * t)))})
+            continue
+        s = 0.12 * leg
+        if anim == "idle":
+            br = math.sin(2 * math.pi * t)
+            k = {"hip": (0.0, -stand + 0.012 * leg * amp * (1 - br) / 2), "lean": 2, "head": 1.5 * amp * math.sin(2 * math.pi * t + 0.7),
+                 "ankle_front": (s, 0.0), "ankle_back": (-s, 0.0), "toe_front": 0, "toe_back": 0,
+                 "arm_front": 6 + 4 * amp * br, "arm_back": -4 - 4 * amp * br, "elbow_front": -14, "elbow_back": -14}
+        elif anim == "jump":
+            j = amp
+            k = _lerp_keys([
+                (0.00, {"hip": (0.0, -stand), "lean": 3, "head": 0, "ankle_front": (s, 0.0), "ankle_back": (-s, 0.0), "arm_front": 10, "arm_back": 6, "elbow_front": -15, "elbow_back": -15, "toe_front": 0, "toe_back": 0}),
+                (0.17, {"hip": (-0.05 * leg, -stand + 0.22 * leg * j), "lean": 22, "head": -10, "ankle_front": (s, 0.0), "ankle_back": (-s, 0.0), "arm_front": 75, "arm_back": 70, "elbow_front": -10, "elbow_back": -10, "toe_front": 0, "toe_back": 0}),
+                (0.30, {"hip": (0.03 * leg, -stand - 0.12 * leg * j), "lean": 6, "head": 0, "ankle_front": (s, -0.05 * leg), "ankle_back": (-s, 0.0), "arm_front": -140, "arm_back": -130, "elbow_front": -20, "elbow_back": -20, "toe_front": 25, "toe_back": 30}),
+                (0.50, {"hip": (0.05 * leg, -stand - 0.75 * leg * j), "lean": 0, "head": 4, "ankle_front": (0.2 * leg, -stand - 0.75 * leg * j + 0.55 * leg), "ankle_back": (-0.02 * leg, -stand - 0.75 * leg * j + 0.62 * leg), "arm_front": -165, "arm_back": -150, "elbow_front": -30, "elbow_back": -25, "toe_front": 20, "toe_back": 25}),
+                (0.72, {"hip": (0.03 * leg, -stand - 0.35 * leg * j), "lean": 2, "head": 0, "ankle_front": (0.14 * leg, -0.32 * leg * j), "ankle_back": (-0.06 * leg, -0.28 * leg * j), "arm_front": -95, "arm_back": -80, "elbow_front": -30, "elbow_back": -30, "toe_front": 10, "toe_back": 10}),
+                (0.86, {"hip": (0.0, -stand + 0.24 * leg * j), "lean": 16, "head": -6, "ankle_front": (s, 0.0), "ankle_back": (-s, 0.0), "arm_front": -40, "arm_back": -30, "elbow_front": -45, "elbow_back": -45, "toe_front": 0, "toe_back": 0}),
+                (1.00, {"hip": (0.0, -stand), "lean": 3, "head": 0, "ankle_front": (s, 0.0), "ankle_back": (-s, 0.0), "arm_front": 10, "arm_back": 6, "elbow_front": -15, "elbow_back": -15, "toe_front": 0, "toe_back": 0}),
+            ], i / max(1, n - 1))
+        elif anim == "attack":
+            fa, ba = (0.3 * leg, 0.0), (-0.28 * leg, 0.0)
+            k = _lerp_keys([
+                (0.00, {"hip": (0.0, -stand * 0.95), "lean": 0, "head": 0, "arm_front": 10, "elbow_front": -20, "arm_back": 0, "elbow_back": -20}),
+                (0.20, {"hip": (-0.06 * leg, -stand * 0.93), "lean": -7, "head": 4, "arm_front": 110, "elbow_front": -70, "arm_back": 35, "elbow_back": -40}),
+                (0.38, {"hip": (-0.09 * leg, -stand * 0.92), "lean": -9, "head": 6, "arm_front": 170, "elbow_front": -55, "arm_back": 50, "elbow_back": -40}),
+                (0.55, {"hip": (0.04 * leg, -stand * 0.9), "lean": 4, "head": -2, "arm_front": 215, "elbow_front": -15, "arm_back": -25, "elbow_back": -50}),
+                (0.70, {"hip": (0.14 * leg, -stand * 0.86), "lean": 13, "head": -6, "arm_front": 268, "elbow_front": -5, "arm_back": -45, "elbow_back": -60}),
+                (0.85, {"hip": (0.1 * leg, -stand * 0.9), "lean": 7, "head": -3, "arm_front": 300, "elbow_front": -15, "arm_back": -25, "elbow_back": -40}),
+                (1.00, {"hip": (0.0, -stand * 0.95), "lean": 0, "head": 0, "arm_front": 370, "elbow_front": -20, "arm_back": 0, "elbow_back": -20}),
+            ], i / max(1, n - 1))
+            k.update({"ankle_front": fa, "ankle_back": ba, "toe_front": 0, "toe_back": 0})
+            k["arm_front"] = k["arm_front"] * amp if amp != 1 else k["arm_front"]
+        elif anim == "hit":
+            k = _lerp_keys([
+                (0.00, {"hip": (0.0, -stand), "lean": 2, "head": 0, "arm_front": 8, "arm_back": -4, "elbow_front": -15, "elbow_back": -15}),
+                (0.15, {"hip": (-0.18 * leg * amp, -stand * 0.93), "lean": -20 * amp, "head": -16 * amp, "arm_front": -55, "arm_back": -70, "elbow_front": -45, "elbow_back": -50}),
+                (0.45, {"hip": (-0.14 * leg * amp, -stand * 0.9), "lean": -10 * amp, "head": -6 * amp, "arm_front": -20, "arm_back": -30, "elbow_front": -35, "elbow_back": -35}),
+                (1.00, {"hip": (0.0, -stand), "lean": 2, "head": 0, "arm_front": 8, "arm_back": -4, "elbow_front": -15, "elbow_back": -15}),
+            ], i / max(1, n - 1))
+            k.update({"ankle_front": (0.13 * leg, 0.0), "ankle_back": (-0.2 * leg, 0.0), "toe_front": 0, "toe_back": 0})
         else:
-            img = capsule(3 * u, limb, c)
-        fx, fy = PART_PIVOT.get(n, LIMB_PIVOT)
-        parts[n] = {"img": img, "pivot": (img.width * fx, img.height * fy), "parent": None if n == "body" else ("arm_front" if n == "weapon" else "body"),
-                    "z": PART_Z.get(n, 3), "at": None}
-    for n, pt in parts.items():
-        if pt["parent"]:
-            pw, ph = parts[pt["parent"]]["img"].size
-            fx, fy = PART_AT.get(n, (0.5, 0.5)) if n != "weapon" else (0.5, 0.92)
-            pt["at"] = (pw * fx, ph * fy)
-    return parts
+            raise UserError(f"không có animation '{anim}'")
+        frames.append(k)
+    return frames
 
 
-def place_in_slots(frames: list[Image.Image], n: int, cell, bg, keep_motion: bool = True, fill: float = 0.78) -> tuple[Image.Image, float]:
-    """Lay frames into the shared slot geometry: one shared scale, feet on the ground line, centered in
-    each slot. keep_motion keeps vertical moves (jump) relative to the ground line. Returns (strip, scale)."""
+def solve_skeleton(f: dict, L: dict) -> dict:
+    """Joint positions and world bone angles for one motion frame."""
+    hip = f["hip"]
+    lean = f["lean"]
+    nx, ny = math.sin(math.radians(lean)), -math.cos(math.radians(lean))
+    neck = (hip[0] + L["torso"] * nx, hip[1] + L["torso"] * ny)
+    shoulder = (hip[0] + L["torso"] * 0.9 * nx, hip[1] + L["torso"] * 0.9 * ny)
+    j = {"hip": hip, "neck": neck, "shoulder": shoulder, "lean": lean, "head_tilt": f["head"]}
+    for side in ("front", "back"):
+        ank = f[f"ankle_{side}"]
+        knee, th, sh = two_bone(hip, ank, L["thigh"], L["shin"])
+        ux, uy = _dir(sh)
+        ankle = (knee[0] + L["shin"] * ux, knee[1] + L["shin"] * uy)
+        toe_a = -90 + f.get(f"toe_{side}", 0)  # foot points forward; a planted foot lies flat
+        tx, ty = _dir(toe_a)
+        j.update({f"knee_{side}": knee, f"ankle_{side}": ankle, f"toe_{side}": (ankle[0] + L["foot"] * tx, ankle[1] + L["foot"] * ty),
+                  f"thigh_{side}": th, f"shin_{side}": sh})
+        ua = lean + f[f"arm_{side}"]
+        fa = ua + f[f"elbow_{side}"]
+        ex, ey = _dir(ua)
+        elbow = (shoulder[0] + L["upper"] * ex, shoulder[1] + L["upper"] * ey)
+        hx, hy = _dir(fa)
+        j.update({f"elbow_{side}": elbow, f"hand_{side}": (elbow[0] + L["fore"] * hx, elbow[1] + L["fore"] * hy),
+                  f"upper_{side}": ua, f"fore_{side}": fa})
+    return j
+
+
+def motion_keys(anim: str, n: int, parts: dict, amp: float = 1.0) -> dict:
+    """Rig keys from the motion model, with bone lengths measured from the rig's own part images.
+    Two-bone limbs if the rig has shin_*/forearm_* parts; otherwise each limb points at its target."""
+    def length(name, default):
+        p = parts.get(name)
+        return p["img"].height * 0.85 if p else default
+    body_h = parts["body"]["img"].height
+    two_leg = "shin_front" in parts
+    two_arm = "forearm_front" in parts
+    leg_len = length("leg_front", body_h * 0.7)
+    L = {"torso": body_h * 0.9, "thigh": leg_len if two_leg else leg_len * 0.5, "shin": length("shin_front", leg_len * 0.5) if two_leg else leg_len * 0.5,
+         "upper": length("arm_front", body_h * 0.6) if two_arm else length("arm_front", body_h * 0.6) * 0.5,
+         "fore": length("forearm_front", body_h * 0.5) if two_arm else length("arm_front", body_h * 0.6) * 0.5, "head": 0, "foot": 0}
+    frames = motion_frames(anim, n, L, amp)
+    rest = solve_skeleton(motion_frames("idle", 1, L, 0)[0], L)
+    k: dict[str, dict[str, list[float]]] = {}
+
+    def put(part, ch, v):
+        k.setdefault(part, {}).setdefault(ch, []).append(round(v, 3))
+
+    for f in frames:
+        s = solve_skeleton(f, L)
+        lean = s["lean"]
+        put("body", "x", s["hip"][0] - rest["hip"][0])
+        put("body", "y", s["hip"][1] - rest["hip"][1])
+        put("body", "rot", lean)
+        put("head", "rot", s["head_tilt"])
+        for side in ("front", "back"):
+            if two_leg:
+                put(f"leg_{side}", "rot", s[f"thigh_{side}"] - lean)
+                put(f"shin_{side}", "rot", s[f"shin_{side}"] - s[f"thigh_{side}"])
+            else:  # one-piece leg: aim it from hip to ankle
+                put(f"leg_{side}", "rot", _ang(s[f"ankle_{side}"][0] - s["hip"][0], s[f"ankle_{side}"][1] - s["hip"][1]) - lean)
+            if two_arm:
+                put(f"arm_{side}", "rot", s[f"upper_{side}"] - lean)
+                put(f"forearm_{side}", "rot", s[f"fore_{side}"] - s[f"upper_{side}"])
+            else:
+                put(f"arm_{side}", "rot", _ang(s[f"hand_{side}"][0] - s["shoulder"][0], s[f"hand_{side}"][1] - s["shoulder"][1]) - lean)
+        put("tail", "rot", 10 * amp * math.sin(2 * math.pi * len(k["body"]["x"]) / n))
+    return k
+
+
+POSE_COLORS = {"front": ((235, 110, 40), (220, 60, 50)), "back": ((60, 130, 230), (40, 80, 190)),
+               "body": (120, 120, 132), "head": (150, 150, 160)}
+
+
+def draw_skeleton(j: dict, L: dict, scale: float, origin, size, ss: int = 3) -> Image.Image:
+    """Stick figure: back limbs first (blue), torso and head, front limbs (orange arm, red leg); round
+    joints so bends read clearly; a nose and a foot on the facing side."""
+    W, H = size
+    img = Image.new("RGBA", (W * ss, H * ss), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    k = scale * ss
+    ox, oy = origin[0] * ss, origin[1] * ss
+    P = lambda p: (ox + p[0] * k, oy + p[1] * k)
+    wl = max(2, round(0.17 * L["thigh"] * k)) if L["thigh"] >= 0.8 else max(2, round(0.22 * L["thigh"] * k))
+    wa = max(2, round(wl * 0.8))
+
+    def bone(a, b, w, c):
+        d.line([P(a), P(b)], fill=c + (255,), width=w)
+        for p in (a, b):
+            x, y = P(p)
+            d.ellipse([x - w / 2, y - w / 2, x + w / 2, y + w / 2], fill=c + (255,))
+
+    for side in ("back", "front"):
+        arm_c, leg_c = POSE_COLORS[side]
+        if side == "front":
+            bone(j["hip"], j["neck"], round(wl * 1.9), POSE_COLORS["body"])
+            hr = L["head"] * k
+            hx, hy = _dir(j["lean"] + 180 + j["head_tilt"])
+            cx, cy = P(j["neck"])
+            cx, cy = cx + hx * hr * 0.95, cy + hy * hr * 0.95
+            d.ellipse([cx - hr, cy - hr, cx + hr, cy + hr], fill=POSE_COLORS["head"] + (255,))
+            nx, ny = _dir(j["lean"] - 90 + j["head_tilt"])
+            d.ellipse([cx + nx * hr * 0.7 - hr * 0.22, cy + ny * hr * 0.7 - hr * 0.22, cx + nx * hr * 0.7 + hr * 0.22, cy + ny * hr * 0.7 + hr * 0.22], fill=(70, 70, 80, 255))
+        bone(j["hip"], j[f"knee_{side}"], wl, leg_c)
+        bone(j[f"knee_{side}"], j[f"ankle_{side}"], wl, leg_c)
+        bone(j[f"ankle_{side}"], j[f"toe_{side}"], max(2, round(wl * 0.8)), leg_c)
+        bone(j["shoulder"], j[f"elbow_{side}"], wa, arm_c)
+        bone(j[f"elbow_{side}"], j[f"hand_{side}"], wa, arm_c)
+    return resize_rgba(img, (W, H))
+
+
+def pose_strip(anim, n: int, cell, proportions: str = "normal", amp: float = 1.0) -> Image.Image:
+    """Stick-figure poses for each frame from the motion model (two-bone legs with planted feet, elbows,
+    hip bob on the real contact/down/passing/up beats). Attached as the pose reference for image_gen."""
+    L = PROPORTIONS[proportions]
+    if isinstance(anim, dict):
+        raise UserError("pose nhận tên animation (idle, walk, run, jump, attack, hit)")
+    if anim not in SKELETON_ANIMS:
+        raise UserError(f"pose: không có '{anim}' (có: {', '.join(SKELETON_ANIMS)})")
+    sk = [solve_skeleton(f, L) for f in motion_frames(anim, n, L, amp)]
     k = slot_scale(n, cell)
     cw, ch = cell[0] * k, cell[1] * k
-    gy = int(ch * GROUND)
-    boxes = [alpha_bbox(f) for f in frames]
-    if not all(boxes):
-        raise UserError("có frame trống")
-    if keep_motion:
-        u = (min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes))
-        rest = max(b[3] for b in boxes)  # the ground: lowest feet over the cycle
-        sc = min(cw * fill / (u[2] - u[0]), gy * fill / (rest - u[1]))
-    else:
-        sc = min(cw * fill / max(b[2] - b[0] for b in boxes), gy * fill / max(b[3] - b[1] for b in boxes))
-    strip_img = Image.new("RGBA", (cw * n, ch), bg)
-    for i, (f, b) in enumerate(zip(frames, boxes)):
-        piece = f.crop(b)
-        piece = resize_rgba(piece, (max(1, round(piece.width * sc)), max(1, round(piece.height * sc))))
-        x = i * cw + (cw - piece.width) // 2
-        y = gy - piece.height - (round((rest - b[3]) * sc) if keep_motion else 0)
-        strip_img.alpha_composite(piece, (x, y))
-    return strip_img, sc
-
-
-def pose_strip(keys_or_anim, n: int, cell, proportions: str = "normal", amp: float = 1.0) -> Image.Image:
-    """Stick-figure poses for each frame, from the same motion math as `rig`: correct left/right
-    alternation, a closed loop, even spacing. Attached as the pose reference for image_gen."""
-    if isinstance(keys_or_anim, dict):
-        keys = keys_or_anim
-        parts = stick_parts(proportions, tail="tail" in keys, weapon="weapon" in keys)
-    else:
-        parts = stick_parts(proportions, weapon=keys_or_anim == "attack")
-        height = parts["body"]["img"].height + parts["head"]["img"].height + parts["leg_front"]["img"].height
-        keys = preset_keys(keys_or_anim, n, height, amp)
-    keys = {k: v for k, v in keys.items() if k in parts}
-    frames = rig_frames(parts, keys, n)
-    strip_img, _ = place_in_slots(frames, n, cell, (246, 246, 242, 255))
+    gy = ch * GROUND
+    # one scale for the whole strip: the tallest reach over the cycle fits in the slot above the ground
+    top = min(min(p[1] for key, p in s.items() if isinstance(p, tuple)) for s in sk) - L["head"] * 2
+    xs = [p[0] for s in sk for key, p in s.items() if isinstance(p, tuple)]
+    span_x = max(abs(min(xs)), abs(max(xs))) + L["head"]
+    scale = min(gy * 0.9 / -top, cw * 0.45 / span_x)
+    strip_img = Image.new("RGBA", (cw * n, ch), (246, 246, 242, 255))
+    for i, s in enumerate(sk):
+        fig = draw_skeleton(s, L, scale, (cw / 2, gy), (cw, ch))
+        strip_img.alpha_composite(fig, (i * cw, 0))
     d = ImageDraw.Draw(strip_img)
-    k = slot_scale(n, cell)
-    cw, ch = cell[0] * k, cell[1] * k
-    gy = int(ch * GROUND)
     for i in range(n + 1):
         d.line([(i * cw, 0), (i * cw, ch)], fill=(200, 200, 205, 255), width=max(2, k))
-    d.line([(0, gy), (cw * n, gy)], fill=(120, 120, 130, 255), width=max(2, k))
+    d.line([(0, round(gy)), (cw * n, round(gy))], fill=(120, 120, 130, 255), width=max(2, k))
     return strip_img.convert("RGB")
 
 
@@ -1353,7 +1541,10 @@ def main(argv=None) -> int:
                 keys = spec.get("keys", spec)
             else:
                 height = parts[root]["img"].height + sum(p["img"].height for k, p in parts.items() if k in ("head", "leg_front"))
-                keys = preset_keys(a.anim, a.frames, height, a.amp)
+                if a.cmd == "rig" and a.anim in SKELETON_ANIMS and "body" in parts:
+                    keys = motion_keys(a.anim, a.frames, parts, a.amp)
+                else:
+                    keys = preset_keys(a.anim, a.frames, height, a.amp)
                 if root != "body" and "body" in keys:
                     keys[root] = keys.pop("body")
                 keys = {k: v for k, v in keys.items() if k in parts}  # presets cover parts a rig may not have
@@ -1373,8 +1564,7 @@ def main(argv=None) -> int:
             print(f"✔ {a.out} {g.width}×{g.height}: {a.frames} ô, đường đất ở 92% chiều cao — đính kèm làm ảnh bố cục, dặn model không vẽ các đường kẻ")
         elif a.cmd == "pose":
             cell = parse_size(a.cell)
-            src = json.loads(Path(a.anim).read_text(encoding="utf-8")).get("keys") if a.anim.endswith(".json") else a.anim
-            strip_img = pose_strip(src, a.frames, cell, a.proportions, a.amp)
+            strip_img = pose_strip(a.anim, a.frames, cell, a.proportions, a.amp)
             save(strip_img, a.out)
             if a.gif:
                 cw = strip_img.width // a.frames

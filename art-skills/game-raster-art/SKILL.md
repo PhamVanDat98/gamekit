@@ -63,10 +63,12 @@ Mọi lần tạo đều đính kèm `art/style/frame.png` là **Image 1** (Code
   "body": {"file": "parts/body.png"},
   "head": {"file": "parts/head.png", "pivot": [40, 70], "at": [30, 6]},
   "arm_front": {"file": "parts/arm_front.png"}, "arm_back": {"file": "parts/arm_back.png"},
-  "leg_front": {"file": "parts/leg_front.png"}, "leg_back": {"file": "parts/leg_back.png"},
+  "leg_front": {"file": "parts/leg_front.png"}, "shin_front": {"file": "parts/shin_front.png"},
+  "leg_back": {"file": "parts/leg_back.png"}, "shin_back": {"file": "parts/shin_back.png"},
+  "forearm_front": {"file": "parts/forearm_front.png"}, "forearm_back": {"file": "parts/forearm_back.png"},
   "weapon": {"file": "parts/sword.png", "parent": "arm_front", "pivot": [6, 60], "at": [10, 44]}}}
 ```
-Tên chuẩn: `body` (gốc), `head`, `arm_front`, `arm_back`, `leg_front`, `leg_back`, `tail`, `weapon`. Xem `--gif` để chỉnh khớp (`pivot`/`at`) và độ mạnh (`--amp 0.6`). Chuyển động riêng: `--anim keys.json` với `{"keys": {"arm_front": {"rot": [0, 30, 60, 30]}, "body": {"y": [0, -3]}}}` (giá trị ít hơn số frame được nội suy vòng).
+Tên chuẩn: `body` (gốc), `head`, `arm_front`/`arm_back` (cánh tay trên), `forearm_front`/`forearm_back` (cẳng tay, gắn vào đầu dưới cánh tay), `leg_front`/`leg_back` (đùi), `shin_front`/`shin_back` (cẳng chân + bàn chân, gắn vào đầu gối), `tail`, `weapon`. Có `shin_*`/`forearm_*` thì `walk`/`run`/`jump`/`attack`/`hit`/`idle` tính chân hai khúc bằng IK (bàn chân bám đất, gối và khuỷu gập đúng) — **nên có**, chân tay một khúc trông cứng. Xem `--gif` để chỉnh khớp (`pivot`/`at`) và độ mạnh (`--amp 0.6`). Chuyển động riêng: `--anim keys.json` với `{"keys": {"arm_front": {"rot": [0, 30, 60, 30]}, "body": {"y": [0, -3]}}}` (giá trị ít hơn số frame được nội suy vòng).
 
 ## 4. Ghép thử và so với concept (bắt buộc trước khi giao)
 1. Viết `art/style/layout.json`: vị trí và cỡ từng asset như trong game (số px của game):

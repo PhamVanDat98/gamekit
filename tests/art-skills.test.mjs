@@ -406,3 +406,44 @@ im = Image.new('RGB', (300, 400), (250, 3, 248)); ImageDraw.Draw(im).rounded_rec
   assert.equal(r.code, 0, r.out);
   assert.equal(ga(dir, 'replace', 'walk.png', '--frames', '6', '--frame', '9', '--with', 'fix.png', '--out', 'x.png').code, 1);
 });
+
+test('gameart motion: walk keeps the planted foot on the ground and moving back, knees bend, hips lowest after contact; rig takes two-bone limbs', { skip: skipPy }, () => {
+  const dir = tmpDir();
+  const m = JSON.parse(py(dir, `
+import json, sys
+sys.path.insert(0, ${JSON.stringify(path.join(ART, 'game-raster-art', 'scripts'))})
+import gameart as g
+L = g.PROPORTIONS['normal']; n = 16
+fr = g.motion_frames('walk', n, L)
+sk = [g.solve_skeleton(f, L) for f in fr]
+duty = g.GAITS['walk']['duty']
+stance = [i for i in range(n) if 0.15 < i / n < duty * 0.68]
+leg = L['thigh'] + L['shin']
+print(json.dumps({
+  'ground': max(abs(sk[i]['ankle_front'][1]) for i in stance),
+  'back': all(sk[a]['ankle_front'][0] > sk[b]['ankle_front'][0] for a, b in zip(stance, stance[1:])),
+  'knee': max(abs(s['shin_front'] - s['thigh_front']) for s in sk),
+  'lift': -min(s['ankle_front'][1] for s in sk) / leg,
+  'low': max(range(n), key=lambda i: sk[i]['hip'][1]) / n,
+}))`));
+  assert.ok(m.ground < 1e-6, `bàn chân đỡ người phải nằm trên đất: ${m.ground}`);
+  assert.ok(m.back, 'bàn chân đỡ người lùi đều về sau (không trượt tới)');
+  assert.ok(m.knee > 20, `gối phải gập khi bước: ${m.knee}°`);
+  assert.ok(m.lift > 0.08, `chân bước phải nhấc lên: ${m.lift}`);
+  assert.ok(m.low < 0.2 || (m.low > 0.5 && m.low < 0.7), `hông thấp nhất ngay sau lúc tiếp đất: t=${m.low}`);
+
+  py(dir, `
+import os, json
+os.makedirs('parts', exist_ok=True)
+def part(w, h, fill):
+    im = Image.new('RGBA', (w, h), (0, 0, 0, 0)); ImageDraw.Draw(im).rounded_rectangle([0, 0, w - 1, h - 1], radius=min(w, h) // 3, fill=fill); return im
+part(30, 46, (70, 130, 200, 255)).save('parts/body.png'); part(36, 36, (250, 210, 170, 255)).save('parts/head.png')
+names = ['body', 'head']
+for s in ('front', 'back'):
+    for n, wh in (('leg', (13, 24)), ('shin', (12, 26)), ('arm', (11, 20)), ('forearm', (10, 20))):
+        part(*wh, (80, 70, 70, 255)).save(f'parts/{n}_{s}.png'); names.append(f'{n}_{s}')
+json.dump({'parts': {n: {'file': f'parts/{n}.png'} for n in names}}, open('rig.json', 'w'))`);
+  const r = ga(dir, 'rig', 'rig.json', '--anim', 'walk', '--frames', '8', '--size', '96x96', '--out', 'walk.png');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /10 phần/);
+});

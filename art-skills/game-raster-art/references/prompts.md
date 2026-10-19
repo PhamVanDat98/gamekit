@@ -59,7 +59,7 @@ Chuẩn bị (cùng `--frames` và `--cell` để các ô khớp nhau):
 GA pose   --anim walk --frames 6 --cell 128x128 --out art/raw/walk-pose.png --gif .gamekit/local/walk-pose.gif
 GA canvas --seed assets/gfx/hero.png --frames 6 --cell 128x128 --out art/raw/walk-canvas.png
 ```
-`--anim`: `idle`, `walk`, `run`, `jump`, `attack`, `hit`, hoặc `keys.json` (định dạng như `rig`). Xem GIF của dải tư thế trước: chuyển động sai thì sửa ở đây, đừng mong model tự sửa. Nhân vật đầu to: `--proportions chibi`.
+`--anim`: `idle`, `walk`, `run`, `jump`, `attack`, `hit` (chân hai khúc bám đất, gót chạm rồi mũi đẩy, khuỷu tay, người nhún đúng nhịp tiếp đất/đổi chân). Xem GIF của dải tư thế trước: chuyển động sai thì sửa ở đây, đừng mong model tự sửa. Nhân vật đầu to: `--proportions chibi`.
 ```
 Input images: Image 1: edit target — a strip of 6 equal slots; slot 1 already holds the approved character; Image 2: pose guide — one stick figure per slot (orange/red = FRONT arm and leg, blue = BACK arm and leg; the gray dot shows the facing side); Image 3: approved style frame (style only)
 Primary request: fill slots 2–6 of Image 1 with the SAME character from slot 1, each slot copying the pose of the matching stick figure in Image 2; keep slot 1 unchanged
@@ -109,8 +109,8 @@ Primary request: exactly <N> frames of a <explosion | hit spark | dust puff | co
 ```
 Input images: Image 1: approved sprite of this character; Image 2: approved style frame
 Asset type: cut-out animation parts sheet
-Primary request: the character from Image 1, side view facing right, separated into body parts laid out apart in one row: head, torso, front arm, back arm, front leg, back leg<, tail, weapon>
-Invariants: identical design, colors, outline and scale to Image 1; each part complete with the hidden area painted in (shoulder and hip ends rounded so they rotate cleanly); arms and legs straight and hanging down
+Primary request: the character from Image 1, side view facing right, separated into body parts laid out apart in one row: head, torso, front thigh, front shin with foot, back thigh, back shin with foot, front upper arm, front forearm with hand, back upper arm, back forearm with hand<, tail, weapon>
+Invariants: identical design, colors, outline and scale to Image 1; each part complete with the hidden area painted in; every joint end (shoulder, elbow, hip, knee) rounded so parts rotate cleanly; every limb piece straight and hanging down
 + [KEY-BLOCK]
 ```
-`GA split parts-raw.png --out-dir parts --index .gamekit/local/parts-index.png --names head,body,arm_front,arm_back,leg_front,leg_back` (theo thứ tự trong ảnh index), rồi viết `rig.json` (SKILL.md §3b) và `GA rig rig.json --anim idle --gif …`. Muốn tay sau/chân sau tối hơn một chút (cho có chiều sâu): thêm "back arm and back leg slightly darker" vào prompt.
+`GA split parts-raw.png --out-dir parts --index .gamekit/local/parts-index.png --names head,body,leg_front,shin_front,leg_back,shin_back,arm_front,forearm_front,arm_back,forearm_back` (theo thứ tự trong ảnh index), rồi viết `rig.json` (SKILL.md §3b) và `GA rig rig.json --anim idle --gif …`. Muốn tay sau/chân sau tối hơn một chút (cho có chiều sâu): thêm "back arm and back leg slightly darker" vào prompt.
