@@ -7,6 +7,10 @@ Chỉ là gợi ý; dùng cái người dùng đã có hoặc đồng ý trả p
 | --- | --- | --- | --- |
 | [claude-illustrate-skill](https://github.com/code-katz/claude-illustrate-skill) (MIT), skill `illustrate` | Logo, icon, bộ icon UI, favicon viết thẳng bằng SVG; 3–5 concept khác nhau; render cả dãy cỡ (16→512) trên nền sáng/tối thành một contact sheet, tự xem rồi sửa (tối đa 3 lượt); bộ icon được duyệt chung một sheet để đồng bộ | Chromium hoặc `rsvg-convert` để render (Playwright Chromium dùng được). Ảnh raster mới cần backend (Recraft, Hugging Face…) | Claude Code: `git clone https://github.com/code-katz/claude-illustrate-skill.git ~/.claude/skills/illustrate`. Codex: clone vào `~/.codex/skills/illustrate` |
 
+| [claudedraw](https://github.com/Griffin2/claudedraw) (MIT), skill `draw` | Agent viết SVG đơn giản, `draw.py` (Python thuần) biến thành **một style cố định**: tô gạch chéo 45° kiểu bút sáp, viền run tay, hạt nhiễu, 21 màu cố định, tối đa 15 mảng | Python 3 | Claude Code: `/plugin marketplace add Griffin2/claudedraw` → `/plugin install draw@claudedraw`. Codex: chép `draw/skills/draw` vào `~/.codex/skills/draw` |
+
+claudedraw không vẽ được cartoon phẳng viền đen hay nền vẽ tay: renderer luôn thay mảng tô bằng nét gạch chéo. Muốn kiểu doodle phẳng: [vector-cartoon](vector-cartoon.md). Viền run tay của nó dùng riêng được (mảng không gắn class giữ phẳng, viền gắn `class="stroke-sil"` + `stroke="…"`) nhưng trái luật của skill; chỉ thử khi người dùng muốn nét run.
+
 Dùng `illustrate` trong game GameKit:
 - Hợp với: icon UI (`kind: icon`/`ui`), logo game, icon portal `public/Icons/web.png`, ảnh cửa hàng. Brief lấy từ `asset-manifest.json`: `minDisplayPx` là cỡ nhỏ nhất phải đọc được, palette hex từ style đã chốt.
 - File nguồn `.svg` và contact sheet để ngoài thư mục phát hành (`art/` commit, sheet trong `.gamekit/local/`); chỉ đưa vào `assets/`/`public/` file game dùng (SVG hoặc PNG đúng cỡ spec).
@@ -44,6 +48,8 @@ Codex đọc skill trong `$CODEX_HOME/skills` (mặc định `~/.codex/skills`);
 | `hatch-pet` | Curated | Đóng atlas pet của Codex | Không dùng cho asset game; tham khảo cách giữ một nhân vật đồng nhất qua nhiều trạng thái |
 | `pxl-pixel-art` | `git clone https://github.com/crsolver/claude-pxl.git ~/.codex/skills/pxl-pixel-art` | `make: pixel-code` | Xem [pxl](pxl.md) |
 | `illustrate` | `git clone https://github.com/code-katz/claude-illustrate-skill.git ~/.codex/skills/illustrate` | `make: vector`: logo, icon, bộ icon UI | Viết cho Claude Code nhưng chỉ là `SKILL.md` + file tham khảo, Codex đọc được; cần Chromium để render |
+| `transparent-visual-assets` | [codex-visual-asset-skills](https://github.com/DwDestiny/codex-visual-asset-skills) (MIT): `npx skills add DwDestiny/codex-visual-asset-skills --skill '*' -g -a codex -y` | Tách nền: tạo ảnh trên nền `#FF00FF` qua `imagegen`, script xoá màu nền ra PNG trong suốt + báo cáo | Cần Pillow. Đã thử: nền trong suốt sạch, viền tối có thể ám màu nền một chút; tăng `--feather-threshold` hoặc đổi màu nền |
+| `sprite-animation-assets` | cùng repo | Ghép frame trong suốt thành atlas + GIF xem thử | **Cẩn thận**: mỗi frame bị cắt sát rồi đặt giữa ô và co riêng (LANCZOS) → mất chuyển động lên/xuống, dáng cao bị co nhỏ, pixel art bị nhoè. Chỉ dùng cho anim tại chỗ không phải pixel art; anim có chuyển động dùng `sprite-pipeline` (cùng tỉ lệ, cùng điểm neo). Một trạng thái, `columns` = số frame → ra strip ngang đúng spec GameKit |
 | agent-sprite-forge | `git clone` repo → `pip install -r requirements.txt` → `python tools/install_skills.py --apply --host codex` | Sprite, map, tile; dùng `image_gen` của Codex khi không có API key | Asset từ model theo điều khoản của nhà cung cấp, không theo MIT |
 
 Không hợp làm asset game: skill `algorithmic-art`, `canvas-design` của [anthropics/skills](https://github.com/anthropics/skills) (hướng tranh/poster, không có nền trong suốt hay sheet).

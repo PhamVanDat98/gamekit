@@ -1,7 +1,7 @@
 # Changelog
 
 ## Chưa phát hành
-- Skill `replace-graphics` (P3, game làm lại của người khác): chọn cách làm từng asset theo `make` — `vector`, `pixel-code`, `image-gen`, `licensed` —, duyệt style theo đợt, hậu xử lý ảnh từ model, gắn nhãn, `validate`. Kèm hướng dẫn [pxl](https://github.com/crsolver/claude-pxl) (pixel art bằng code, không cần API key) và bảng công cụ tạo art cho Claude Code/Codex, gồm skill cho Codex: `imagegen` có sẵn, plugin Game Studio (`sprite-pipeline`, `game-ui-frontend`, `game-playtest`), cách cài pxl và agent-sprite-forge vào Codex; skill [illustrate](https://github.com/code-katz/claude-illustrate-skill) cho logo/icon SVG (`make: vector`), ghi nguồn gốc bằng `gamekit provenance` thay cho `assets/MANIFEST.md` của nó.
+- Skill `replace-graphics` (P3, game làm lại của người khác): chọn cách làm từng asset theo `make` — `vector`, `pixel-code`, `image-gen`, `licensed` —, duyệt style theo đợt, hậu xử lý ảnh từ model, gắn nhãn, `validate`. Kèm hướng dẫn [pxl](https://github.com/crsolver/claude-pxl) (pixel art bằng code, không cần API key) và bảng công cụ tạo art cho Claude Code/Codex, gồm skill cho Codex: `imagegen` có sẵn, plugin Game Studio (`sprite-pipeline`, `game-ui-frontend`, `game-playtest`), cách cài pxl và agent-sprite-forge vào Codex; skill [illustrate](https://github.com/code-katz/claude-illustrate-skill) cho logo/icon SVG (`make: vector`), ghi nguồn gốc bằng `gamekit provenance` thay cho `assets/MANIFEST.md` của nó. Bảng chọn cách làm theo ảnh mẫu style; công thức cartoon phẳng viền đen bằng SVG (render PNG trong suốt bằng Chromium); claudedraw (style gạch chéo bút sáp) và codex-visual-asset-skills (tách nền, ghép atlas — kèm lưu ý đã thử).
 - `asset-manifest.json`: `make` nhận thêm `pixel-code`.
 
 ## 0.2.0 — 2026-10-16
