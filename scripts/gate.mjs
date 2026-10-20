@@ -61,6 +61,13 @@ function runAuto(root, name, phase) {
       return { ok: false, detail: e.message };
     }
   }
+  if (name === 'assets') {
+    // Declared techniques (seamless, 9-slice, frames, sizes) must work; no manifest = nothing declared.
+    if (!exists(path.join(root, 'asset-manifest.json'))) return { ok: true, detail: '' };
+    const r = spawnSync(process.execPath, [path.join(HERE, 'gamekit.mjs'), 'assets', 'check'], { cwd: root, encoding: 'utf8' });
+    const tail = `${r.stdout ?? ''}`.trim().split('\n').filter((l) => /✘/.test(l)).slice(0, 3).join(' | ');
+    return { ok: r.status === 0, detail: r.status === 0 ? '' : tail };
+  }
   if (name === 'motion') {
     const bad = checkMotions(root).results.filter((r) => r.errors.length);
     return { ok: !bad.length, detail: bad.map((r) => `${r.rel}: ${r.errors[0].msg}`).slice(0, 3).join('; ') };

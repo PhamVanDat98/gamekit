@@ -49,9 +49,14 @@ function downscale(img) {
  * Which pixels are the subject: alpha when the image has transparency, otherwise everything
  * except a flat background flood-filled from the border; a full illustration keeps every pixel.
  */
-function subjectMask(img, lab) {
+function subjectMask(img, lab, whole) {
   const n = img.width * img.height;
   const mask = new Uint8Array(n);
+  if (whole) {
+    // Backgrounds and tiles are the picture itself: nothing to cut away.
+    mask.fill(1);
+    return { mask, background: 'none' };
+  }
   let clear = 0;
   for (let i = 0; i < n; i++) if (img.data[i * 4 + 3] < 128) clear++;
   if (clear / n > 0.02) {
@@ -246,13 +251,16 @@ function measureOutline(img, mask, lab, background) {
   return { present: true, thicknessPx: thickness, hex: hex(rgb), innerLines: deep ? lines / deep : 0 };
 }
 
-/** Everything measurable about one image (8-bit RGBA, any size). `samples` is for pooling, not for output. */
-export function analyzeImage(source) {
+/**
+ * Everything measurable about one image (8-bit RGBA, any size). `samples` is for pooling, not for
+ * output. `whole`: the image is a background/tile — measure all of it, do not look for a subject.
+ */
+export function analyzeImage(source, { whole = false } = {}) {
   const img = downscale(source);
   const labs = new Float32Array(img.width * img.height * 3);
   for (let i = 0; i < img.width * img.height; i++) labs.set(srgbToLab(img.data[i * 4], img.data[i * 4 + 1], img.data[i * 4 + 2]), i * 3);
   const lab = (i) => labs.subarray(i * 3, i * 3 + 3);
-  const { mask, background } = subjectMask(img, lab);
+  const { mask, background } = subjectMask(img, lab, whole);
   let [x0, y0, x1, y1, area] = [img.width, img.height, -1, -1, 0];
   for (let i = 0; i < mask.length; i++)
     if (mask[i]) {
@@ -301,8 +309,11 @@ export const renderingOf = (flatness) => (flatness >= 85 ? 'phẳng (flat)' : fl
 
 /** One style from several references: palette pooled over all of them, everything else the median. */
 export function combineAnalyses(list) {
-  const points = list.flatMap((a) => a.samples.points);
-  const rgbs = list.flatMap((a) => a.samples.rgbs);
+  // Pool an equal share from every image (≤ 120k points in all), so one big image does not drown the rest.
+  const per = Math.max(1000, Math.floor(120000 / list.length));
+  const take = (xs) => xs.filter((_, i) => i % Math.max(1, Math.ceil(xs.length / per)) === 0);
+  const points = list.flatMap((a) => take(a.samples.points));
+  const rgbs = list.flatMap((a) => take(a.samples.rgbs));
   const palette = kmeans(points, rgbs, 20);
   const near = points.map((p) => Math.min(...palette.map((c) => deltaE(p, c.lab))));
   const flatness = round((near.filter((d) => d < FLAT_DE).length / near.length) * 100);

@@ -27,6 +27,8 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
                                             Đo phong cách từ ảnh tham khảo (PNG): bảng màu, nét viền, cách tô, sáng/bão hoà
                                             → art/style/{analysis.json, palette.png, style.md}
   style check <ảnh|thư mục…> [--style …]   Asset mới có đúng phong cách không (màu lạ, nét dày/mảnh, tô khác)
+  assets analyze|check|review|bleed …       Kỹ thuật art (tile, 9-slice, sheet, cỡ chuẩn), đánh giá cả bộ có liền mạch
+                                            (độ nét, nét viền, màu, ánh sáng, mép, mối nối) + ảnh tổng quan art/review/
   frames <motion> [--codex] [--check] [--install] [--ref ảnh] [--style "…"]
                                             Ảnh từng khung từ pose đã xuất (art/frames/<motion>/): prompt từng khung,
                                             Codex vẽ lại từng khung, kiểm kích thước/nền, cài vào assets/img/anim/
@@ -37,7 +39,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'codex', 'check', 'install']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'codex', 'check', 'install', 'manifest']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -69,6 +71,7 @@ const COMMANDS = {
   motion: () => import('./motion.mjs').then((m) => m.run),
   frames: () => import('./frames.mjs').then((m) => m.run),
   style: () => import('./style.mjs').then((m) => m.run),
+  assets: () => import('./assets.mjs').then((m) => m.run),
   fanout: () => import('./parallel.mjs').then((m) => m.fanout),
   'check-ownership': () => import('./parallel.mjs').then((m) => m.checkOwnership),
   integrate: () => import('./parallel.mjs').then((m) => m.integrate),

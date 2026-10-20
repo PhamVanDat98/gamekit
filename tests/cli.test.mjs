@@ -881,3 +881,50 @@ test('style check: same style passes, off-style fails naming the stray colours',
   assert.equal(JSON.parse(read(dir, 'art/style/analysis.json')).style.extraPalette.length, 2);
   assert.equal(gk(dir, 'style', 'check', 'new').code, 0);
 });
+
+// ---------- assets: techniques per file, the whole set, bleed ----------
+async function pngOf(w, h, fn) {
+  const { encodePng } = await import('../scripts/lib/png.mjs');
+  const data = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) data.set(fn(x, y), (y * w + x) * 4);
+  return encodePng(w, h, data);
+}
+const tilePng = (seam = false) => pngOf(64, 64, (x, y) => (seam && x > 56 ? [200, 60, 60, 255] : (Math.sin((Math.PI * x) / 16) + Math.cos((Math.PI * y) / 16) > 0.8 ? [96, 140, 70, 255] : [124, 170, 96, 255])));
+
+test('assets analyze --manifest → check → review → bleed', async () => {
+  const dir = newGame('as1');
+  fs.mkdirSync(path.join(dir, 'assets/img'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'assets/img/grass.png'), await tilePng());
+  fs.writeFileSync(path.join(dir, 'assets/img/hero.png'), await blobPng({ size: 160, line: 5 }));
+  fs.writeFileSync(path.join(dir, 'assets/img/coin.png'), await blobPng({ size: 60, line: 2 }));
+  let r = gk(dir, 'assets', 'analyze', 'assets/img', '--manifest');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /grass\.png  64×64\n  tile lặp hai chiều/);
+  assert.match(r.out, /thêm 3 mục/);
+  const man = JSON.parse(read(dir, 'asset-manifest.json'));
+  assert.deepEqual(man.assets.map((a) => [a.id, a.kind]), [['coin', 'sprite'], ['grass', 'tile'], ['hero', 'sprite']]);
+  assert.equal(gk(dir, 'validate').code, 1, 'assets/ without provenance labels still fails validate');
+  // A broken tile still declared seamless → check fails, gate item fails.
+  fs.writeFileSync(path.join(dir, 'assets/img/grass.png'), await tilePng(true));
+  r = gk(dir, 'assets', 'check');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /✘ khai báo lặp ngang nhưng mép trái\/phải lệch/);
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^phase: P0/m, 'phase: P3'));
+  assert.match(gk(dir, 'gate').out, /✘ Asset dùng được đúng kỹ thuật khai báo.*\[auto: assets\]/);
+  fs.writeFileSync(path.join(dir, 'assets/img/grass.png'), await tilePng());
+  assert.equal(gk(dir, 'assets', 'check').code, 0);
+
+  r = gk(dir, 'assets', 'review');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Tổng quan 3 asset/);
+  for (const f of ['overview.png', 'review.md', 'review.json']) assert.ok(fs.existsSync(path.join(dir, 'art/review', f)), f);
+  const doc = read(dir, 'art/review/review.md');
+  assert.match(doc, /\| 2 \| grass \| tile \| 64×64 \| tile lặp hai chiều/);
+  assert.match(doc, /## Nhìn tổng quan \(nhìn\)/);
+  assert.match(doc, /- \[ \] Cả bộ trông như một game/);
+
+  r = gk(dir, 'assets', 'bleed', 'assets/img/hero.png', '--out', 'fixed');
+  assert.equal(r.code, 0, r.out);
+  assert.ok(fs.existsSync(path.join(dir, 'fixed/hero.png')));
+  assert.equal(gk(dir, 'assets', 'nope').code, 1);
+});

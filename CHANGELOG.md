@@ -1,6 +1,13 @@
 # Changelog
 
 ## Chưa phát hành
+Kỹ thuật art và đánh giá tổng quan (skill **art-review**, P1 + P3):
+- `gamekit assets analyze <ảnh|thư mục…> [--manifest]`: nhận ra mỗi ảnh dùng thế nào — tile lặp hai chiều, nền lặp ngang (parallax), 9-slice / 3-slice kèm viền, sprite sheet kèm số khung, pixel art lưu ở cỡ phóng to, sprite cỡ cố định; báo lề trong suốt thừa, hình chạm mép, cạnh > 2048/4096; ghi gợi ý vào `asset-manifest.json`.
+- `assets check`: asset dùng được đúng khai báo (mép tile khớp, vùng kéo 9-slice trơn, khung sheet không chạm nhau, giới hạn texture). Cổng P3 `{auto: assets}`.
+- `assets review`: đánh giá cả bộ đặt cạnh nhau — độ nét đo trên mép (bắt ảnh bị phóng to mà không bắt nhầm art màu phẳng), nét viền theo px màn hình, có/không viền, mép mượt vs pixel, hướng sáng, màu so với bộ hoặc `art/style`, nền lấn vật chơi, tile đặt cạnh nhau lộ ranh giới. Ghi `art/review/overview.png` (mọi asset ở cỡ hiển thị: nền lặp đôi, tile 3×3, hàng nhân vật trên nền đúng tỉ lệ, khung UI kéo hai cỡ, có số) + `review.md` (bảng, vấn đề, câu hỏi nhìn, mục người dùng duyệt). Cổng P3 có mục duyệt (bạn).
+- `assets bleed`: đổ màu mép ra vùng trong suốt — hết viền tối khi WebGL/công cụ resize không nhân alpha.
+- Template: `src/view/art.ts` (`drawNineSlice`, `drawTiled` cho tile/parallax, `integerScale`, `crispPixels`). `asset-manifest.json`: `seamless` nhận `"x"`/`"y"`, thêm `pixelArt`.
+
 Phân tích phong cách đồ hoạ (skill **style-analysis**, P3):
 - `gamekit style analyze <ảnh|thư mục…>`: đo từ ảnh tham khảo PNG — bảng màu (k-means trong Lab, bỏ màu pha ở mép), nét viền (có/không, màu, độ dày theo % chiều cao vật thể, nét trong), cách tô (phẳng / cel / chuyển màu), sáng, bão hoà, tỉ lệ màu nóng; tách chủ thể khỏi nền trong suốt hoặc nền phẳng. Ghi `art/style/analysis.json`, `palette.png` và bản nháp `style.md` (mục đo đã điền, mục "nhìn" để AI điền, khối prompt cho Codex, token màu để vẽ bằng code).
 - `gamekit style check <ảnh|thư mục…>`: asset mới có đúng phong cách không — màu lạ (in kèm hex), nét dày/mảnh/thiếu, tô khác, rực/nhạt, sáng/tối hơn.

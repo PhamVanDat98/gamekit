@@ -29,6 +29,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Kiểm tra dữ liệu | `npm run gk -- validate` |
 | Test / typecheck / lint | `npm test` · `npm run typecheck` · `npm run lint` |
 | Chấm chuyển động (nguyên lý hoạt hình, biểu đồ nhịp) | `npm run gk -- motion` · xem: `npm run dev` → `/lab.html?m=hop&onion=1` · chơi thử: `/lab.html?play=1` |
+| Kỹ thuật art, đánh giá cả bộ liền mạch | `npm run gk -- assets analyze <thư mục> --manifest` · `assets check` · `assets review` → `art/review/overview.png` |
 | Ảnh từng khung bằng Codex | lab → "Xuất frame" → `npm run gk -- frames <motion> --codex` → xem `/lab.html?frames=<motion>` → `--install` |
 | Parity với game gốc | `npm run gk -- parity` (nghĩa vụ trong `spec/obligations.yaml`, test gắn thẻ `[id:case]`) |
 | Kiểm tra cổng, sang pha sau | `npm run gk -- gate` · `npm run gk -- gate --advance` |

@@ -4,13 +4,13 @@ export const PHASES = ['P0', 'P1', 'P2', 'P3', 'P4', 'P5'];
 
 export const PHASE_INFO = {
   P0: { name: 'Intake', skills: ['game-recon', 'triage'], human: 'Bạn quyết định làm hay bỏ (triage).' },
-  P1: { name: 'Phân tích', skills: ['engine-<engine>', 're-notes', 'gameplay-spec', 'asset-inventory', 'ui-extract'] },
+  P1: { name: 'Phân tích', skills: ['engine-<engine>', 're-notes', 'gameplay-spec', 'asset-inventory', 'art-review', 'ui-extract'] },
   P2: { name: 'Dựng lại', skills: ['runtime-select', 'module-plan', 'rebuild-game', 'integrate', 'parity-check'] },
   P3: {
     name: 'Chuyển sang web',
-    skills: ['web-relayout', 'animate'],
+    skills: ['web-relayout', 'animate', 'art-review'],
     human: 'Bạn duyệt bố cục và điều khiển trên web.',
-    thirdParty: { name: 'Reskin', skills: ['web-relayout', 'style-analysis', 'style-direction', 'style-preview', 'asset-spec', 'apply-style', 'replace-graphics', 'animate', 'replace-audio', 'rename-and-text'], human: 'Bạn chọn style.' },
+    thirdParty: { name: 'Reskin', skills: ['web-relayout', 'style-analysis', 'style-direction', 'style-preview', 'asset-spec', 'apply-style', 'replace-graphics', 'animate', 'art-review', 'replace-audio', 'rename-and-text'], human: 'Bạn chọn style.' },
   },
   P4: { name: 'Tích hợp', skills: ['platform-sdk', 'add-analytics', 'add-leaderboard', 'add-save', 'add-i18n'] },
   P5: { name: 'Phát hành', skills: ['package-web-build', 'perf-budget', 'qa-smoke', 'store-assets', 'release-check'], human: 'Bạn playtest bản cuối.' },
@@ -27,6 +27,7 @@ export const AVAILABLE_SKILLS = new Set([
   'platform-sdk',
   'animate',
   'style-analysis',
+  'art-review',
   'package-web-build',
   'release-check',
 ]);

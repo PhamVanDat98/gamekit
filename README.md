@@ -59,6 +59,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | `motion [file…] [--quiet] [--json]` | Chấm `motion/*.json` theo nguyên lý hoạt hình (slow in/out, anticipation theo vai trò, follow-through, squash giữ khối, overlap, arc, timing) và in biểu đồ nhịp; lỗi chặn cổng P3 `{auto: motion}`, bỏ một kiểm tra cần `skip` có lý do |
 | `frames <motion> [--codex] [--check] [--install]` | Ảnh từng khung không cần Spine: pose xuất từ lab (`art/frames/<motion>/`) → prompt từng khung (giữ pose, anchor, nhịp) → `codex exec` vẽ lại từng khung → kiểm kích thước/nền trong suốt → cài vào `assets/img/anim/` với nhãn `generated` |
 | `style analyze <ảnh…>` · `style check <ảnh…>` | Đo phong cách từ ảnh tham khảo PNG (bảng màu, nét viền, cách tô, sáng/bão hoà) → `art/style/{analysis.json, palette.png, style.md}`; chấm asset mới có lệch phong cách không. Skill **style-analysis** |
+| `assets analyze\|check\|review\|bleed` | Kỹ thuật từng ảnh (tile lặp, nền cuộn, 9/3-slice, sprite sheet, pixel art, cỡ chuẩn) → gợi ý `asset-manifest.json`; kiểm asset dùng được đúng khai báo; đánh giá cả bộ có liền mạch (độ nét, nét viền trên màn hình, màu, ánh sáng, mép, mối nối tile, nền lấn vật chơi) + ảnh tổng quan `art/review/overview.png`; sửa viền tối khi co giãn. Skill **art-review** |
 | `fanout --wave N` | Mỗi module một worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>` + `BRIEF.md` |
 | `check-ownership` | Module chỉ sửa trong thư mục được giao, không đụng vùng shared |
 | `integrate --wave N [--cleanup]` | Merge theo phụ thuộc, test sau mỗi merge, đỏ thì hoàn tác |
@@ -70,7 +71,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 .claude-plugin/   plugin.json, marketplace.json
 hooks/            SessionStart → using-gamekit + gamekit status
 commands/         /gamekit:status, /gamekit:next
-skills/           using-gamekit, re-notes, rebuild-game, module-plan, integrate, parity-check, animate, style-analysis, platform-sdk, package-web-build, release-check
+skills/           using-gamekit, re-notes, rebuild-game, module-plan, integrate, parity-check, animate, style-analysis, art-review, platform-sdk, package-web-build, release-check
 portals/          vỏ portal dùng chung: azgames, dev-mock (portal.yaml, kit.mjs, shell.html, loader.entry.js, Icons/), shared/
 scripts/          CLI gamekit.mjs + lệnh; lib/
 schemas/          game, params, provenance, module-plan, asset-manifest, motion, … (JSON Schema)
@@ -83,6 +84,7 @@ tests/            node --test
 - `src/core/` logic thuần: `Rng` có seed, fixed timestep, input ghi/phát lại. ESLint chặn DOM, `Math.random`, `Date.now`, thư viện render và số lạ.
 - `src/platform/`: `Platform` (game gọi) và `PortalAdapter` (mỗi portal một file mỏng). `createPlatform()` lo pause + tắt tiếng khi ad, gameplay start/stop cân bằng, không chồng ad, lọc tên event, save fallback. Build chỉ bundle adapter của portal đang đóng gói (`virtual:gk-adapter`).
 - `src/view/anim/` + `motion/*.json`: chuyển động theo key pose (ease, `stretch` giữ khối, vòng lặp, `step` giữ pose kiểu vẽ tay), `Animator` (idle + một lần), `Spring` cho follow-through, rig cắt rời cho asset tách phần, onion skin. `npm run dev` → `/lab.html?m=hop&onion=1&f=20` để xem/chụp từng khung, `?play=1` để điều khiển nhân vật mẫu Mochi (8 chuyển động, tay chân thân đuôi tai mềm bằng mesh deform + drag tự động; nút "Mềm (mesh)" để so với rig cứng), "Xuất frame" ra PNG từng khung cho `gamekit frames`, `?frames=hop` để xem ảnh từng khung (chỉ khi dev, không vào build). `FrameAnim` phát ảnh từng khung trong game. Skill **animate**.
+- `src/view/art.ts`: vẽ đúng kỹ thuật — `drawNineSlice` (khung co giãn không méo góc), `drawTiled` (tile, nền cuộn parallax), `integerScale` + `crispPixels` (pixel art).
 - Game demo (né vật rơi) để pipeline chạy được từ đầu đến cuối; thay bằng game thật ở P2.
 
 ## Nâng cấp game cũ

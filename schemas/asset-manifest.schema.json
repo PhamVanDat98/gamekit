@@ -37,7 +37,8 @@
               "fps": { "type": "number" }
             }
           },
-          "seamless": { "type": "boolean" },
+          "seamless": { "description": "Lặp không lộ nối: true = hai chiều, \"x\" = ngang (nền cuộn), \"y\" = dọc", "anyOf": [{ "type": "boolean" }, { "enum": ["x", "y", "xy"] }] },
+          "pixelArt": { "type": "boolean", "description": "Lưu ×1, phóng số nguyên lúc vẽ, không làm mượt" },
           "collider": { "type": "string", "description": "Đường dẫn param collider, vd player.hitbox" },
           "minDisplayPx": { "type": "integer", "description": "Kích thước nhỏ nhất thật sự hiển thị (icon)" },
           "noText": { "type": "boolean", "description": "Không in chữ vào ảnh" },
