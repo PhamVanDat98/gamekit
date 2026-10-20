@@ -11,6 +11,7 @@ import { pngInfo, isWebp, imageSize } from './lib/png.mjs';
 import { loadLanguages, placeholders } from './lib/languages.mjs';
 import { checkSetting, loadPortal, missingSettings } from './lib/portals.mjs';
 import { loadChosenStyle, loadStyleOptions, styleProblems, themeSource } from './lib/style.mjs';
+import { storeProblems } from './lib/store.mjs';
 
 /** Folders whose files end up in a build and therefore need provenance. */
 export const SHIPPED_DIRS = ['assets', 'public'];
@@ -47,6 +48,12 @@ export function validateGame(root, { stage } = {}) {
   validateModulePlan(root, pr);
   validateAssetManifest(root, pr);
   validateStyles(root, pr);
+  if (exists(path.join(root, 'store'))) {
+    // Store material is a release item: advice before P5, required from P5 on.
+    const { errors, warnings } = storeProblems(root, game);
+    for (const e of errors) (st >= PHASES.indexOf('P5') ? pr.error : pr.warn).call(pr, 'store', e);
+    for (const w of warnings) pr.warn('store', w);
+  }
   return { problems: pr, game };
 }
 

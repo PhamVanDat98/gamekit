@@ -11,6 +11,7 @@ import { requireGameRoot, loadGame, updateGame, nowIso, ownershipOf } from './li
 import { PHASES, nextPhase, phaseInfo } from './lib/phases.mjs';
 import { validateGame } from './validate.mjs';
 import { parityDetail, parityForGame } from './parity.mjs';
+import { storeProblems } from './lib/store.mjs';
 
 /**
  * Gate file syntax (gates/P2.md):
@@ -67,6 +68,10 @@ function runAuto(root, name, phase) {
     const ok = v != null && v !== '' && !(Array.isArray(v) && v.length === 0) && v !== 'unknown';
     return { ok, detail: ok ? '' : `game.yaml: ${key} chưa điền` };
   }
+  if (name === 'store') {
+    const { errors } = storeProblems(root, loadGame(root));
+    return { ok: !errors.length, detail: errors.slice(0, 3).join('; ') };
+  }
   if (name.startsWith('file:')) {
     const f = path.join(root, name.slice(5).trim());
     const ok = exists(f) && fs.statSync(f).size > 0;
@@ -78,6 +83,7 @@ function runAuto(root, name, phase) {
     lint: ['npm', ['run', 'lint', '--silent']],
     pack: [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'pack', '--all']],
     'release-check': [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'release-check']],
+    smoke: [process.execPath, [path.join(HERE, 'gamekit.mjs'), 'smoke']],
   };
   const cmd = cmds[name];
   if (!cmd) return { ok: false, detail: `không biết kiểm tra tự động "${name}"` };

@@ -802,6 +802,44 @@ test('assets scan drafts manifest entries; review lists problems and --apply wri
   assert.match(gk(dir, 'review', '--apply', 'other.json').out, /của game khac/);
 });
 
+test('store: listing skeleton, images per portal from store/source or smoke shots, limits checked, gate item', () => {
+  const dir = newGame('sto');
+  let r = gk(dir, 'store');
+  assert.equal(r.code, 1);
+  assert.match(read(dir, 'store/listing.yaml'), /title:\n  en: "Demo"/);
+  assert.match(r.out, /chưa có ảnh nguồn store\/source\/icon\.png/);
+  assert.match(r.out, /description\.en còn TODO/);
+  assert.match(r.out, /bộ kích thước chung của GameKit/);
+  fs.mkdirSync(path.join(dir, 'store/source'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'store/source/icon.png'), solidPng(300, 200));
+  fs.mkdirSync(path.join(dir, '.gamekit/local/smoke/26102001-dev-mock'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.gamekit/local/smoke/26102001-dev-mock/desktop-play.png'), solidPng(1280, 720));
+  fs.writeFileSync(path.join(dir, '.gamekit/local/smoke/26102001-dev-mock/phone-portrait-play.png'), solidPng(390, 844));
+  write(dir, 'store/listing.yaml', [
+    'title: { en: "Demo", vi: "Bản thử" }',
+    `description: { en: "${'A fun little game. '.repeat(8)}" }`,
+    'controls: { en: "Arrow keys or tap the sides" }',
+    'tags: [arcade, casual]',
+  ].join('\n'));
+  r = gk(dir, 'store');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /store\/azgames\/thumb\.png 512×384 ← \.gamekit\/local\/smoke/);
+  assert.match(r.out, /azgames: cần ít nhất 3 tag \(có 2\)/);
+  editYaml(dir, (g) => {
+    g.languages = ['en', 'vi'];
+  });
+  write(dir, 'Language/vi.json', '{}');
+  write(dir, 'store/listing.yaml', read(dir, 'store/listing.yaml').replace('tags: [arcade, casual]', 'tags: [arcade, casual, dodge]'));
+  r = gk(dir, 'store');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /description thiếu vi/);
+  assert.deepEqual(['icon', 'thumb', 'cover', 'portrait'].map((n) => fs.existsSync(path.join(dir, `store/azgames/${n}.png`))), [true, true, true, true]);
+  assert.ok(!fs.existsSync(path.join(dir, 'store/dev-mock')), 'dev-mock không có trang store');
+  fs.writeFileSync(path.join(dir, 'store/azgames/icon.png'), solidPng(10, 10));
+  assert.match(gk(dir, 'validate').out, /⚠ store: store\/azgames\/icon\.png: 10×10, cần 512×512/);
+  assert.match(gk(dir, 'validate', '--stage', 'P5').out, /✘ store: store\/azgames\/icon\.png/);
+});
+
 test('validate: Icons/web.png must be PNG, loading.webp must be WebP; builds/ must be gitignored', () => {
   const dir = newGame('vicon');
   assert.equal(gk(dir, 'validate').code, 0);

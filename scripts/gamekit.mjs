@@ -35,6 +35,9 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   gen prompt [--id a]                       In prompt (dùng với Codex, ChatGPT, công cụ khác)
   gen import <id> <file> [--lang vi]        Đưa file làm ở nơi khác vào: khớp spec, gắn nhãn
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
+  smoke [--version V] [--portal dev-mock] [--quick]   Chạy gói build trong Chromium (Playwright): thời gian vào game, FPS máy tính
+                                            và điện thoại chậm, lỗi console, màn trắng, Settings, mọi ngôn ngữ; so với budget
+  store [--portal p]                        Ảnh trang game cho từng portal (từ store/source/ hoặc ảnh smoke) + kiểm store/listing.yaml
   release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)
   fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
   check-ownership [--module id]             Module chỉ sửa trong thư mục được giao
@@ -43,7 +46,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'write', 'reanalyze', 'yes', 'force']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'write', 'reanalyze', 'yes', 'force', 'quick']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -82,6 +85,8 @@ const COMMANDS = {
   assets: () => import('./assets.mjs').then((m) => m.run),
   review: () => import('./review.mjs').then((m) => m.run),
   gen: () => import('./gen.mjs').then((m) => m.run),
+  smoke: () => import('./smoke.mjs').then((m) => m.run),
+  store: () => import('./store.mjs').then((m) => m.run),
 };
 
 export async function main(argv = process.argv.slice(2)) {
