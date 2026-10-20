@@ -13,6 +13,7 @@
     "status": "node scripts/gk.mjs status",
     "validate": "node scripts/gk.mjs validate",
     "gate": "node scripts/gk.mjs gate",
+    "motion": "node scripts/gk.mjs motion",
     "pack": "node scripts/gk.mjs pack --all",
     "preview": "vite preview --outDir builds",
     "release-check": "node scripts/gk.mjs release-check"

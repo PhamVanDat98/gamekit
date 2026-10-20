@@ -1,0 +1,26 @@
+{
+  "$schema": "../.gamekit/schemas/motion.schema.json",
+  "name": "idle",
+  "role": "idle",
+  "loop": true,
+  "brief": "Đứng thở: thân phồng nhẹ 3% trong 1 s rồi xẹp (giữ khối), râu lắc chậm hơn thân 10 khung (overlap), chớp mắt một lần mỗi vòng (secondary action). Không bao giờ đứng im hẳn — moving hold.",
+  "tracks": {
+    "body.stretch": [
+      { "f": 0, "v": 1 },
+      { "f": 60, "v": 1.03, "ease": "inOut" },
+      { "f": 120, "v": 1, "ease": "inOut" }
+    ],
+    "antenna.rot": [
+      { "f": 0, "v": 2 },
+      { "f": 70, "v": -3, "ease": "inOut" },
+      { "f": 120, "v": 2, "ease": "inOut" }
+    ],
+    "eyes.sy": [
+      { "f": 0, "v": 1 },
+      { "f": 96, "v": 1 },
+      { "f": 99, "v": 0.1, "ease": "in" },
+      { "f": 104, "v": 1, "ease": "out" },
+      { "f": 120, "v": 1 }
+    ]
+  }
+}

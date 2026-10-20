@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gamekit/motion.schema.json",
+  "title": "motion/*.json — một chuyển động (key pose theo khung hình), view/ phát lại, `gamekit motion` chấm theo nguyên lý hoạt hình",
+  "type": "object",
+  "required": ["name", "role", "tracks"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "role": {
+      "enum": ["action", "player-action", "telegraph", "reaction", "ui", "idle", "fx"],
+      "description": "action: diễn xuất nhân vật · player-action: phản hồi input người chơi (chuẩn bị ≤ 4 khung) · telegraph: đòn báo trước của địch (chuẩn bị ≥ 18 khung) · reaction: bị đánh/va chạm (không chuẩn bị, vào ngay) · ui: nút, popup · idle: vòng lặp đứng yên · fx: hiệu ứng"
+    },
+    "fps": { "type": "number", "exclusiveMinimum": 0, "default": 60, "description": "Đơn vị của f trong key (mặc định 60)" },
+    "frames": { "type": "integer", "minimum": 1, "description": "Độ dài (khung). Mặc định = key cuối cùng. Vòng lặp: khung này trùng khung 0" },
+    "loop": { "type": "boolean", "default": false },
+    "step": { "type": "number", "exclusiveMinimum": 0, "description": "Giữ pose theo nhịp này (vd 12 = 'on twos' ở 24fps) cho cảm giác vẽ tay; bỏ trống = mượt" },
+    "brief": { "type": "string", "description": "Mô tả bằng lời: ý đồ, pose chính, nhịp" },
+    "tracks": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-zA-Z][\\w-]*\\.(x|y|rot|sx|sy|stretch|alpha)$" },
+      "description": "<phần>.<thuộc tính>: x, y (px, so với vị trí nghỉ), rot (độ), sx, sy (tỉ lệ), stretch (giữ khối: sy = s, sx = 1/s), alpha",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["f", "v"],
+          "additionalProperties": false,
+          "properties": {
+            "f": { "type": "number", "minimum": 0, "description": "Khung (theo fps)" },
+            "v": { "type": "number" },
+            "ease": {
+              "enum": ["linear", "in", "out", "inOut", "inBack", "outBack", "inOutBack", "outElastic", "outBounce", "hold"],
+              "default": "inOut",
+              "description": "Cách đi từ key trước tới key này. hold = đứng yên rồi nhảy (snap)"
+            },
+            "beat": { "enum": ["anticipation", "action", "overshoot", "settle", "hold"], "description": "Ghi chú nhịp; key 'action' chọn chuyển động chính khi tự nhận sai" }
+          }
+        }
+      }
+    },
+    "skip": {
+      "type": "object",
+      "propertyNames": { "enum": ["slow-in-out", "anticipation", "follow-through", "squash-stretch", "overlap", "arcs", "timing"] },
+      "additionalProperties": { "type": "string", "minLength": 3 },
+      "description": "Bỏ một kiểm tra nguyên lý cho chuyển động này, kèm lý do"
+    }
+  }
+}

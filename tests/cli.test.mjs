@@ -717,3 +717,38 @@ test('ownership: game.yaml without the field counts as own; unknown values are r
   assert.equal(r.code, 1);
   assert.match(r.out, /ownership/);
 });
+
+// ---------- motion: animation principles ----------
+test('motion command: template motions pass with a chart; a linear tween fails; validate checks the format', () => {
+  const dir = newGame('mo1');
+  let r = gk(dir, 'motion');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /4 chuyển động đạt/);
+  assert.match(r.out, /hop · action · 58 khung/);
+  assert.match(gk(dir, 'motion', 'motion/hit.json', '--quiet').out, /1 chuyển động đạt/);
+  write(dir, 'motion/slide.json', JSON.stringify({ name: 'slide', role: 'action', tracks: { 'body.x': [{ f: 0, v: 0 }, { f: 20, v: 100, ease: 'linear' }] } }));
+  r = gk(dir, 'motion');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /\[slow-in-out\] body\.x f0→20 đi đều/);
+  assert.match(r.out, /\[anticipation\]/);
+  assert.equal(gk(dir, 'validate').code, 0, 'principles are judged by motion, not validate');
+  const json = JSON.parse(gk(dir, 'motion', '--json').out);
+  assert.deepEqual(json.find((m) => m.name === 'slide').errors.map((e) => e.check), ['slow-in-out', 'anticipation', 'follow-through']);
+  write(dir, 'motion/slide.json', JSON.stringify({ name: 'other', role: 'action', tracks: { 'body.z': [{ f: 0, v: 0 }] } }));
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /motion\/slide\.json/);
+});
+
+test('motion: gate P3 runs {auto: motion}; a game without motion/ passes it', () => {
+  const dir = newGame('mo2', '--third-party');
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^phase: P0/m, 'phase: P3'));
+  write(dir, 'motion/slide.json', JSON.stringify({ name: 'slide', role: 'ui', tracks: { 'root.x': [{ f: 0, v: 0 }, { f: 10, v: 50, ease: 'linear' }] } }));
+  let r = gk(dir, 'gate');
+  assert.match(r.out, /✘ Chuyển động trong `motion\/\*\.json` đạt nguyên lý hoạt hình.*\[auto: motion\] — motion\/slide\.json/);
+  assert.match(r.out, /duyệt cảm giác \(bạn\) \[bạn quyết\]/);
+  fs.rmSync(path.join(dir, 'motion'), { recursive: true });
+  r = gk(dir, 'gate');
+  assert.match(r.out, /✔ Chuyển động trong `motion\/\*\.json`/);
+  assert.equal(gk(dir, 'motion').code, 0);
+});

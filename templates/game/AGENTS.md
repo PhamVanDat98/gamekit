@@ -19,6 +19,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 - `src/platform/` interface chung cho mọi portal. Gameplay chỉ gọi `Platform`; adapter nằm trong `src/platform/adapters/`. Event analytics chỉ dùng tên trong `src/platform/events.ts`.
 - `src/contracts/` type dùng chung giữa các module — chỉ agent chính sửa.
 - `Language/` mỗi ngôn ngữ một file (`en.json` bắt buộc) · `public/Icons/` (`web.png`, `loading.webp`) · `builds/` đầu ra của pack (gitignored, không commit).
+- `motion/*.json` chuyển động (key pose theo khung) — `src/view/anim/` phát lại, `npm run gk -- motion` chấm theo nguyên lý hoạt hình và in biểu đồ nhịp; xem thử ở `/lab.html` khi `npm run dev`. Chuyển động chỉ ở view/, không đổi state.
 - `params/` số liệu có nguồn và `confidence` · `spec/` gameplay spec, `obligations.yaml`, `oracles/` · `notes/` ghi chú RE, `QUESTIONS.md` · `gates/` checklist cổng · `DECISIONS.md` lý do và sai khác.
 
 ## Lệnh
@@ -27,6 +28,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Trạng thái, việc tiếp theo | `npm run gk -- status` |
 | Kiểm tra dữ liệu | `npm run gk -- validate` |
 | Test / typecheck / lint | `npm test` · `npm run typecheck` · `npm run lint` |
+| Chấm chuyển động (nguyên lý hoạt hình, biểu đồ nhịp) | `npm run gk -- motion` · xem: `npm run dev` → `/lab.html?m=hop&onion=1` |
 | Parity với game gốc | `npm run gk -- parity` (nghĩa vụ trong `spec/obligations.yaml`, test gắn thẻ `[id:case]`) |
 | Kiểm tra cổng, sang pha sau | `npm run gk -- gate` · `npm run gk -- gate --advance` |
 | Dựng song song | `npm run gk -- fanout --wave N` → subagent làm theo `.gamekit/local/BRIEF.md` → `npm run gk -- integrate --wave N` |

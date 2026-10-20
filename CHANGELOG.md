@@ -1,5 +1,12 @@
 # Changelog
 
+## Chưa phát hành
+Chuyển động theo nguyên lý hoạt hình (skill **animate**, P3):
+- `motion/*.json`: chuyển động viết bằng key pose theo khung (`<phần>.<x|y|rot|sx|sy|stretch|alpha>`, ease từng key, `beat`, `loop`, `step` giữ pose kiểu on twos), `role` = action / player-action / telegraph / reaction / ui / idle / fx. Schema `motion.schema.json`; `validate` kiểm định dạng.
+- Lệnh `motion`: chấm theo nguyên lý — lỗi khi đi đều (`linear`), thiếu anticipation (action, telegraph), player-action chuẩn bị > 4 khung@60 (trễ input), telegraph < 18 khung (không kịp phản ứng), reaction không vào ngay, dừng cứng không follow-through, vòng lặp giật ở chỗ nối; cảnh báo thiếu squash & stretch hoặc mất khối, không overlap, đường thẳng thay cho arc, nhịp đều. In biểu đồ nhịp (sparkline từng track, đoạn chuẩn bị / action / follow-through) để agent "xem" timing. Bỏ kiểm tra bằng `skip` có lý do. Cổng P3 có `{auto: motion}` và mục duyệt chuyển động (bạn) cho game làm lại.
+- Template: `src/view/anim/` (ease, motion, `Animator`, `Spring`, `stretchFromSpeed`, rig cắt rời, onion skin), 4 chuyển động mẫu (`idle`, `hop`, `hit`, `pop-in`), `lab.html` (xem chậm, từng khung, onion skin, đường đi; URL cố định để chụp màn hình). Renderer demo: nghiêng + giãn theo tốc độ bằng spring, `hit` khi thua, `pop-in` cho overlay.
+- Skill `animate` + tài liệu: 12 nguyên lý áp vào web game kèm số khung, công thức từng hành động (nhảy, đáp, đi/chạy, telegraph, nút, popup, nhặt xu…; JSON mẫu được test chấm lại), làm asset cho AI theo rig cắt rời thay vì sprite sheet.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.

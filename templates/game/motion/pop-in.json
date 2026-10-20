@@ -1,0 +1,26 @@
+{
+  "$schema": "../.gamekit/schemas/motion.schema.json",
+  "name": "pop-in",
+  "role": "ui",
+  "brief": "Popup/nhãn xuất hiện: phồng từ 0 vượt đích (1.22) rồi nảy về như thạch. sy đi trước sx 2 khung (overlap) để có cảm giác mềm; hiện rõ trong 5 khung đầu. Tổng 26 khung (~0.43 s).",
+  "tracks": {
+    "root.sy": [
+      { "f": 0, "v": 0 },
+      { "f": 7, "v": 1.22, "ease": "out", "beat": "action" },
+      { "f": 13, "v": 0.92, "ease": "inOut" },
+      { "f": 19, "v": 1.03, "ease": "inOut" },
+      { "f": 24, "v": 1, "ease": "inOut" }
+    ],
+    "root.sx": [
+      { "f": 0, "v": 0 },
+      { "f": 9, "v": 1.18, "ease": "out" },
+      { "f": 15, "v": 0.94, "ease": "inOut" },
+      { "f": 21, "v": 1.02, "ease": "inOut" },
+      { "f": 26, "v": 1, "ease": "inOut" }
+    ],
+    "root.alpha": [
+      { "f": 0, "v": 0 },
+      { "f": 5, "v": 1, "ease": "out" }
+    ]
+  }
+}

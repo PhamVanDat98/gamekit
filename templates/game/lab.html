@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Motion lab — {{TITLE}}</title>
+    <style>
+      body { margin: 0; background: #14161a; color: #e8eaed; font: 14px system-ui, sans-serif; }
+      main { display: flex; flex-wrap: wrap; gap: 16px; padding: 16px; }
+      canvas { background: #1d2026; border-radius: 8px; max-width: 100%; }
+      aside { display: flex; flex-direction: column; gap: 8px; min-width: 240px; }
+      button { background: #2a2e36; color: inherit; border: 1px solid #3a3f49; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+      button[aria-pressed='true'] { background: #4fb3ff; color: #0d0f12; }
+      pre { white-space: pre-wrap; color: #9aa0a6; max-width: 360px; }
+    </style>
+  </head>
+  <body>
+    <!-- Dev only (npm run dev → /lab.html). Not part of any build. -->
+    <main>
+      <canvas id="lab" width="480" height="420"></canvas>
+      <aside id="controls"></aside>
+    </main>
+    <script type="module" src="./src/view/anim/lab.ts"></script>
+  </body>
+</html>

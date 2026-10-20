@@ -98,7 +98,7 @@ async function main(): Promise<void> {
     }
     const overlay =
       state === 'ready' ? t('game.start') : state === 'over' ? t('game.score', { score: Math.floor(world.score) }) : bus.paused ? t('game.paused') : null;
-    renderer.draw(world, overlay);
+    renderer.draw(world, overlay, bus.paused ? 0 : elapsed);
     if (!shown) {
       shown = true;
       window.GM_LOADER?.ready(); // first frame on screen: the portal hides its loading screen

@@ -11,6 +11,7 @@ import { requireGameRoot, loadGame, updateGame, nowIso, ownershipOf } from './li
 import { PHASES, nextPhase, phaseInfo } from './lib/phases.mjs';
 import { validateGame } from './validate.mjs';
 import { parityDetail, parityForGame } from './parity.mjs';
+import { checkMotions } from './motion.mjs';
 
 /**
  * Gate file syntax (gates/P2.md):
@@ -59,6 +60,10 @@ function runAuto(root, name, phase) {
     } catch (e) {
       return { ok: false, detail: e.message };
     }
+  }
+  if (name === 'motion') {
+    const bad = checkMotions(root).results.filter((r) => r.errors.length);
+    return { ok: !bad.length, detail: bad.map((r) => `${r.rel}: ${r.errors[0].msg}`).slice(0, 3).join('; ') };
   }
   if (name.startsWith('field:')) {
     // field:release.forbiddenTerms → the game.yaml value must be non-empty

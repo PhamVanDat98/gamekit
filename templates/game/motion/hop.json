@@ -1,0 +1,48 @@
+{
+  "$schema": "../.gamekit/schemas/motion.schema.json",
+  "name": "hop",
+  "role": "action",
+  "brief": "Nhảy cartoon (pivot ở chân). Chuẩn bị: nén 0.72 trong 9 khung, giữ 3 khung. Action: bật lên 10 khung, giãn 1.25 lúc rời đất, tròn lại ở đỉnh (out rồi in = treo ở đỉnh). Rơi 12 khung, giãn dần theo tốc độ. Chạm đất: bẹp 0.68 trong 2 khung, nảy 1.08, settle. Râu trễ sau thân (drag) rồi quất tới khi chạm đất, dao động tắt dần. Mắt nheo khi chạm (secondary). x và y khác ease → đường cung.",
+  "tracks": {
+    "body.y": [
+      { "f": 0, "v": 0 },
+      { "f": 12, "v": 0 },
+      { "f": 22, "v": -110, "ease": "out", "beat": "action" },
+      { "f": 34, "v": 0, "ease": "in" }
+    ],
+    "body.x": [
+      { "f": 0, "v": 0 },
+      { "f": 12, "v": 0 },
+      { "f": 34, "v": 40, "ease": "inOut" },
+      { "f": 40, "v": 44, "ease": "out" }
+    ],
+    "body.stretch": [
+      { "f": 0, "v": 1 },
+      { "f": 9, "v": 0.72, "ease": "inOut", "beat": "anticipation" },
+      { "f": 12, "v": 0.72 },
+      { "f": 15, "v": 1.25, "ease": "out" },
+      { "f": 22, "v": 1, "ease": "inOut" },
+      { "f": 34, "v": 1.18, "ease": "in" },
+      { "f": 36, "v": 0.68, "ease": "out" },
+      { "f": 44, "v": 1.08, "ease": "out", "beat": "overshoot" },
+      { "f": 52, "v": 0.98, "ease": "inOut" },
+      { "f": 58, "v": 1, "ease": "inOut", "beat": "settle" }
+    ],
+    "antenna.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 14, "v": 0 },
+      { "f": 20, "v": -18, "ease": "out" },
+      { "f": 34, "v": -8, "ease": "inOut" },
+      { "f": 38, "v": 16, "ease": "out" },
+      { "f": 44, "v": -8, "ease": "inOut" },
+      { "f": 50, "v": 4, "ease": "inOut" },
+      { "f": 56, "v": 0, "ease": "inOut" }
+    ],
+    "eyes.sy": [
+      { "f": 0, "v": 1 },
+      { "f": 34, "v": 1 },
+      { "f": 36, "v": 0.4, "ease": "out" },
+      { "f": 42, "v": 1, "ease": "out" }
+    ]
+  }
+}

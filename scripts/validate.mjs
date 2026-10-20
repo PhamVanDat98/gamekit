@@ -10,6 +10,7 @@ import { PHASES } from './lib/phases.mjs';
 import { pngInfo, isWebp } from './lib/png.mjs';
 import { loadLanguages, placeholders } from './lib/languages.mjs';
 import { checkSetting, loadPortal, missingSettings } from './lib/portals.mjs';
+import { checkMotionFile, motionFiles } from './motion.mjs';
 
 /** Folders whose files end up in a build and therefore need provenance. */
 export const SHIPPED_DIRS = ['assets', 'public'];
@@ -44,6 +45,7 @@ export function validateGame(root, { stage } = {}) {
   validateProvenance(root, st, pr);
   validateModulePlan(root, pr);
   validateAssetManifest(root, pr);
+  validateMotions(root, pr);
   return { problems: pr, game };
 }
 
@@ -372,6 +374,13 @@ function validateAssetManifest(root, pr) {
     if (info.width !== w || info.height !== a.height)
       pr.error(where, `${a.id}: ${a.path} là ${info.width}×${info.height}, spec cần ${w}×${a.height}`);
     if (a.alpha === true && info.alpha === false) pr.error(where, `${a.id}: cần nền trong suốt nhưng PNG không có kênh alpha`);
+  }
+}
+
+// ---------- motion/*.json: the file format only; `gamekit motion` judges the animation ----------
+function validateMotions(root, pr) {
+  for (const rel of motionFiles(root)) {
+    for (const e of checkMotionFile(root, rel).errors) if (['json', 'schema', 'structure'].includes(e.check)) pr.error(rel, e.msg);
   }
 }
 
