@@ -85,3 +85,39 @@ export const editYaml = (dir, fn) => {
   fn(data);
   fs.writeFileSync(f, YAML.stringify(data));
 };
+
+/**
+ * A test "character": a filled blob with an outline ring and a patch, on transparent or flat
+ * background. Every number the analysis should find is known.
+ */
+export function blob({ size = 200, fill = '#fff1d6', ink = '#3b2a20', line = 6, patch = '#f5a25d', bg = null, shape = 'circle' } = {}) {
+  const data = new Uint8Array(size * size * 4);
+  const c = size / 2;
+  const r = size * 0.4;
+  const inside = (x, y) => (shape === 'circle' ? Math.hypot(x - c, y - c) <= r : Math.abs(x - c) <= r && Math.abs(y - c) <= r * 0.8);
+  const depth = (x, y) => {
+    // distance to the silhouette edge, measured on a grid (good enough for a ring)
+    if (shape === 'circle') return r - Math.hypot(x - c, y - c);
+    return Math.min(r - Math.abs(x - c), r * 0.8 - Math.abs(y - c));
+  };
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const o = (y * size + x) * 4;
+      let rgba = bg ? [...hexRgb(bg), 255] : [0, 0, 0, 0];
+      if (inside(x + 0.5, y + 0.5)) {
+        const d = depth(x + 0.5, y + 0.5);
+        const col = line && d < line ? ink : Math.hypot(x - c * 0.8, y - c * 0.8) < size * 0.12 ? patch : fill;
+        rgba = [...hexRgb(col), 255];
+      }
+      data.set(rgba, o);
+    }
+  return { width: size, height: size, data };
+}
+const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+
+/** blob() as a PNG file buffer. */
+export async function blobPng(opts) {
+  const { encodePng } = await import('../scripts/lib/png.mjs');
+  const img = blob(opts);
+  return encodePng(img.width, img.height, img.data);
+}

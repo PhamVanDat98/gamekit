@@ -1,6 +1,11 @@
 # Changelog
 
 ## Chưa phát hành
+Phân tích phong cách đồ hoạ (skill **style-analysis**, P3):
+- `gamekit style analyze <ảnh|thư mục…>`: đo từ ảnh tham khảo PNG — bảng màu (k-means trong Lab, bỏ màu pha ở mép), nét viền (có/không, màu, độ dày theo % chiều cao vật thể, nét trong), cách tô (phẳng / cel / chuyển màu), sáng, bão hoà, tỉ lệ màu nóng; tách chủ thể khỏi nền trong suốt hoặc nền phẳng. Ghi `art/style/analysis.json`, `palette.png` và bản nháp `style.md` (mục đo đã điền, mục "nhìn" để AI điền, khối prompt cho Codex, token màu để vẽ bằng code).
+- `gamekit style check <ảnh|thư mục…>`: asset mới có đúng phong cách không — màu lạ (in kèm hex), nét dày/mảnh/thiếu, tô khác, rực/nhạt, sáng/tối hơn.
+- Đọc PNG thuần Node (mọi color type, bit depth; trừ interlaced). Cổng P3 (`third-party`) có mục `art/style/style.md`.
+
 Chuyển động theo nguyên lý hoạt hình (skill **animate**, P3):
 - `motion/*.json`: chuyển động viết bằng key pose theo khung (`<phần>.<x|y|rot|sx|sy|stretch|alpha>`, ease từng key, `beat`, `loop`, `step` giữ pose kiểu on twos), `role` = action / player-action / telegraph / reaction / ui / idle / fx. Schema `motion.schema.json`; `validate` kiểm định dạng.
 - Lệnh `motion`: chấm theo nguyên lý — lỗi khi đi đều (`linear`), thiếu anticipation (action, telegraph), player-action chuẩn bị > 4 khung@60 (trễ input), telegraph < 18 khung (không kịp phản ứng), reaction không vào ngay, dừng cứng không follow-through, vòng lặp giật ở chỗ nối; cảnh báo thiếu squash & stretch hoặc mất khối, không overlap, đường thẳng thay cho arc, nhịp đều. In biểu đồ nhịp (sparkline từng track, đoạn chuẩn bị / action / follow-through) để agent "xem" timing. Bỏ kiểm tra bằng `skip` có lý do. Cổng P3 có `{auto: motion}` và mục duyệt chuyển động (bạn) cho game làm lại.

@@ -26,7 +26,8 @@ test('skills: frontmatter name matches the folder and description says when to u
 
 test('skills: AVAILABLE_SKILLS lists exactly the shipped skills, each suggested by a phase', () => {
   assert.deepEqual([...AVAILABLE_SKILLS].sort(), skillDirs());
-  const suggested = new Set(Object.values(PHASE_INFO).flatMap((p) => p.skills));
+  // A phase may suggest different skills for games remade from someone else's (thirdParty).
+  const suggested = new Set(Object.values(PHASE_INFO).flatMap((p) => [...p.skills, ...(p.thirdParty?.skills ?? [])]));
   for (const s of AVAILABLE_SKILLS) if (s !== 'using-gamekit') assert.ok(suggested.has(s), `${s} không có trong pha nào`);
 });
 

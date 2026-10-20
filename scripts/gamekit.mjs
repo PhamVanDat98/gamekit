@@ -23,6 +23,10 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
   release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)
   motion [file…] [--quiet] [--json]          Chấm motion/*.json theo nguyên lý hoạt hình, in biểu đồ nhịp (timing chart)
+  style analyze <ảnh|thư mục…> [--out art/style] [--name "…"]
+                                            Đo phong cách từ ảnh tham khảo (PNG): bảng màu, nét viền, cách tô, sáng/bão hoà
+                                            → art/style/{analysis.json, palette.png, style.md}
+  style check <ảnh|thư mục…> [--style …]   Asset mới có đúng phong cách không (màu lạ, nét dày/mảnh, tô khác)
   frames <motion> [--codex] [--check] [--install] [--ref ảnh] [--style "…"]
                                             Ảnh từng khung từ pose đã xuất (art/frames/<motion>/): prompt từng khung,
                                             Codex vẽ lại từng khung, kiểm kích thước/nền, cài vào assets/img/anim/
@@ -64,6 +68,7 @@ const COMMANDS = {
   'release-check': () => import('./release-check.mjs').then((m) => m.run),
   motion: () => import('./motion.mjs').then((m) => m.run),
   frames: () => import('./frames.mjs').then((m) => m.run),
+  style: () => import('./style.mjs').then((m) => m.run),
   fanout: () => import('./parallel.mjs').then((m) => m.fanout),
   'check-ownership': () => import('./parallel.mjs').then((m) => m.checkOwnership),
   integrate: () => import('./parallel.mjs').then((m) => m.integrate),

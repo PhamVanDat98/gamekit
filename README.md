@@ -58,6 +58,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | `release-check [--version V] [--portal p]` | Mặc định bản mới nhất. Kiểm bố cục az-v1, footer bản quyền, chặn asset reference/placeholder, tên game gốc, link ngoài, đường dẫn tuyệt đối, vượt ngân sách tải |
 | `motion [file…] [--quiet] [--json]` | Chấm `motion/*.json` theo nguyên lý hoạt hình (slow in/out, anticipation theo vai trò, follow-through, squash giữ khối, overlap, arc, timing) và in biểu đồ nhịp; lỗi chặn cổng P3 `{auto: motion}`, bỏ một kiểm tra cần `skip` có lý do |
 | `frames <motion> [--codex] [--check] [--install]` | Ảnh từng khung không cần Spine: pose xuất từ lab (`art/frames/<motion>/`) → prompt từng khung (giữ pose, anchor, nhịp) → `codex exec` vẽ lại từng khung → kiểm kích thước/nền trong suốt → cài vào `assets/img/anim/` với nhãn `generated` |
+| `style analyze <ảnh…>` · `style check <ảnh…>` | Đo phong cách từ ảnh tham khảo PNG (bảng màu, nét viền, cách tô, sáng/bão hoà) → `art/style/{analysis.json, palette.png, style.md}`; chấm asset mới có lệch phong cách không. Skill **style-analysis** |
 | `fanout --wave N` | Mỗi module một worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>` + `BRIEF.md` |
 | `check-ownership` | Module chỉ sửa trong thư mục được giao, không đụng vùng shared |
 | `integrate --wave N [--cleanup]` | Merge theo phụ thuộc, test sau mỗi merge, đỏ thì hoàn tác |
@@ -69,7 +70,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 .claude-plugin/   plugin.json, marketplace.json
 hooks/            SessionStart → using-gamekit + gamekit status
 commands/         /gamekit:status, /gamekit:next
-skills/           using-gamekit, re-notes, rebuild-game, module-plan, integrate, parity-check, animate, platform-sdk, package-web-build, release-check
+skills/           using-gamekit, re-notes, rebuild-game, module-plan, integrate, parity-check, animate, style-analysis, platform-sdk, package-web-build, release-check
 portals/          vỏ portal dùng chung: azgames, dev-mock (portal.yaml, kit.mjs, shell.html, loader.entry.js, Icons/), shared/
 scripts/          CLI gamekit.mjs + lệnh; lib/
 schemas/          game, params, provenance, module-plan, asset-manifest, motion, … (JSON Schema)

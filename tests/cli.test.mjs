@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { gk, newGame, token, sh, write, read, editJson, editYaml, solidPng, CLI } from './helpers.mjs';
+import { gk, newGame, token, sh, write, read, editJson, editYaml, solidPng, blobPng, CLI } from './helpers.mjs';
 import { spawnSync } from 'node:child_process';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
@@ -823,4 +823,61 @@ fs.copyFileSync(big ? 'art/character-big.png' : 'art/character.png', out);
   assert.deepEqual(meta.frames.map((f) => f.file), ['00.png', '01.png', '02.png']);
   assert.match(read(dir, 'provenance.json'), /assets\/img\/anim\/hop\/01\.png[\s\S]*generated/);
   assert.equal(gk(dir, 'validate').code, 0);
+});
+
+// ---------- style: analyse references, check new assets ----------
+test('style analyze: writes analysis, palette and a draft guide; keeps an edited guide; only PNG', async () => {
+  const dir = newGame('st1', '--third-party');
+  fs.mkdirSync(path.join(dir, 'reference/style'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'reference/style/a.png'), await blobPng());
+  fs.writeFileSync(path.join(dir, 'reference/style/b.png'), await blobPng({ size: 240, bg: '#ffffff' }));
+  let r = gk(dir, 'style', 'analyze', 'reference/style', '--name', 'Mochi');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Phong cách từ 2 ảnh/);
+  assert.match(r.out, /nét viền: #3[a-c]2[a-c]2\d/);
+  const analysis = JSON.parse(read(dir, 'art/style/analysis.json'));
+  assert.deepEqual(analysis.sources.map((s) => s.file), ['a.png', 'b.png']);
+  assert.equal(analysis.sources[1].background, '#ffffff');
+  assert.ok(!('samples' in analysis.sources[0]));
+  const doc = read(dir, 'art/style/style.md');
+  assert.match(doc, /# Phong cách đồ hoạ: Mochi/);
+  assert.match(doc, /Palette: #fff1d6/);
+  assert.match(doc, /không chép nhân vật/);
+  write(dir, 'art/style/style.md', '# đã sửa tay\n');
+  r = gk(dir, 'style', 'analyze', 'reference/style');
+  assert.match(r.out, /style\.md đã có, giữ nguyên/);
+  assert.equal(read(dir, 'art/style/style.md'), '# đã sửa tay\n');
+  assert.ok(fs.existsSync(path.join(dir, 'art/style/style.draft.md')));
+  write(dir, 'reference/style/c.jpg', 'x');
+  r = gk(dir, 'style', 'analyze', 'reference/style/c.jpg');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /chỉ đọc PNG.*magick/s);
+  // P3 gate of a remade game asks for the guide
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^phase: P0/m, 'phase: P3'));
+  assert.match(gk(dir, 'gate').out, /✔ Có phân tích phong cách `art\/style\/style\.md`/);
+});
+
+test('style check: same style passes, off-style fails naming the stray colours', async () => {
+  const dir = newGame('st2');
+  assert.match(gk(dir, 'style', 'check', '.').out, /Không có ảnh PNG|Chưa có/);
+  fs.writeFileSync(path.join(dir, 'ref.png'), await blobPng());
+  assert.equal(gk(dir, 'style', 'analyze', 'ref.png').code, 0);
+  fs.mkdirSync(path.join(dir, 'new'));
+  fs.writeFileSync(path.join(dir, 'new/box.png'), await blobPng({ shape: 'box', size: 180 }));
+  let r = gk(dir, 'style', 'check', 'new');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /1 ảnh đúng phong cách/);
+  fs.writeFileSync(path.join(dir, 'new/teal.png'), await blobPng({ fill: '#3ad1c0', patch: '#1b4fd8' }));
+  r = gk(dir, 'style', 'check', 'new');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /✘ new\/teal\.png: khớp bảng màu \d/);
+  assert.match(r.out, /màu lạ: #3ad1c0/);
+  assert.match(r.out, /1\/2 ảnh lệch phong cách/);
+  // An approved extra colour survives re-analysis and makes the asset pass.
+  editJson(dir, 'art/style/analysis.json', (a) => {
+    a.style.extraPalette = [{ hex: '#3ad1c0', why: 'test' }, { hex: '#1b4fd8', why: 'test' }];
+  });
+  assert.equal(gk(dir, 'style', 'analyze', 'ref.png').code, 0);
+  assert.equal(JSON.parse(read(dir, 'art/style/analysis.json')).style.extraPalette.length, 2);
+  assert.equal(gk(dir, 'style', 'check', 'new').code, 0);
 });
