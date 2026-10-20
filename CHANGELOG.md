@@ -1,5 +1,8 @@
 # Changelog
 
+## Chưa phát hành
+- Đa ngôn ngữ cho ảnh có chữ (logo, nút, banner): `assets/i18n/<mã>/<đường dẫn>`, bản gốc ở `assets/i18n/en/`, lấy URL bằng `tAsset('ui/title.png')`; ngôn ngữ thiếu ảnh dùng bản en. Mỗi ảnh là một file riêng trong gói (không nhúng vào `framework.js`), người chơi chỉ tải ảnh của ngôn ngữ mình. `validate` báo file không có bản en, thư mục ngôn ngữ ngoài `languages`, `tAsset()` trỏ tới file không có; thiếu bản dịch chỉ cảnh báo. Game cũ: chép `src/view/i18n.ts` từ template.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.

@@ -40,6 +40,7 @@ export function validateGame(root, { stage } = {}) {
   validateOracles(root, pr);
   validatePortalSettings(game, st, pr);
   validateLanguages(root, game, pr);
+  validateLocalizedAssets(root, game, pr);
   validateIcons(root, pr);
   validateProvenance(root, st, pr);
   validateModulePlan(root, pr);
@@ -228,6 +229,35 @@ function validateLanguages(root, game, pr) {
     const text = fs.readFileSync(path.join(root, 'src', rel), 'utf8');
     for (const m of text.matchAll(/\bt\(\s*['"]([\w.-]+)['"]/g))
       if (!Object.hasOwn(en, m[1]) && !pluralParams.has(m[1])) pr.error(`src/${rel}`, `t('${m[1]}') không có trong Language/en.json`);
+  }
+}
+
+// ---------- assets/i18n/<code>/: images with words in them, en is the source of every version ----------
+function validateLocalizedAssets(root, game, pr) {
+  const base = path.join(root, 'assets', 'i18n');
+  const codes = game.languages ?? ['en'];
+  const byCode = new Map();
+  if (exists(base)) {
+    for (const ent of fs.readdirSync(base, { withFileTypes: true })) {
+      if (ent.isDirectory()) byCode.set(ent.name, new Set(walk(path.join(base, ent.name)).filter((f) => path.basename(f) !== '.gitkeep')));
+      else if (ent.name !== '.gitkeep') pr.error(`assets/i18n/${ent.name}`, 'phải nằm trong assets/i18n/<mã ngôn ngữ>/');
+    }
+  }
+  const en = byCode.get('en') ?? new Set();
+  for (const [c, files] of byCode) {
+    if (!codes.includes(c)) pr.warn(`assets/i18n/${c}`, `${c} không có trong languages của game.yaml — vẫn bị đóng gói nhưng không ai dùng`);
+    if (c === 'en') continue;
+    for (const f of files) if (!en.has(f)) pr.error(`assets/i18n/${c}/${f}`, `không có bản gốc assets/i18n/en/${f}`);
+  }
+  for (const c of codes) {
+    if (c === 'en' || !en.size) continue;
+    const miss = [...en].filter((f) => !byCode.get(c)?.has(f));
+    if (miss.length) pr.warn(`assets/i18n/${c}`, `thiếu ${miss.length} file, game dùng bản en: ${miss.slice(0, 20).join(', ')}${miss.length > 20 ? '…' : ''}`);
+  }
+  for (const rel of walk(path.join(root, 'src')).filter((f) => /\.tsx?$/.test(f))) {
+    const text = fs.readFileSync(path.join(root, 'src', rel), 'utf8');
+    for (const m of text.matchAll(/\btAsset\(\s*['"]([^'"]+)['"]/g))
+      if (!en.has(m[1])) pr.error(`src/${rel}`, `tAsset('${m[1]}'): thiếu assets/i18n/en/${m[1]}`);
   }
 }
 

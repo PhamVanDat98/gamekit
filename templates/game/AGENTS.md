@@ -11,14 +11,14 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 3. **Asset.** `own`: asset gốc xuất sang định dạng web, đưa vào `assets/`/`public/` với nhãn `own`. `third-party`: asset gốc chỉ là tư liệu trong `reference/` (gitignored). Mọi file trong `assets/` và `public/` phải có nhãn trong `provenance.json` (`gamekit provenance add … --label …`).
 4. **Không tự đánh dấu việc "(bạn)"** trong `gates/*.md` — đó là quyết định của người dùng.
 5. **Popup Settings phải giữ footer bản quyền** (`platform.info.copyright`) — portal yêu cầu, không bỏ khi đổi giao diện.
-6. **Mọi text hiển thị đi qua `t()`** và `Language/en.json` (+ các ngôn ngữ khác), không viết cứng trong `src/`.
+6. **Mọi text hiển thị đi qua `t()`** và `Language/en.json` (+ các ngôn ngữ khác), không viết cứng trong `src/`. **Ảnh có chữ** (logo, nút, banner…) đặt ở `assets/i18n/<mã>/` cùng đường dẫn với bản gốc `assets/i18n/en/`, lấy URL bằng `tAsset('ui/title.png')`; ngôn ngữ thiếu ảnh thì dùng bản en. Ảnh không có chữ để ngoài `assets/i18n/`.
 
 ## Cấu trúc
 - `src/core/` logic thuần, deterministic: không DOM, không thư viện render, thời gian từ fixed step, ngẫu nhiên từ `Rng` có seed. **Viết test trước** (TDD).
 - `src/view/` render và input thiết bị; chỉ đọc state. Kiểm tra bằng screenshot/checklist, không unit test.
 - `src/platform/` interface chung cho mọi portal. Gameplay chỉ gọi `Platform`; adapter nằm trong `src/platform/adapters/`. Event analytics chỉ dùng tên trong `src/platform/events.ts`.
 - `src/contracts/` type dùng chung giữa các module — chỉ agent chính sửa.
-- `Language/` mỗi ngôn ngữ một file (`en.json` bắt buộc) · `public/Icons/` (`web.png`, `loading.webp`) · `builds/` đầu ra của pack (gitignored, không commit).
+- `Language/` mỗi ngôn ngữ một file (`en.json` bắt buộc) · `assets/i18n/<mã>/` ảnh có chữ theo ngôn ngữ · `public/Icons/` (`web.png`, `loading.webp`) · `builds/` đầu ra của pack (gitignored, không commit).
 - `params/` số liệu có nguồn và `confidence` · `spec/` gameplay spec, `obligations.yaml`, `oracles/` · `notes/` ghi chú RE, `QUESTIONS.md` · `gates/` checklist cổng · `DECISIONS.md` lý do và sai khác.
 
 ## Lệnh

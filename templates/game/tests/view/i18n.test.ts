@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { translate } from '../../src/view/i18n';
+import { localizedUrl, translate } from '../../src/view/i18n';
 
 const dict = { 'hud.score': 'Score: {score}', 'coins.one': '{count} coin', 'coins.other': '{count} coins', 'only.other': '{count} x' };
 
@@ -24,5 +24,19 @@ describe('i18n', () => {
   });
   it('leaves unknown placeholders untouched', () => {
     expect(translate(dict, 'en', 'hud.score')).toBe('Score: {score}');
+  });
+});
+
+describe('localized assets', () => {
+  const files = { '/assets/i18n/en/ui/title.png': 'en-title.png', '/assets/i18n/vi/ui/title.png': 'vi-title.png', '/assets/i18n/en/ui/play.png': 'en-play.png' };
+  it('picks the file of the current language', () => {
+    expect(localizedUrl(files, 'vi', 'ui/title.png')).toBe('vi-title.png');
+  });
+  it('falls back to en when the language has no version', () => {
+    expect(localizedUrl(files, 'vi', 'ui/play.png')).toBe('en-play.png');
+    expect(localizedUrl(files, 'ja', 'ui/title.png')).toBe('en-title.png');
+  });
+  it('throws when en has no such file', () => {
+    expect(() => localizedUrl(files, 'en', 'ui/nope.png')).toThrow(/assets\/i18n\/en\/ui\/nope\.png/);
   });
 });

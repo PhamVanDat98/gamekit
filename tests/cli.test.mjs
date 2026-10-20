@@ -615,6 +615,33 @@ test('validate: plural forms a language needs (few/many) are valid when en has t
   assert.match(gk(dir, 'validate').out, /constructor: không có trong en\.json/);
 });
 
+test('validate: assets/i18n — en is the source, extra files fail, missing ones warn, tAsset() names exist', () => {
+  const dir = newGame('vlimg');
+  editYaml(dir, (g) => {
+    g.languages = ['en', 'es'];
+  });
+  write(dir, 'Language/es.json', '{}');
+  write(dir, 'assets/i18n/en/ui/title.png', 'en');
+  write(dir, 'assets/i18n/en/ui/play.png', 'en');
+  write(dir, 'assets/i18n/es/ui/title.png', 'es');
+  write(dir, 'src/view/x.ts', "export const a = (tAsset: (n: string) => string) => tAsset('ui/title.png');\n");
+  gk(dir, 'provenance', 'add', 'assets', '--all', '--label', 'own');
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /assets\/i18n\/es[^\n]*thiếu 1 file[^\n]*ui\/play\.png/, 'thiếu bản dịch chỉ cảnh báo');
+  write(dir, 'assets/i18n/es/ui/extra.png', 'es');
+  write(dir, 'assets/i18n/fr/ui/title.png', 'fr');
+  write(dir, 'assets/i18n/loose.png', 'x');
+  write(dir, 'src/view/x.ts', "export const a = (tAsset: (n: string) => string) => tAsset('ui/nope.png');\n");
+  gk(dir, 'provenance', 'add', 'assets', '--all', '--label', 'own');
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /assets\/i18n\/es\/ui\/extra\.png[^\n]*bản gốc/);
+  assert.match(r.out, /assets\/i18n\/fr[^\n]*không có trong languages/);
+  assert.match(r.out, /assets\/i18n\/loose\.png[^\n]*mã ngôn ngữ/);
+  assert.match(r.out, /tAsset\('ui\/nope\.png'\)/);
+});
+
 test('validate: Icons/web.png must be PNG, loading.webp must be WebP; builds/ must be gitignored', () => {
   const dir = newGame('vicon');
   assert.equal(gk(dir, 'validate').code, 0);

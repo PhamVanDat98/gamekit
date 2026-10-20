@@ -18,3 +18,18 @@ export function translate(dict: Readonly<Record<string, unknown>>, code: string,
 }
 
 export const t = (key: string, params?: Params): string => translate(window.GM_LANG?.dict ?? {}, window.GM_LANG?.code ?? 'en', key, params);
+
+/**
+ * Images (or voice clips) with words in them: assets/i18n/<code>/<name>, en is the source and the
+ * fallback. Every language's file ships as its own URL — never inlined into framework.js — so the
+ * player downloads only the one for their language.
+ */
+const LOCALIZED = import.meta.glob<string>('/assets/i18n/*/**/*', { eager: true, query: '?url&no-inline', import: 'default' });
+
+export function localizedUrl(files: Readonly<Record<string, string>>, code: string, name: string): string {
+  const url = files[`/assets/i18n/${code}/${name}`] ?? files[`/assets/i18n/en/${name}`];
+  if (url === undefined) throw new Error(`assets/i18n/en/${name} not found`);
+  return url;
+}
+
+export const tAsset = (name: string): string => localizedUrl(LOCALIZED, window.GM_LANG?.code ?? 'en', name);
