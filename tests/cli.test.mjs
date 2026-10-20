@@ -615,6 +615,19 @@ test('validate: plural forms a language needs (few/many) are valid when en has t
     d.constructor = 'x';
   });
   assert.match(gk(dir, 'validate').out, /constructor: không có trong en\.json/);
+  // "mode.one"/"mode.two" are menu items, not plural forms: no .other needed.
+  editJson(dir, 'Language/en.json', (d) => Object.assign(d, { 'mode.one': 'One player', 'mode.two': 'Two players' }));
+  editJson(dir, 'Language/ru.json', (d) => {
+    delete d.constructor;
+    Object.assign(d, { 'mode.one': 'Один игрок', 'mode.two': 'Два игрока' });
+  });
+  let out = gk(dir, 'validate').out;
+  assert.doesNotMatch(out, /mode: có dạng số nhiều/);
+  editJson(dir, 'Language/ru.json', (d) => {
+    delete d['coins.other'];
+  });
+  out = gk(dir, 'validate').out;
+  assert.match(out, /coins: có dạng số nhiều nhưng thiếu coins\.other/);
 });
 
 test('validate: assets/i18n — en is the source, extra files fail, missing ones warn, tAsset() names exist', () => {
@@ -661,6 +674,21 @@ test('validate: asset-manifest — an image with words (text: true) lives in ass
   assert.match(r.out, /play: ảnh có chữ phải nằm trong assets\/i18n\/en\//);
   assert.match(r.out, /logo: [^\n]*phải có text: true/);
   assert.match(r.out, /both: text và noText/);
+  // Every language's version of an image with words is checked against the spec.
+  editYaml(dir, (g) => {
+    g.languages = ['en', 'vi'];
+  });
+  write(dir, 'Language/vi.json', '{}');
+  fs.mkdirSync(path.join(dir, 'assets/i18n/en/ui'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'assets/i18n/vi/ui'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'assets/i18n/en/ui/title.png'), solidPng(8, 8));
+  fs.writeFileSync(path.join(dir, 'assets/i18n/vi/ui/title.png'), solidPng(16, 16));
+  gk(dir, 'provenance', 'add', 'assets', '--label', 'generated');
+  man([{ id: 'title', path: 'assets/i18n/en/ui/title.png', text: true, ...ui }, { id: 'nopath', kind: 'ui', width: 1, height: 1 }]);
+  r = gk(dir, 'validate');
+  assert.match(r.out, /title: assets\/i18n\/vi\/ui\/title\.png là 16×16, spec cần 8×8/);
+  assert.doesNotMatch(r.out, /Cannot read/, 'mục thiếu path chỉ báo lỗi schema');
+  assert.match(r.out, /must have required property 'path'/);
 });
 
 test('recon --write: notes/recon.md + source.engine/engineVersion/path; refuses a path inside the game', () => {
@@ -680,52 +708,75 @@ test('recon --write: notes/recon.md + source.engine/engineVersion/path; refuses 
   assert.equal(gk(dir, 'validate').code, 0);
   r = gk(dir, 'recon', '--json');
   assert.equal(JSON.parse(r.out).backend, 'Mono', 'không có đường dẫn thì dùng source.path');
+  editYaml(dir, (g) => {
+    g.source.path = '../orig';
+  });
+  r = gk(path.join(dir, 'src'), 'recon', '--json');
+  assert.equal(JSON.parse(r.out).backend, 'Mono', 'source.path tương đối tính từ thư mục game, không phải cwd');
+  const other = path.join(path.dirname(dir), 'p2');
+  fs.mkdirSync(other);
+  assert.equal(gk(other, 'init', 'g2', '--no-install', '--set', 'sourcePath=../orig2').code, 0);
+  assert.equal(YAML.parse(read(path.join(other, 'g2'), 'game.yaml')).source.path, path.resolve(other, '../orig2').split(path.sep).join('/'));
   r = gk(dir, 'recon', 'src');
   assert.equal(r.code, 1);
   assert.match(r.out, /nằm ngoài thư mục game/);
 });
 
-test('ghidra: needs GHIDRA_HOME; --entry picks a library out of an APK; import once, then export only', { skip: process.platform === 'win32' }, () => {
+test('ghidra: needs GHIDRA_HOME; --entry picks a library out of an APK/XAPK; import once, export after; a different file re-imports', { skip: process.platform === 'win32' }, () => {
   const dir = newGame('ghd');
   const parent = path.dirname(dir);
-  write(parent, 'apk/lib/arm64-v8a/libil2cpp.so', 'ELF');
+  write(parent, 'apk/lib/arm64-v8a/libil2cpp.so', 'ELF64');
+  write(parent, 'apk/lib/armeabi-v7a/libil2cpp.so', 'ELF32');
   zipDir(path.join(parent, 'apk'), path.join(parent, 'g.apk'));
   write(parent, 'script.json', '{"ScriptMethod":[]}');
-  // Fake Ghidra: records its arguments and writes what GameKitExport.java would.
+  // Fake Ghidra: records its arguments and writes what GameKitExport.java would (FAIL=1: script error, exit 0).
   const home = path.join(parent, 'ghidra');
   write(home, 'support/analyzeHeadless', `#!/bin/sh
 echo "$@" >> "${path.join(parent, 'calls.txt')}"
 mkdir -p "$1/$2.rep"
 for a; do last4="$last3"; last3="$last2"; last2="$last1"; last1="$a"; done
 mkdir -p "$last4/c" && printf 'address\tname\n001\tPlayer$$Update\n' > "$last4/functions.tsv" && : > "$last4/strings.tsv"
+[ -n "$FAIL" ] || echo ok > "$last4/done"
 `);
   fs.chmodSync(path.join(home, 'support/analyzeHeadless'), 0o755);
-  const env = { ...process.env, GHIDRA_HOME: '' };
+  const arm64 = ['ghidra', '../g.apk', '--entry', 'lib/arm64-v8a/libil2cpp.so', '--ghidra-home', home];
   let r = gk(dir, 'ghidra', '../g.apk');
   assert.equal(r.code, 1);
-  assert.match(r.out, /--entry[\s\S]*lib\/arm64-v8a\/libil2cpp\.so/);
+  assert.match(r.out, /--entry[\s\S]*lib\/arm64-v8a\/libil2cpp\.so[\s\S]*lib\/armeabi-v7a\/libil2cpp\.so/);
   r = gk(dir, 'ghidra', '../g.apk', '--entry', 'lib/arm64-v8a/libil2cpp.so', '--dry-run');
-  assert.match(r.out, /-import \S*libil2cpp\.so -overwrite/);
-  r = spawnSync(process.execPath, [CLI, 'ghidra', '../g.apk', '--entry', 'lib/arm64-v8a/libil2cpp.so'], { cwd: dir, encoding: 'utf8', env });
+  assert.match(r.out, /-import \S*arm64-v8a_libil2cpp\.so -overwrite/);
+  r = spawnSync(process.execPath, [CLI, 'ghidra', '../g.apk', '--entry', 'lib/arm64-v8a/libil2cpp.so'], { cwd: dir, encoding: 'utf8', env: { ...process.env, GHIDRA_HOME: '' } });
   assert.match(r.stdout, /GHIDRA_HOME/);
-  r = gk(dir, 'ghidra', '../g.apk', '--entry', 'lib/arm64-v8a/libil2cpp.so', '--il2cpp', '../script.json', '--functions', 'Player', '--ghidra-home', home);
+  assert.match(gk(dir, ...arm64, '--functions', '(').out, /--functions không phải regex/);
+  assert.match(gk(dir, ...arm64, '--max', 'abc').out, /--max phải là số nguyên dương/);
+  r = gk(dir, ...arm64, '--il2cpp', '../script.json', '--functions', 'Player|Enemy');
   assert.equal(r.code, 0, r.out);
   assert.match(r.out, /1 hàm/);
-  // XAPK: the library is inside a split APK.
+  r = gk(dir, ...arm64);
+  assert.match(r.out, /chỉ xuất lại/);
+  r = gk(dir, 'ghidra', '../g.apk', '--entry', 'lib/armeabi-v7a/libil2cpp.so', '--ghidra-home', home);
+  assert.match(r.out, /nhập và phân tích armeabi-v7a_libil2cpp\.so/, 'ABI khác là chương trình khác');
+  // The original changed (new game version): import again.
+  fs.utimesSync(path.join(parent, 'g.apk'), new Date(), new Date(Date.now() + 5000));
+  assert.match(gk(dir, ...arm64).out, /khác file đã phân tích trước đây/);
+  // A script error leaves no "done": stale output must not count as success.
+  r = spawnSync(process.execPath, [CLI, ...arm64], { cwd: dir, encoding: 'utf8', env: { ...process.env, FAIL: '1' } });
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /không chạy xong/);
+  // XAPK: the library is inside a split APK; a wrong split name is a clear error.
   fs.mkdirSync(path.join(parent, 'x'));
   fs.copyFileSync(path.join(parent, 'g.apk'), path.join(parent, 'x', 'config.arm64_v8a.apk'));
   zipDir(path.join(parent, 'x'), path.join(parent, 'g.xapk'));
-  r = gk(dir, 'ghidra', '../g.xapk');
-  assert.match(r.out, /config\.arm64_v8a\.apk!\/lib\/arm64-v8a\/libil2cpp\.so/);
+  assert.match(gk(dir, 'ghidra', '../g.xapk').out, /config\.arm64_v8a\.apk!\/lib\/arm64-v8a\/libil2cpp\.so/);
+  assert.match(gk(dir, 'ghidra', '../g.xapk', '--entry', 'nope.apk!/lib/x.so').out, /không có nope\.apk/);
   r = gk(dir, 'ghidra', '../g.xapk', '--entry', 'config.arm64_v8a.apk!/lib/arm64-v8a/libil2cpp.so', '--dry-run');
-  assert.match(r.out, /-process libil2cpp\.so -noanalysis/);
-  r = gk(dir, 'ghidra', '.gamekit/ghidra/bin/libil2cpp.so', '--ghidra-home', home);
-  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /-import \S*arm64-v8a_libil2cpp\.so/, 'XAPK là file khác APK: nhập lại');
   const calls = read(parent, 'calls.txt').trim().split('\n');
-  assert.match(calls[0], /-import .*libil2cpp\.so -overwrite -scriptPath .* -postScript GameKitExport\.java .*decompiled\/ghidra\/libil2cpp\.so .*script\.json Player 200/);
-  assert.match(calls[1], /-process libil2cpp\.so -noanalysis .* - - 200$/, 'lần hai chỉ xuất lại');
+  assert.match(calls[0], /-import .*arm64-v8a_libil2cpp\.so -overwrite -scriptPath .* -postScript GameKitExport\.java .*decompiled\/ghidra\/arm64-v8a_libil2cpp\.so .*script\.json Player\|Enemy 200/);
+  assert.match(calls[1], /-process arm64-v8a_libil2cpp\.so -noanalysis .* - - 200$/, 'lần hai chỉ xuất lại');
   const g = YAML.parse(read(dir, 'game.yaml'));
-  assert.deepEqual(g.ghidra.programs.map((p) => [p.name, p.il2cpp]), [['libil2cpp.so', true]]);
+  assert.deepEqual(g.ghidra.programs.map((p) => [p.name, p.il2cpp]).sort(), [['arm64-v8a_libil2cpp.so', true], ['armeabi-v7a_libil2cpp.so', false]]);
+  assert.ok(!fs.existsSync(path.join(dir, '.gamekit/ghidra/bin/apk')), 'APK con chỉ giải nén tạm');
   assert.equal(gk(dir, 'validate').code, 0);
   assert.equal(sh(dir, 'git', 'status', '--porcelain', '--', '.gamekit', 'decompiled'), '', '.gamekit/ghidra và decompiled/ phải được gitignore');
 });
@@ -762,6 +813,9 @@ test('style: options are checked, choose writes style/style.json + theme.ts the 
     d.palette.primary = '#00ff00';
   });
   assert.match(gk(dir, 'validate').out, /theme\.ts: khác style\/style\.json/);
+  gk(dir, 'style', 'choose', 'candy');
+  write(dir, 'src/view/theme.ts', read(dir, 'src/view/theme.ts').replace(/\n/g, '\r\n'));
+  assert.doesNotMatch(gk(dir, 'validate').out, /theme\.ts: khác/, 'CRLF (Windows) không phải là thay đổi');
   assert.equal(gk(dir, 'style', 'list').code, 0);
   r = gk(dir, 'style', 'preview');
   assert.equal(r.code, 0, r.out);

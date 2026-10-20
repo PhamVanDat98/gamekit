@@ -15,7 +15,7 @@ Mục tiêu: biết game làm bằng gì, logic và dữ liệu nằm ở đâu,
 
 ## 2. Chạy recon
 `npm run gk -- recon <đường dẫn> --write` trong thư mục game (bỏ đường dẫn thì dùng `source.path`; `--json` in kết quả thô).
-- Đọc thư mục, hoặc `.apk/.xapk/.apks/.aab/.ipa/.zip/.obb` mà không giải nén ra đĩa. XAPK/APKS: các APK con được liệt kê dưới `<tên>.apk!/`.
+- Đọc thư mục, hoặc `.apk/.xapk/.apks/.aab/.ipa/.zip/.obb` mà không giải nén cả gói. XAPK/APKS: các APK con được giải nén tạm (xoá ngay sau đó) và liệt kê dưới `<tên>.apk!/`; APK con hỏng được ghi lại, không làm dừng recon.
 - Ra: engine, version (đọc header file, chỉ file ≤ 64 MB trong file nén), backend Unity (Mono / IL2CPP / IL2CPP WebGL), file logic, file dữ liệu, công cụ gợi ý, kiểm kê theo loại và đuôi.
 - `--write`: ghi đè `notes/recon.md`; ghi `source.path`, và `source.engine`/`engineVersion` nếu nhận ra. Engine mới khác engine cũ thì recon cảnh báo — xem lại.
 

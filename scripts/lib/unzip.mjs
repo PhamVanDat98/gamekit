@@ -13,7 +13,13 @@ const MAX = 0xffffffff;
 
 function readAt(fd, pos, len) {
   const buf = Buffer.alloc(len);
-  const n = fs.readSync(fd, buf, 0, len, pos);
+  // One readSync returns at most ~2 GB on Linux: loop until done or end of file.
+  let n = 0;
+  while (n < len) {
+    const got = fs.readSync(fd, buf, n, Math.min(len - n, 1 << 30), pos + n);
+    if (!got) break;
+    n += got;
+  }
   return buf.subarray(0, n);
 }
 
@@ -88,7 +94,7 @@ export function readZipEntry(file, entry, { limit = 64 * 1024 * 1024 } = {}) {
     if (head.readUInt32LE(0) !== LOC) throw new GkError(`${entry.name}: local header hỏng`);
     const data = readAt(fd, entry.offset + 30 + head.readUInt16LE(26) + head.readUInt16LE(28), entry.compressedSize);
     if (entry.method === 0) return data;
-    if (entry.method === 8) return zlib.inflateRawSync(data);
+    if (entry.method === 8) return zlib.inflateRawSync(data, { maxOutputLength: Math.max(1, entry.size) });
     throw new GkError(`${entry.name}: kiểu nén ${entry.method} chưa hỗ trợ`);
   } finally {
     fs.closeSync(fd);

@@ -2,6 +2,7 @@
 // what a port needs: function list, strings, decompiled C of chosen functions. IL2CPP: names from an
 // Il2CppDumper script.json. Project in .gamekit/ghidra/, output in decompiled/ghidra/ (both gitignored).
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -31,6 +32,16 @@ export function headlessArgs({ projectDir, project, binary, imported, outDir, il
   return a;
 }
 
+/**
+ * analyzeHeadless is a .bat on Windows: cmd.exe would split paths with spaces and read "|" in a
+ * --functions regex as a pipe, so quote every argument ourselves.
+ */
+function runHeadless(exe, args) {
+  if (process.platform !== 'win32') return spawnSync(exe, args, { stdio: 'inherit' });
+  const line = [exe, ...args].map((x) => `"${String(x).replace(/"/g, '""')}"`).join(' ');
+  return spawnSync(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', `"${line}"`], { stdio: 'inherit', windowsVerbatimArguments: true });
+}
+
 export async function run(args) {
   const root = requireGameRoot(args.cwd);
   const game = loadGame(root);
@@ -41,52 +52,70 @@ export async function run(args) {
   const local = path.join(root, '.gamekit', 'ghidra');
   fs.mkdirSync(local, { recursive: true });
 
+  let program = path.basename(binary); // name in the project and under decompiled/ghidra/
+  let identity; // what the program was imported from: a different file means a new import
   if (ARCHIVE.test(binary)) {
     // Native code inside an APK/IPA: copy the one entry out (lib/<abi>/libil2cpp.so, Frameworks/UnityFramework…).
     // XAPK/APKS: native code sits in split APKs inside — "config.arm64_v8a.apk!/lib/arm64-v8a/libil2cpp.so".
+    const archiveFile = binary;
+    const outer = listZip(archiveFile);
     const native = (list, prefix) => list.filter((e) => /(^|\/)lib\/[^/]+\/[^/]+\.so$|\.framework\/[^/.]+$|GameAssembly\.dll$/.test(e.name)).map((e) => prefix + e.name);
-    const outer = listZip(binary);
-    const inner = (name) => {
+    // Split APKs are unpacked to a temp file only while we read them.
+    const withInner = (name, fn) => {
       const e = outer.find((x) => x.name === name);
-      const f = path.join(local, 'bin', 'apk', path.basename(name));
-      fs.mkdirSync(path.dirname(f), { recursive: true });
-      fs.writeFileSync(f, readZipEntry(binary, e, { limit: 2 * 1024 ** 3 }));
-      return f;
+      if (!e) throw new GkError(`${given} không có ${name}`);
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gk-ghidra-'));
+      try {
+        const f = path.join(dir, path.basename(name));
+        fs.writeFileSync(f, readZipEntry(archiveFile, e, { limit: 2 * 1024 ** 3 }));
+        return fn(f);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
     };
     if (!args.entry) {
-      const natives = [...native(outer, ''), ...outer.filter((e) => /\.apk$/i.test(e.name)).flatMap((e) => native(listZip(inner(e.name)), `${e.name}!/`))];
+      const natives = [...native(outer, ''), ...outer.filter((e) => /\.apk$/i.test(e.name)).flatMap((e) => withInner(e.name, (f) => native(listZip(f), `${e.name}!/`)))];
       throw new GkError(`${given} là file nén — chọn file trong đó bằng --entry:\n${natives.map((n) => `  ${n}`).join('\n') || '  (không thấy thư viện native)'}`);
     }
     const [apk, rest] = String(args.entry).includes('!/') ? String(args.entry).split('!/') : [null, String(args.entry)];
-    const archive = apk ? inner(apk) : binary;
-    const entry = listZip(archive).find((e) => e.name === rest);
-    if (!entry) throw new GkError(`${given} không có ${args.entry}`);
-    const to = path.join(local, 'bin', path.basename(entry.name));
-    if (!args['dry-run']) {
+    const abi = /(^|\/)lib\/([^/]+)\/[^/]+$/.exec(rest)?.[2];
+    program = abi ? `${abi}_${path.basename(rest)}` : path.basename(rest);
+    const to = path.join(local, 'bin', program);
+    const extract = (archive) => {
+      const entry = listZip(archive).find((e) => e.name === rest);
+      if (!entry) throw new GkError(`${given} không có ${args.entry}`);
+      identity = `${toPosix(archiveFile)}!/${args.entry}:${entry.size}:${fs.statSync(archiveFile).mtimeMs}`;
+      if (args['dry-run']) return;
       fs.mkdirSync(path.dirname(to), { recursive: true });
       fs.writeFileSync(to, readZipEntry(archive, entry, { limit: 2 * 1024 ** 3 }));
-    }
+    };
+    if (apk) withInner(apk, extract);
+    else extract(archiveFile);
     binary = to;
+  } else {
+    const st = fs.statSync(binary);
+    identity = `${toPosix(binary)}:${st.size}:${st.mtimeMs}`;
   }
 
   const il2cpp = args.il2cpp ? path.resolve(args.cwd ?? process.cwd(), args.il2cpp) : null;
   if (il2cpp && !exists(il2cpp)) throw new GkError(`Không có ${args.il2cpp} (script.json của Il2CppDumper)`);
-  const name = path.basename(binary);
+  const functions = args.functions === true ? 'all' : args.functions;
+  if (functions && functions !== 'all') {
+    try {
+      new RegExp(functions);
+    } catch (e) {
+      throw new GkError(`--functions không phải regex hợp lệ: ${e.message}`);
+    }
+  }
+  const max = args.max === undefined ? 200 : Number(args.max);
+  if (!Number.isInteger(max) || max < 1) throw new GkError('--max phải là số nguyên dương');
   const stateFile = path.join(local, 'imported.json');
   const state = exists(stateFile) ? readJson(stateFile) : {};
-  const imported = !args.reanalyze && Boolean(state[name]) && exists(path.join(local, `${game.name}.rep`));
-  const outDir = path.join(root, 'decompiled', 'ghidra', name);
-  const a = headlessArgs({
-    projectDir: local,
-    project: game.name,
-    binary,
-    imported,
-    outDir,
-    il2cpp,
-    functions: args.functions === true ? 'all' : args.functions,
-    max: args.max ? Number(args.max) : 200,
-    timeout: args.timeout,
-  });
+  const known = state[program] && exists(path.join(local, `${game.name}.rep`));
+  const changed = known && state[program].identity !== identity;
+  const imported = !args.reanalyze && known && !changed;
+  const outDir = path.join(root, 'decompiled', 'ghidra', program);
+  const a = headlessArgs({ projectDir: local, project: game.name, binary, imported, outDir, il2cpp, functions, max, timeout: args.timeout });
 
   const home = args['ghidra-home'] ?? process.env.GHIDRA_HOME;
   if (args['dry-run']) {
@@ -95,13 +124,17 @@ export async function run(args) {
   }
   if (!home) throw new GkError('Chưa có Ghidra: đặt biến môi trường GHIDRA_HOME (thư mục cài Ghidra 11+, cần JDK 21) hoặc --ghidra-home <thư mục>');
   const exe = launcher(home);
-  log.info(imported ? `Ghidra: ${name} đã phân tích — chỉ xuất lại (--reanalyze để phân tích lại)` : `Ghidra: nhập và phân tích ${name} (file lớn như libil2cpp.so có thể mất hàng giờ)…`);
-  const r = spawnSync(exe, a, { stdio: 'inherit', shell: process.platform === 'win32' });
+  if (changed) log.info(`Ghidra: ${program} khác file đã phân tích trước đây — nhập và phân tích lại`);
+  log.info(imported ? `Ghidra: ${program} đã phân tích — chỉ xuất lại (--reanalyze để phân tích lại)` : `Ghidra: nhập và phân tích ${program} (file lớn như libil2cpp.so có thể mất hàng giờ)…`);
+  // Old output must not pass for this run's: the script writes "done" as its last step.
+  for (const f of ['functions.tsv', 'strings.tsv', 'c', 'done']) fs.rmSync(path.join(outDir, f), { recursive: true, force: true });
+  const r = runHeadless(exe, a);
   if (r.status !== 0) throw new GkError(`analyzeHeadless dừng với mã ${r.status ?? r.signal}`);
-  if (!exists(path.join(outDir, 'functions.tsv'))) throw new GkError(`Ghidra chạy xong nhưng không có ${toPosix(path.relative(root, outDir))}/functions.tsv — xem log phía trên`);
+  if (!exists(path.join(outDir, 'done'))) throw new GkError(`GameKitExport.java không chạy xong (xem "SCRIPT ERROR" trong log phía trên) — ${toPosix(path.relative(root, outDir))}/ không dùng được`);
 
-  state[name] = { binary: toPosix(binary), il2cpp: Boolean(il2cpp), at: nowIso() };
+  state[program] = { binary: toPosix(binary), identity, il2cpp: Boolean(il2cpp), at: nowIso() };
   writeJson(stateFile, state);
+  const name = program;
   const programs = (game.ghidra?.programs ?? []).filter((p) => p.name !== name);
   programs.push({ name, il2cpp: Boolean(il2cpp) || Boolean(game.ghidra?.programs?.find((p) => p.name === name)?.il2cpp), exportedAt: nowIso() });
   updateGame(root, [[['ghidra'], { project: '.gamekit/ghidra', output: 'decompiled/ghidra', programs }]]);

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { tmpDir, write, solidPng } from './helpers.mjs';
-import { decodePng, encodePng, resize, fit, colourCount } from '../scripts/lib/png.mjs';
+import { decodePng, encodePng, resize, fit, colourCount, imageSize } from '../scripts/lib/png.mjs';
 import { zipDir } from '../scripts/lib/zip.mjs';
 import { listZip, readZipEntry } from '../scripts/lib/unzip.mjs';
 
@@ -71,4 +71,18 @@ test('unzip: lists and reads entries written by zipDir', () => {
   assert.throws(() => readZipEntry(path.join(dir, 'a.apk'), entries[1], { limit: 10 }), /giới hạn/);
   fs.writeFileSync(path.join(dir, 'no.zip'), 'nope');
   assert.throws(() => listZip(path.join(dir, 'no.zip')), /không phải file zip/);
+});
+
+test('imageSize: JPEG with >64 KB of APP data and fill bytes; Apple CgBI PNG', () => {
+  const dir = tmpDir();
+  const seg = (marker, body) => Buffer.concat([Buffer.from([0xff, marker]), Buffer.from([(body.length + 2) >> 8, (body.length + 2) & 255]), body]);
+  const sof = Buffer.from([8, 0, 23, 0, 37, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]); // precision, height 23, width 37, 3 components
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8]), seg(0xe2, Buffer.alloc(60000)), seg(0xe2, Buffer.alloc(60000)), Buffer.from([0xff, 0xff]), seg(0xc0, sof), Buffer.from([0xff, 0xd9])]);
+  fs.writeFileSync(path.join(dir, 'a.jpg'), jpeg);
+  assert.deepEqual(imageSize(path.join(dir, 'a.jpg')), { width: 37, height: 23, alpha: false });
+  const png = solidPng(5, 3);
+  const cgbi = Buffer.concat([png.subarray(0, 8), Buffer.from([0, 0, 0, 4]), Buffer.from('CgBI'), Buffer.alloc(8), png.subarray(8)]);
+  fs.writeFileSync(path.join(dir, 'c.png'), cgbi);
+  assert.deepEqual(imageSize(path.join(dir, 'c.png')), { width: 5, height: 3, alpha: true });
+  assert.throws(() => decodePng(cgbi), /CgBI/);
 });

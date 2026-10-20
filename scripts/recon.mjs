@@ -35,6 +35,7 @@ export function openSource(src) {
     return { files: [{ path: name, size }], read: (_, max) => head(src, max), cleanup() {} };
   }
   const tmp = [];
+  const skipped = [];
   const files = [];
   const sources = new Map(); // listed path → [archive file, entry]
   const add = (archive, prefix) => {
@@ -45,26 +46,37 @@ export function openSource(src) {
       sources.set(p, [archive, e]);
       if (/\.apk$/i.test(e.name) && !prefix) {
         // XAPK/APKS hold the real APKs: unpack them to a temp file and list them too, under "<name>.apk!/".
-        const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gk-recon-')), path.basename(e.name));
-        fs.writeFileSync(f, readZipEntry(archive, e, { limit: 2 * 1024 ** 3 }));
-        tmp.push(path.dirname(f));
-        add(f, `${e.name}!/`);
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gk-recon-'));
+        tmp.push(dir);
+        const f = path.join(dir, path.basename(e.name));
+        try {
+          fs.writeFileSync(f, readZipEntry(archive, e, { limit: 2 * 1024 ** 3 }));
+          add(f, `${e.name}!/`);
+        } catch (err) {
+          skipped.push(`${e.name}: ${err.message}`); // one broken split APK must not hide the others
+        }
       }
     }
   };
-  add(src, '');
+  const cleanup = () => tmp.forEach((d) => fs.rmSync(d, { recursive: true, force: true }));
+  try {
+    add(src, '');
+  } catch (err) {
+    cleanup();
+    throw err;
+  }
   const read = (p, max) => {
     const s = sources.get(p);
     if (!s || s[1].size > 64 * 1024 * 1024) return null;
     return readZipEntry(s[0], s[1]).subarray(0, max);
   };
-  return { files, read, cleanup: () => tmp.forEach((d) => fs.rmSync(d, { recursive: true, force: true })) };
+  return { files, read, skipped, cleanup };
 }
 
 export function recon(src) {
   const s = openSource(src);
   try {
-    return { path: src, ...detect(s.files, s.read) };
+    return { path: src, ...detect(s.files, s.read), skipped: s.skipped ?? [] };
   } finally {
     s.cleanup();
   }
@@ -80,6 +92,7 @@ export function reportMarkdown(r) {
   L.push(`- Engine: **${r.name}**${r.version ? ` ${r.version}` : ''} → \`source.engine: ${r.engine}\``);
   if (r.backend) L.push(`- Scripting backend: ${r.backend}`);
   if (r.evidence.length) L.push(`- Dấu hiệu: ${r.evidence.map((e) => `\`${e}\``).join(', ')}`);
+  for (const s of r.skipped ?? []) L.push(`- Không đọc được ${s}`);
   if (r.alsoMatched.length) L.push(`- Cũng khớp: ${r.alsoMatched.join(', ')} (kiểm tra lại nếu engine chính có vẻ sai)`);
   L.push('', '## Logic và dữ liệu nằm ở đâu', '');
   L.push(`- Logic: ${r.logic.length ? r.logic.map((e) => `\`${e}\``).join(', ') : 'chưa xác định'}`);
@@ -98,7 +111,8 @@ export async function run(args) {
   const game = root ? loadGame(root) : null;
   const given = args._[0] ?? game?.source?.path;
   if (!given) throw new GkError('Dùng: gamekit recon <thư mục | file .apk/.xapk/.ipa/.zip…> [--write] [--json]');
-  const src = path.resolve(args.cwd ?? process.cwd(), given);
+  // source.path in game.yaml is relative to the game folder; a path typed on the command line, to the cwd.
+  const src = args._[0] ? path.resolve(args.cwd ?? process.cwd(), given) : path.resolve(root, given);
   if (root && (src === root || src.startsWith(root + path.sep))) throw new GkError('Đường dẫn game gốc phải nằm ngoài thư mục game web');
   const r = recon(src);
   if (args.json) {

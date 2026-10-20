@@ -4,14 +4,15 @@
 /** Signatures, most specific first. `engine` is the game.yaml value; `name` what people call it. */
 const RULES = [
   { engine: 'unity', name: 'Unity (project)', source: true, any: [/(^|\/)ProjectSettings\/ProjectVersion\.txt$/] },
-  { engine: 'unity', name: 'Unity', any: [/(^|\/)lib\/[^/]+\/libunity\.so$/, /(^|\/)UnityPlayer\.(dll|dylib|so)$/, /(^|\/)UnityFramework\.framework\//, /(^|\/)[^/]+_Data\/globalgamemanagers$/, /(^|\/)assets\/bin\/Data\//] },
+  { engine: 'unity', name: 'Unity', any: [/(^|\/)lib\/[^/]+\/libunity\.so$/, /(^|\/)UnityPlayer\.(dll|dylib|so)$/, /(^|\/)UnityFramework\.framework\//, /(^|\/)[^/]+_Data\/globalgamemanagers$/, /(^|\/)assets\/bin\/Data\//, /\.app\/Data\/(globalgamemanagers|unity default resources)$/, /(^|\/)Data\/Managed\/Metadata\/global-metadata\.dat$/] },
   { engine: 'unity', name: 'Unity WebGL', any: [/(^|\/)Build\/[^/]+\.(loader\.js|framework\.js(\.gz|\.br|\.unityweb)?)$/, /(^|\/)Build\/UnityLoader\.js$/] },
   { engine: 'godot', name: 'Godot (project)', source: true, any: [/(^|\/)project\.godot$/] },
   { engine: 'godot', name: 'Godot', any: [/\.pck$/, /(^|\/)lib\/[^/]+\/libgodot_android\.so$/] },
   { engine: 'unreal', name: 'Unreal (project)', source: true, any: [/\.uproject$/] },
   { engine: 'unreal', name: 'Unreal', any: [/(^|\/)lib\/[^/]+\/lib(UE4|Unreal)\.so$/, /(^|\/)Content\/Paks\/[^/]+\.(pak|utoc)$/] },
-  { engine: 'cocos', name: 'Cocos Creator (project)', source: true, all: [/(^|\/)assets\//, /(^|\/)(project\.json|settings\/project\.json|creator\.d\.ts)$/] },
-  { engine: 'cocos', name: 'Cocos Creator / cocos2d-x JS', any: [/(^|\/)lib\/[^/]+\/libcocos2djs\.so$/, /(^|\/)lib\/[^/]+\/libcocos\.so$/, /(^|\/)cocos2d-js(-min)?(\.[0-9a-f]+)?\.js$/, /(^|\/)cocos-js\/cc\.js$/, /(^|\/)src\/settings(\.[0-9a-f]+)?\.(js|json)$/, /\.jsc$/] },
+  // A Creator project has .meta next to every asset and its own settings files (a build has neither).
+  { engine: 'cocos', name: 'Cocos Creator (project)', source: true, all: [/(^|\/)assets\/.+\.meta$/, /(^|\/)(settings\/project\.json|settings\/v2\/packages\/[^/]+\.json|creator\.d\.ts)$/] },
+  { engine: 'cocos', name: 'Cocos Creator / cocos2d-x JS', any: [/(^|\/)lib\/[^/]+\/libcocos2djs\.so$/, /(^|\/)lib\/[^/]+\/libcocos\.so$/, /(^|\/)cocos2d-js(-min)?(\.[0-9a-f]+)?\.js$/, /(^|\/)cocos-js\/cc\.js$/, /\.jsc$/] },
   { engine: 'cocos', name: 'cocos2d-x Lua', any: [/(^|\/)lib\/[^/]+\/libcocos2dlua\.so$/] },
   { engine: 'cocos', name: 'cocos2d-x C++', any: [/(^|\/)lib\/[^/]+\/libcocos2dcpp\.so$/, /(^|\/)lib\/[^/]+\/libMyGame\.so$/] },
   { engine: 'flash', name: 'Adobe AIR', any: [/(^|\/)META-INF\/AIR\//, /(^|\/)lib\/[^/]+\/libCore\.so$/] },

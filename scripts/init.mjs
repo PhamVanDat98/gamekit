@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { copyDir, exists, readYaml, writeJson } from './lib/io.mjs';
+import { copyDir, exists, readYaml, writeJson, toPosix } from './lib/io.mjs';
 import { log, GkError } from './lib/log.mjs';
 import { git } from './lib/git.mjs';
 import { nowIso, updateGame } from './lib/game.mjs';
@@ -59,7 +59,8 @@ export async function run(args) {
   if (gameErrors.length) throw new GkError(`game.yaml sinh ra không hợp lệ: ${gameErrors.join('; ')}`);
   updateGame(dest, [
     [['source', 'ownership'], args['third-party'] ? 'third-party' : 'own'],
-    [['source', 'path'], answers.sourcePath ?? null],
+    // Stored absolute: a path typed relative to where init ran means nothing from inside the game folder.
+    [['source', 'path'], answers.sourcePath ? toPosix(path.resolve(args.cwd ?? process.cwd(), answers.sourcePath)) : null],
     [['portals'], portals],
     [['portalSettings'], portalSettings],
     [['language'], language],

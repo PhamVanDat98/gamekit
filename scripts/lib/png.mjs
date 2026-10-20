@@ -38,6 +38,7 @@ export function isWebp(file) {
 // An image is { width, height, data } with data = RGBA, 8 bits per channel, row after row.
 
 const SIG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const MAX_PIXELS = 64e6; // 8000×8000: decoding keeps three copies in memory
 const CHANNELS = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 };
 
 /** PNG bytes → RGBA. Every colour type and bit depth; interlaced (Adam7) PNGs are refused. */
@@ -53,6 +54,7 @@ export function decodePng(buf) {
     const type = buf.toString('latin1', pos + 4, pos + 8);
     const body = buf.subarray(pos + 8, pos + 8 + len);
     pos += 12 + len;
+    if (type === 'CgBI') throw new GkError('PNG kiểu Apple (CgBI) — chuyển về PNG thường trước (vd pngdefry, AssetRipper)');
     if (type === 'IHDR') ihdr = { width: body.readUInt32BE(0), height: body.readUInt32BE(4), depth: body[8], color: body[9], interlace: body[12] };
     else if (type === 'PLTE') palette = body;
     else if (type === 'tRNS') trns = body;
@@ -60,11 +62,12 @@ export function decodePng(buf) {
     else if (type === 'IEND') break;
   }
   if (!ihdr || !(ihdr.color in CHANNELS)) throw new GkError('PNG hỏng: thiếu hoặc sai IHDR');
+  if (ihdr.width * ihdr.height > MAX_PIXELS) throw new GkError(`PNG ${ihdr.width}×${ihdr.height} quá lớn (tối đa ${MAX_PIXELS / 1e6} triệu điểm ảnh)`);
   if (ihdr.interlace) throw new GkError('PNG interlaced (Adam7) chưa hỗ trợ — xuất lại không interlace');
   const { width, height, depth, color } = ihdr;
   const bpp = Math.max(1, (CHANNELS[color] * depth) >> 3); // bytes per pixel for filtering
   const stride = Math.ceil((width * CHANNELS[color] * depth) / 8);
-  const raw = zlib.inflateSync(Buffer.concat(idat));
+  const raw = zlib.inflateSync(Buffer.concat(idat), { maxOutputLength: (stride + 1) * height });
   const px = Buffer.alloc(stride * height);
   for (let y = 0; y < height; y++) {
     const f = raw[y * (stride + 1)];
@@ -263,7 +266,11 @@ export function imageSize(file) {
     const buf = Buffer.alloc(64 * 1024);
     const n = fs.readSync(fd, buf, 0, buf.length, 0);
     const b = buf.subarray(0, n);
-    if (n >= 26 && b.subarray(0, 8).equals(SIG)) return { width: b.readUInt32BE(16), height: b.readUInt32BE(20), alpha: b[25] === 4 || b[25] === 6 ? true : b[25] === 3 ? null : false };
+    if (n >= 26 && b.subarray(0, 8).equals(SIG)) {
+      // Apple's iOS-optimised PNG puts a CgBI chunk (16 bytes) before IHDR.
+      const o = b.toString('latin1', 12, 16) === 'CgBI' ? 16 : 0;
+      return { width: b.readUInt32BE(16 + o), height: b.readUInt32BE(20 + o), alpha: b[25 + o] === 4 || b[25 + o] === 6 ? true : b[25 + o] === 3 ? null : false };
+    }
     if (n >= 10 && b.toString('latin1', 0, 3) === 'GIF') return { width: b.readUInt16LE(6), height: b.readUInt16LE(8), alpha: null };
     if (n >= 30 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') {
       const chunk = b.toString('latin1', 12, 16);
@@ -275,17 +282,37 @@ export function imageSize(file) {
       if (chunk === 'VP8 ') return { width: b.readUInt16LE(26) & 0x3fff, height: b.readUInt16LE(28) & 0x3fff, alpha: false };
       return null;
     }
-    if (n >= 4 && b[0] === 0xff && b[1] === 0xd8) {
-      // JPEG: walk the segments to the first start-of-frame marker.
-      for (let i = 2; i + 9 < n; ) {
-        if (b[i] !== 0xff) return null;
-        const m = b[i + 1];
-        if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { width: b.readUInt16BE(i + 7), height: b.readUInt16BE(i + 5), alpha: false };
-        i += 2 + b.readUInt16BE(i + 2);
-      }
-    }
+    if (n >= 4 && b[0] === 0xff && b[1] === 0xd8) return jpegSize(fd);
     return null;
   } finally {
     fs.closeSync(fd);
   }
+}
+
+/** Walk JPEG segments to the first start-of-frame, seeking past large APP blocks (ICC, XMP, Photoshop). */
+function jpegSize(fd) {
+  const at = (pos, len) => {
+    const buf = Buffer.alloc(len);
+    return buf.subarray(0, fs.readSync(fd, buf, 0, len, pos));
+  };
+  let pos = 2;
+  for (let guard = 0; guard < 10000; guard++) {
+    const h = at(pos, 2);
+    if (h.length < 2) return null;
+    if (h[0] !== 0xff) return null;
+    const m = h[1];
+    if (m === 0xff) {
+      pos++; // fill byte
+      continue;
+    }
+    if ((m >= 0xd0 && m <= 0xd9) || m === 0x01) {
+      pos += 2; // standalone marker, no length
+      continue;
+    }
+    const seg = at(pos + 2, 7);
+    if (seg.length < 2) return null;
+    if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return seg.length >= 7 ? { width: seg.readUInt16BE(5), height: seg.readUInt16BE(3), alpha: false } : null;
+    pos += 2 + seg.readUInt16BE(0);
+  }
+  return null;
 }

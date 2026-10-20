@@ -48,6 +48,10 @@ public class GameKitExport extends GhidraScript {
 		if (!filter.equals("-")) {
 			decompile(new File(out, "c"), filter, max);
 		}
+		// gamekit ghidra treats the export as complete only when this file exists.
+		try (PrintWriter w = new PrintWriter(new File(out, "done"), StandardCharsets.UTF_8)) {
+			w.println(currentProgram.getName());
+		}
 	}
 
 	private static String clean(String s) {

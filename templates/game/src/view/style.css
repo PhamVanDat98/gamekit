@@ -98,7 +98,8 @@ body {
 }
 .gk-settings-title {
   margin: 0;
-  font: 20px var(--gk-font-display, system-ui, sans-serif);
+  font-family: var(--gk-font-display, system-ui, sans-serif);
+  font-size: 20px;
 }
 .gk-settings-row {
   display: flex;

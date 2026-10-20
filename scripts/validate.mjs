@@ -46,7 +46,7 @@ export function validateGame(root, { stage } = {}) {
   validateIcons(root, pr);
   validateProvenance(root, st, pr);
   validateModulePlan(root, pr);
-  validateAssetManifest(root, pr);
+  validateAssetManifest(root, game, pr);
   validateStyles(root, pr);
   if (exists(path.join(root, 'store'))) {
     // Store material is a release item: advice before P5, required from P5 on.
@@ -231,7 +231,8 @@ function validateLanguages(root, game, pr) {
     }
     if (c === 'en') continue;
     // Intl.PluralRules can always answer "other": without it, translate() falls back to the key.
-    for (const base of new Set(Object.keys(dict).map(pluralBase).filter((b) => b && pluralParams.has(b))))
+    // Only real plurals (en has base.other): "mode.one"/"mode.two" as menu items are plain keys.
+    for (const base of new Set(Object.keys(dict).map(pluralBase).filter((b) => b && Object.hasOwn(en, `${b}.other`))))
       if (!Object.hasOwn(dict, `${base}.other`)) pr.error(where, `${base}: có dạng số nhiều nhưng thiếu ${base}.other (pack sẽ lấy bản en)`);
     const hasBase = new Set(Object.keys(dict).map(pluralBase).filter(Boolean));
     const miss = Object.keys(en).filter((k) => k !== '_meta' && !Object.hasOwn(dict, k) && !(pluralParams.has(pluralBase(k)) && hasBase.has(pluralBase(k))));
@@ -389,7 +390,7 @@ function validateModulePlan(root, pr) {
 }
 
 // ---------- asset-manifest.json ----------
-function validateAssetManifest(root, pr) {
+function validateAssetManifest(root, game, pr) {
   const f = path.join(root, 'asset-manifest.json');
   if (!exists(f)) return;
   const where = 'asset-manifest.json';
@@ -401,6 +402,7 @@ function validateAssetManifest(root, pr) {
     return;
   }
   for (const e of check('asset-manifest', man)) pr.error(where, e);
+  if (!Array.isArray(man.assets)) return;
   let en = {};
   try {
     en = loadLanguages(root).en ?? {};
@@ -411,7 +413,9 @@ function validateAssetManifest(root, pr) {
   if (todo.length) pr.warn(where, `${todo.length} mục còn brief TODO: ${todo.slice(0, 10).join(', ')}${todo.length > 10 ? '…' : ''}`);
   const fix = (man.assets ?? []).filter((a) => a.review?.status === 'fix').map((a) => a.id);
   if (fix.length) pr.warn(where, `${fix.length} mục người duyệt yêu cầu sửa (review.status: fix): ${fix.slice(0, 10).join(', ')}${fix.length > 10 ? '…' : ''}`);
-  for (const a of man.assets ?? []) {
+  for (const a of man.assets) {
+    if (!a || typeof a.path !== 'string') continue; // reported by the schema check
+    if (a.path.includes('\\')) pr.error(where, `${a.id}: path dùng "/" (không dùng "\\"): ${a.path}`);
     // Words in an image are text too: they need one version per language, like Language/*.json.
     const localized = a.path.startsWith('assets/i18n/');
     if (a.text && a.noText) pr.error(where, `${a.id}: text và noText không thể cùng true`);
@@ -419,18 +423,21 @@ function validateAssetManifest(root, pr) {
     if (localized && !a.text && !a.voice) pr.error(where, `${a.id}: ${a.path} nằm trong assets/i18n/ nên phải có text: true (ảnh có chữ) hoặc voice: true (lời thoại)`);
     if (a.voice && (a.kind !== 'audio' || !a.path.startsWith('assets/i18n/en/'))) pr.error(where, `${a.id}: lời thoại (voice: true) phải là kind audio, path trong assets/i18n/en/`);
     if ((a.voice || a.textKey) && !Object.hasOwn(en, a.textKey ?? '')) pr.error(where, `${a.id}: textKey ${a.textKey ?? '(thiếu)'} không có trong Language/en.json`);
-    const file = path.join(root, a.path);
-    if (!exists(file)) continue; // not generated yet
-    if (a.kind === 'audio' || !/\.(png|jpe?g|webp|gif)$/i.test(a.path)) continue;
-    const info = imageSize(file);
-    if (!info) {
-      pr.error(where, `${a.path} không đọc được kích thước (PNG/JPEG/WebP/GIF hỏng?)`);
-      continue;
+    // Images with words: every language's version must match the spec too.
+    const files = a.text && a.path.startsWith('assets/i18n/en/') ? (game.languages ?? ['en']).map((c) => `assets/i18n/${c}/${a.path.slice('assets/i18n/en/'.length)}`) : [a.path];
+    for (const rel of files) {
+      const file = path.join(root, rel);
+      if (!exists(file)) continue; // not generated yet
+      if (a.kind === 'audio' || !/\.(png|jpe?g|webp|gif)$/i.test(rel)) continue;
+      const info = imageSize(file);
+      if (!info) {
+        pr.error(where, `${rel} không đọc được kích thước (PNG/JPEG/WebP/GIF hỏng?)`);
+        continue;
+      }
+      const w = a.frames ? a.frames.width * a.frames.count : a.width;
+      if (info.width !== w || info.height !== a.height) pr.error(where, `${a.id}: ${rel} là ${info.width}×${info.height}, spec cần ${w}×${a.height}`);
+      if (a.alpha === true && info.alpha === false) pr.error(where, `${a.id}: ${rel} cần nền trong suốt nhưng ảnh không có kênh alpha`);
     }
-    const w = a.frames ? a.frames.width * a.frames.count : a.width;
-    if (info.width !== w || info.height !== a.height)
-      pr.error(where, `${a.id}: ${a.path} là ${info.width}×${info.height}, spec cần ${w}×${a.height}`);
-    if (a.alpha === true && info.alpha === false) pr.error(where, `${a.id}: cần nền trong suốt nhưng PNG không có kênh alpha`);
   }
 }
 
@@ -457,7 +464,8 @@ function validateStyles(root, pr) {
   for (const e of errors) pr.error('style', e);
   for (const w of warnings) pr.warn('style', w);
   const theme = path.join(root, 'src', 'view', 'theme.ts');
-  if (!errors.length && exists(theme) && fs.readFileSync(theme, 'utf8') !== themeSource(chosen))
+  const lf = (t) => t.replace(/\r\n/g, '\n'); // Windows checkouts (autocrlf) are not a change
+  if (!errors.length && exists(theme) && lf(fs.readFileSync(theme, 'utf8')) !== lf(themeSource(chosen)))
     pr.warn('src/view/theme.ts', `khác style/style.json — sửa style/options/${chosen.id}.json rồi chạy gamekit style choose ${chosen.id}`);
 }
 

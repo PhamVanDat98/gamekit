@@ -3,14 +3,30 @@ import tseslint from 'typescript-eslint';
 
 const RENDER_LIBS = ['pixi.js', 'pixi.js/*', 'phaser', 'three', 'three/*', '@babylonjs/*', 'howler'];
 
-// Text typed into view code: a string literal with letters in any script ("Play", "Chơi", "プレイ") at
-// a place that puts it on screen. `%` in each selector stands for that literal.
+// Text typed into view code: a string literal (or the text parts of a template literal) with letters in any
+// script ("Play", "Chơi", "プレイ") at a place that puts it on screen — directly, or through `a ? 'x' : 'y'`,
+// `t('k') + ' pts'`, `a || 'x'`, `'x' as string`. `%` in a place stands for that expression.
 const NO_HARDCODED_TEXT = 'Text hiển thị phải qua t() (Language/*.json). Ảnh có chữ: assets/i18n/<mã>/ + tAsset().';
+const TEXT = ':matches(Literal[value=/\\p{L}/u], TemplateLiteral:has(> TemplateElement[value.raw=/\\p{L}/u]))';
+const WRAPS = [
+  ['ConditionalExpression', '.consequent'],
+  ['ConditionalExpression', '.alternate'],
+  ['BinaryExpression[operator="+"]', ''],
+  ['LogicalExpression', ''],
+  ['TSAsExpression', '.expression'],
+];
 const hardcoded = (...places) =>
-  places.flatMap((p) => [p.replace('%', 'Literal[value=/\\p{L}/u]'), p.replace('%', 'TemplateLiteral:has(TemplateElement[value.raw=/\\p{L}/u])')]).map((selector) => ({ selector, message: NO_HARDCODED_TEXT }));
+  places
+    .flatMap((p) => [
+      p.replace('%', TEXT),
+      ...WRAPS.map(([w, field]) => `${p.replace('%', w)} > ${TEXT}${field}`),
+      // one more level for chains like 'a' + b + 'c' and a ? 'x' + n : y
+      ...WRAPS.slice(0, 4).map(([w, field]) => `${p.replace('%', w)} > BinaryExpression[operator="+"]${field} > ${TEXT}`),
+    ])
+    .map((selector) => ({ selector, message: NO_HARDCODED_TEXT }));
 
 export default tseslint.config(
-  { ignores: ['builds/', 'node_modules/', 'scripts/', '.gamekit/', 'reference/', 'decompiled/'] },
+  { ignores: ['builds/', 'dist/', 'node_modules/', 'scripts/', '.gamekit/', 'reference/', 'decompiled/'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -22,10 +38,14 @@ export default tseslint.config(
         ...hardcoded(
           'CallExpression[callee.property.name=/^(fillText|strokeText|setText|createTextNode)$/] > %.arguments:first-child',
           'CallExpression[callee.property.name="text"] > %.arguments', // Phaser this.add.text(x, y, '…')
+          'CallExpression[callee.property.name=/^(append|prepend|replaceChildren|before|after)$/] > %.arguments',
+          'CallExpression[callee.property.name="insertAdjacentText"] > %.arguments:nth-child(2)',
           'CallExpression[callee.property.name="setAttribute"][arguments.0.value=/^(aria-label|title|alt|placeholder)$/] > %.arguments:nth-child(2)',
-          'AssignmentExpression[left.property.name=/^(textContent|innerText|innerHTML|title|placeholder|alt)$/] > %.right',
+          'AssignmentExpression[left.property.name=/^(textContent|innerText|title|placeholder|alt|ariaLabel)$/] > %.right',
           'NewExpression[callee.name=/^(Text|BitmapText|HTMLText)$/] > %.arguments:first-child', // Pixi v7
-          'NewExpression[callee.name=/^(Text|BitmapText|HTMLText)$/] Property[key.name="text"] > %.value', // Pixi v8
+          'NewExpression[callee.property.name=/^(Text|BitmapText|HTMLText)$/] > %.arguments:first-child', // new PIXI.Text('…')
+          ':matches(NewExpression[callee.name=/^(Text|BitmapText|HTMLText)$/], NewExpression[callee.property.name=/^(Text|BitmapText|HTMLText)$/]) Property[key.name="text"] > %.value', // Pixi v8
+          'CallExpression[callee.name="el"] > %.arguments:nth-child(3)', // the template's el(tag, class, text) in settings.ts
         ),
       ],
     },

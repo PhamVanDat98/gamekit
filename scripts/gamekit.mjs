@@ -17,7 +17,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   status | next                             Game đang ở pha nào, việc gì tiếp
   recon [đường dẫn] [--write] [--json]      Nhận diện engine game gốc (thư mục, apk/xapk/ipa/zip), logic/dữ liệu ở đâu, kiểm kê
                                             --write: ghi notes/recon.md và source.engine/engineVersion/path vào game.yaml
-  ghidra <file> [--entry lib/…so] [--il2cpp script.json] [--functions <regex>|all] [--max N] [--reanalyze] [--dry-run]
+  ghidra <file> [--entry lib/…so] [--il2cpp script.json] [--functions <regex>|all] [--max N] [--timeout giây] [--reanalyze] [--dry-run]
                                             Ghidra headless (GHIDRA_HOME): danh sách hàm, chuỗi, decompile → decompiled/ghidra/
   gate [--advance]                          Kiểm tra cổng của pha hiện tại
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
@@ -35,7 +35,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   gen prompt [--id a]                       In prompt (dùng với Codex, ChatGPT, công cụ khác)
   gen import <id> <file> [--lang vi]        Đưa file làm ở nơi khác vào: khớp spec, gắn nhãn
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
-  smoke [--version V] [--portal dev-mock] [--quick]   Chạy gói build trong Chromium (Playwright): thời gian vào game, FPS máy tính
+  smoke [--version V] [--portal dev-mock] [--quick] [--browser <chromium>]   Chạy gói build trong Chromium (Playwright): thời gian vào game, FPS máy tính
                                             và điện thoại chậm, lỗi console, màn trắng, Settings, mọi ngôn ngữ; so với budget
   store [--portal p]                        Ảnh trang game cho từng portal (từ store/source/ hoặc ảnh smoke) + kiểm store/listing.yaml
   release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)

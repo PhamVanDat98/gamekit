@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { tmpDir, write } from './helpers.mjs';
 import { zipDir } from '../scripts/lib/zip.mjs';
@@ -97,4 +98,33 @@ test('recon: Flutter points at libapp.so, Construct/Defold projects, hashed Coco
   write(dir, 'cw/cocos2d-js-min.1a2b3c.js', 'Cocos Creator v2.4.8');
   r = recon(path.join(dir, 'cw'));
   assert.deepEqual([r.engine, r.version], ['cocos', '2.4.8']);
+});
+
+test('recon: no Cocos false positives (project.json, src/settings.js); Unity iOS before UnityFramework; a broken split APK is skipped', () => {
+  const dir = tmpDir();
+  write(dir, 'mono/apps/game/project.json', '{}');
+  write(dir, 'mono/assets/logo.png', 'x');
+  assert.notEqual(recon(path.join(dir, 'mono')).engine, 'cocos', 'project.json + assets/ không đủ là project Creator');
+  write(dir, 'ph/index.html', '');
+  write(dir, 'ph/src/settings.js', '');
+  write(dir, 'ph/src/main.js', 'new Phaser.Game()');
+  assert.equal(recon(path.join(dir, 'ph')).engine, 'html5');
+  write(dir, 'cc/assets/scenes/Main.fire', '{}');
+  write(dir, 'cc/assets/scenes/Main.fire.meta', '{}');
+  write(dir, 'cc/settings/project.json', '{}');
+  assert.deepEqual([recon(path.join(dir, 'cc')).name, recon(path.join(dir, 'cc')).source], ['Cocos Creator (project)', true]);
+  write(dir, 'ios/Payload/G.app/Data/globalgamemanagers', '2018.4.36f1');
+  write(dir, 'ios/Payload/G.app/Data/Managed/Metadata/global-metadata.dat', 'x');
+  zipDir(path.join(dir, 'ios'), path.join(dir, 'g.ipa'));
+  const ios = recon(path.join(dir, 'g.ipa'));
+  assert.deepEqual([ios.engine, ios.version, ios.backend], ['unity', '2018.4.36f1', 'IL2CPP']);
+  const apkDir = path.join(dir, 'xa');
+  write(dir, 'xa/config.zz.apk', 'not a zip');
+  fs.copyFileSync(unityApk(tmpDir()), path.join(apkDir, 'com.a.apk'));
+  zipDir(apkDir, path.join(dir, 'g.xapk'));
+  const before = fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith('gk-recon-')).length;
+  const r = recon(path.join(dir, 'g.xapk'));
+  assert.equal(r.engine, 'unity');
+  assert.match(r.skipped.join(), /config\.zz\.apk/);
+  assert.equal(fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith('gk-recon-')).length, before, 'file tạm đã xoá');
 });
