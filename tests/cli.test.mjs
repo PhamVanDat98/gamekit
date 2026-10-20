@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
+import { gk, newGame, token, sh, write, read, editJson, editYaml, CLI } from './helpers.mjs';
+import { spawnSync } from 'node:child_process';
+import { zipDir } from '../scripts/lib/zip.mjs';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
 import { ownershipProblems, topo } from '../scripts/parallel.mjs';
@@ -681,6 +683,43 @@ test('recon --write: notes/recon.md + source.engine/engineVersion/path; refuses 
   r = gk(dir, 'recon', 'src');
   assert.equal(r.code, 1);
   assert.match(r.out, /nằm ngoài thư mục game/);
+});
+
+test('ghidra: needs GHIDRA_HOME; --entry picks a library out of an APK; import once, then export only', { skip: process.platform === 'win32' }, () => {
+  const dir = newGame('ghd');
+  const parent = path.dirname(dir);
+  write(parent, 'apk/lib/arm64-v8a/libil2cpp.so', 'ELF');
+  zipDir(path.join(parent, 'apk'), path.join(parent, 'g.apk'));
+  write(parent, 'script.json', '{"ScriptMethod":[]}');
+  // Fake Ghidra: records its arguments and writes what GameKitExport.java would.
+  const home = path.join(parent, 'ghidra');
+  write(home, 'support/analyzeHeadless', `#!/bin/sh
+echo "$@" >> "${path.join(parent, 'calls.txt')}"
+mkdir -p "$1/$2.rep"
+for a; do last4="$last3"; last3="$last2"; last2="$last1"; last1="$a"; done
+mkdir -p "$last4/c" && printf 'address\tname\n001\tPlayer$$Update\n' > "$last4/functions.tsv" && : > "$last4/strings.tsv"
+`);
+  fs.chmodSync(path.join(home, 'support/analyzeHeadless'), 0o755);
+  const env = { ...process.env, GHIDRA_HOME: '' };
+  let r = gk(dir, 'ghidra', '../g.apk');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /--entry[\s\S]*lib\/arm64-v8a\/libil2cpp\.so/);
+  r = gk(dir, 'ghidra', '../g.apk', '--entry', 'lib/arm64-v8a/libil2cpp.so', '--dry-run');
+  assert.match(r.out, /-import \S*libil2cpp\.so -overwrite/);
+  r = spawnSync(process.execPath, [CLI, 'ghidra', '../g.apk', '--entry', 'lib/arm64-v8a/libil2cpp.so'], { cwd: dir, encoding: 'utf8', env });
+  assert.match(r.stdout, /GHIDRA_HOME/);
+  r = gk(dir, 'ghidra', '../g.apk', '--entry', 'lib/arm64-v8a/libil2cpp.so', '--il2cpp', '../script.json', '--functions', 'Player', '--ghidra-home', home);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /1 hàm/);
+  r = gk(dir, 'ghidra', '.gamekit/ghidra/bin/libil2cpp.so', '--ghidra-home', home);
+  assert.equal(r.code, 0, r.out);
+  const calls = read(parent, 'calls.txt').trim().split('\n');
+  assert.match(calls[0], /-import .*libil2cpp\.so -overwrite -scriptPath .* -postScript GameKitExport\.java .*decompiled\/ghidra\/libil2cpp\.so .*script\.json Player 200/);
+  assert.match(calls[1], /-process libil2cpp\.so -noanalysis .* - - 200$/, 'lần hai chỉ xuất lại');
+  const g = YAML.parse(read(dir, 'game.yaml'));
+  assert.deepEqual(g.ghidra.programs.map((p) => [p.name, p.il2cpp]), [['libil2cpp.so', true]]);
+  assert.equal(gk(dir, 'validate').code, 0);
+  assert.equal(sh(dir, 'git', 'status', '--porcelain', '--', '.gamekit', 'decompiled'), '', '.gamekit/ghidra và decompiled/ phải được gitignore');
 });
 
 test('validate: Icons/web.png must be PNG, loading.webp must be WebP; builds/ must be gitignored', () => {

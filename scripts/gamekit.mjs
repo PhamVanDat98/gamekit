@@ -17,6 +17,8 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   status | next                             Game đang ở pha nào, việc gì tiếp
   recon [đường dẫn] [--write] [--json]      Nhận diện engine game gốc (thư mục, apk/xapk/ipa/zip), logic/dữ liệu ở đâu, kiểm kê
                                             --write: ghi notes/recon.md và source.engine/engineVersion/path vào game.yaml
+  ghidra <file> [--entry lib/…so] [--il2cpp script.json] [--functions <regex>|all] [--max N] [--reanalyze] [--dry-run]
+                                            Ghidra headless (GHIDRA_HOME): danh sách hàm, chuỗi, decompile → decompiled/ghidra/
   gate [--advance]                          Kiểm tra cổng của pha hiện tại
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
   parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)
@@ -31,7 +33,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'write']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'write', 'reanalyze']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -65,6 +67,7 @@ const COMMANDS = {
   integrate: () => import('./parallel.mjs').then((m) => m.integrate),
   precommit: () => import('./precommit.mjs').then((m) => m.run),
   recon: () => import('./recon.mjs').then((m) => m.run),
+  ghidra: () => import('./ghidra.mjs').then((m) => m.run),
 };
 
 export async function main(argv = process.argv.slice(2)) {
