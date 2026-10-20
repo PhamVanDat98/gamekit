@@ -5,7 +5,7 @@ description: Dùng ở pha P3 khi chuyển một game mobile (của bạn hay l�
 
 # Chuyển bố cục và điều khiển sang web (P3)
 
-Áp cho cả `own` và `third-party`. Gameplay (`src/core/`, `params/`) giữ nguyên; việc nằm ở `src/view/`, `src/view/style.css`, `index.html`. Hành vi người chơi cảm nhận được mà buộc phải khác game gốc → sai khác (bước 6).
+Áp cho cả `own` và `third-party`. Gameplay (`src/core/`, `params/`) giữ nguyên; việc nằm ở `src/view/`, `src/view/style.css` (`index.html` của game chỉ dùng cho `npm run dev`; trang trong bản build là `portals/<id>/shell.html` của plugin). Hành vi người chơi cảm nhận được mà buộc phải khác game gốc → sai khác (bước 6).
 
 ## 1. Ghi lại game gốc trước khi sửa
 Trong `notes/web-layout.md`: hướng màn hình gốc, độ phân giải thiết kế (`params` `world.width`/`world.height` có `source`), UI neo cạnh nào, mọi thao tác gốc (tap, giữ, vuốt, kéo, đa chạm, nghiêng máy). Đây là chuẩn để so khi người dùng duyệt.
@@ -13,7 +13,7 @@ Trong `notes/web-layout.md`: hướng màn hình gốc, độ phân giải thi�
 ## 2. Chọn cách bố cục
 | Cách | Làm thế nào | Khi nào |
 | --- | --- | --- |
-| Letterbox (mặc định) | Giữ `#game { aspect-ratio }` + `max-width/max-height: 100%`; phần thừa là nền `--gk-bg` của `#stage` | Vùng chơi phải giống hệt gốc (gần như mọi game) |
+| Letterbox (mặc định) | Giữ `#game { aspect-ratio }` + `max-width/max-height: 100%`; phần thừa là nền `--gk-bg` của `html, body` | Vùng chơi phải giống hệt gốc (gần như mọi game) |
 | Responsive | Canvas theo cỡ `#stage`, vùng nhìn rộng/hẹp theo màn hình, HUD neo cạnh | Chỉ khi letterbox quá nhỏ (vd game dọc trên màn ngang điện thoại) — thấy nhiều/ít thế giới hơn là sai khác |
 
 - `aspect-ratio: 2 / 3` trong `style.css` không đọc từ `params`: đổi `world.width/height` thì sửa CSS cho khớp.
@@ -21,7 +21,7 @@ Trong `notes/web-layout.md`: hướng màn hình gốc, độ phân giải thi�
 - Thử cả máy tính ngang, điện thoại dọc và ngang, kéo cỡ cửa sổ liên tục: không vỡ, không cuộn trang, không méo hình. Không chặn bằng màn "xoay máy" nếu game vẫn chơi được.
 
 ## 3. Safe area
-`index.html` có `viewport-fit=cover`; `#stage` đệm `env(safe-area-inset-*)`. Phần tử `position: absolute` trong `#stage` (vd `.gk-gear` ở `top/right: 10px`) tính từ mép trong viền, **không** tự tránh tai thỏ: cộng `env(safe-area-inset-top/right)` vào vị trí, hoặc đặt trong một khung đã đệm. Nút và HUD không nằm dưới thanh hệ thống.
+Trang (dev và shell của portal) có `viewport-fit=cover`; `#stage` đệm `env(safe-area-inset-*)`. Phần tử `position: absolute` trong `#stage` không tự tránh tai thỏ: cộng `env(safe-area-inset-*)` vào vị trí như `.gk-gear`, hoặc đặt trong một khung đã đệm. Nút và HUD không nằm dưới thanh hệ thống.
 
 ## 4. Input → `Action`
 `core/` chỉ hiểu `Action` trong `src/contracts/input.ts`; thiết bị map ở `src/view/input-dom.ts` (`KEYMAP` + pointer). Thêm hành động mới là đổi contract: chỉ agent chính sửa, kèm test core.
@@ -47,4 +47,4 @@ Dùng `PauseBus` (`src/platform/pause-bus.ts`), không tự thêm listener riên
 2. `npm run dev`: đổi cỡ cửa sổ, chế độ thiết bị của DevTools (dọc/ngang), chơi bằng chuột, bàn phím, cảm ứng; mở Settings; chuyển tab để thấy pause.
 3. Tuỳ chọn: `npm run gk -- pack` rồi `npm run gk -- smoke` (ảnh `phone-portrait`, `phone-landscape`, `lang-<mã>`, `settings` trong `.gamekit/local/smoke/`).
 4. `npm run gk -- gate`. Báo người dùng: cách bố cục đã chọn, bảng map điều khiển, các D-n chờ duyệt, những gì chưa thử trên máy thật. Mục "Đã duyệt bố cục và điều khiển trên web (bạn)" chỉ người dùng tick.
-5. Tiếp theo: `own` → nén asset, rồi P4 (**platform-sdk**) khi người dùng đồng ý `gate --advance`; `third-party` → **style-direction**.
+5. Tiếp theo: `own` → nén asset (cách làm ở skill perf-budget, mục sửa), rồi P4 (**platform-sdk**) khi người dùng đồng ý `gate --advance`; `third-party` → **style-direction**.

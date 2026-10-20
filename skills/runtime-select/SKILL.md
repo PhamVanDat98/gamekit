@@ -34,7 +34,7 @@ Không đoán dung lượng thư viện: thử trên nhánh nháp, `gamekit pack
 - Lời thoại có chữ theo ngôn ngữ: URL lấy bằng `tAsset()`.
 
 ## 5. Bước thời gian
-`runtime.fixedStepHz` = nhịp logic của game gốc (Unity `FixedUpdate` mặc định 50 Hz; game tính theo frame thì 30/60), có nguồn trong `notes/`. `src/main.ts` của template đặt `FIXED_HZ = 60` riêng: sửa cho khớp.
+`runtime.fixedStepHz` = nhịp logic của game gốc (Unity `FixedUpdate` mặc định 50 Hz; game tính theo frame thì 30/60), có nguồn trong `notes/`. Chỉ sửa ở game.yaml: `vite.config.ts` đưa giá trị này vào `FIXED_HZ` của `src/main.ts` lúc build.
 
 ## 6. Ghi lại
 1. `game.yaml`: `runtime: { kind: 2d|3d, renderer: <tên>, physics: none|custom|planck|matter|rapier…, fixedStepHz: <10–240> }` (`.gamekit/schemas/game.schema.json`).

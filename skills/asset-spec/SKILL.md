@@ -8,7 +8,7 @@ description: Dùng ở pha P3 khi game làm lại (third-party) cần asset mớ
 `asset-manifest.json` (schema `.gamekit/schemas/asset-manifest.schema.json`) là danh sách asset game sẽ phát hành, mỗi mục đủ để người vẽ hoặc `gamekit gen` làm ra đúng file. `third-party`: mọi asset là thiết kế mới, bản gốc chỉ là tư liệu trong `reference/`. `own`: dùng khi một số asset gốc phải làm lại (quá nhỏ, in chữ không dịch được…); asset giữ nguyên có `make: own`.
 
 ## 1. Nháp
-`npm run gk -- assets scan [--from reference|assets]` xem trước (mặc định `reference` cho third-party, `assets` cho own); thêm `--write` để ghi. Scan bỏ qua file đã có trong manifest (theo `path`/`ref`), đặt `id` không trùng, đoán `kind` từ tên, đọc `width`/`height`/`alpha` của ảnh, và với `reference/` đặt `path` = `assets/img/<…>.png` hoặc `assets/audio/<…>.ogg`, `ref` = file gốc. Mọi `brief` là `TODO`; tên file gợi ý có chữ (logo, button, title…) được nhắc riêng — mở ảnh ra xem.
+`npm run gk -- assets scan [--from reference|assets]` xem trước (mặc định `reference` cho third-party, `assets` cho own); thêm `--write` để ghi. Scan bỏ qua file đã có trong manifest (theo `path`/`ref`), đặt `id` không trùng, đoán `kind` từ tên, đọc `width`/`height`/`alpha` của ảnh, và với `reference/` đặt `path` = `assets/img/<…>.png` hoặc `assets/audio/<…>.ogg`, `ref` = file gốc. Với `reference/` mọi `brief` là `TODO`; với `assets/` (own) chỉ file có tên gợi ý chữ (logo, button, title…) mới có brief nhắc — mở ảnh ra xem.
 
 ## 2. Mỗi mục cần gì
 | Trường | Ghi chú |

@@ -13,7 +13,7 @@ Lấy danh sách từ hai phía: cấu trúc trong game gốc (scene/prefab Unit
 ## 2. Ảnh chụp
 - Tên `<màn>--<trạng thái>.png`, chụp ở độ phân giải tham chiếu, cả dọc và ngang nếu game gốc hỗ trợ.
 - `own`: lưu ở `ui-kit/screens/` (không nằm trong `assets/`/`public/` nên không đóng gói). Được chạy game gốc trong emulator/Editor, dùng debug để nhảy tới trạng thái khó gặp.
-- `third-party`: lưu ở `reference/ui/` (gitignored), chụp khi chơi bình thường hoặc từ video; không hook hay can thiệp game đang chạy.
+- `third-party`: lưu ở `reference/ui/` (gitignored), chụp khi chơi bình thường hoặc từ video; không debug, hook hay can thiệp game đang chạy.
 
 ## 3. Bố cục
 Mỗi màn trong `notes/ui.md`, kèm nguồn (prefab/scene + đường dẫn node, hoặc ảnh chụp + cách đo) và độ tin cậy (`observed` đọc từ prefab, `inferred` đo trên ảnh):
@@ -40,6 +40,6 @@ Khối `mermaid` `flowchart` trong `notes/ui.md`: nút là màn/popup, cạnh l�
 Ghi các mục Settings của game gốc. Bản web dùng popup của template (`src/view/settings.ts`): popup phải giữ footer bản quyền `gk-settings-footer` (`platform.info.copyright`); mục gốc không có trên web ghi vào bảng ở bước 4.
 
 ## 8. Kết thúc
-1. `gamekit validate` sạch (key ngôn ngữ, tham số chuỗi), rồi `gamekit gate`. Mục UI của cổng là mục tay: báo người dùng, không tự tick mục `(bạn)`.
+1. `gamekit validate` sạch (key ngôn ngữ, tham số chuỗi), rồi `gamekit gate`. Mục UI của cổng là mục tay (không phải `(bạn)`): kiểm xong thì tick và báo người dùng.
 2. Báo: số màn/popup và trạng thái đã chụp, số chuỗi, ảnh có chữ, phần chỉ đo trên ảnh (`inferred`), câu còn mở trong `notes/QUESTIONS.md`.
 3. Tiếp: gameplay-spec, asset-inventory nếu chưa xong; P2 runtime-select; P3 web-relayout dùng `notes/ui.md` để dựng bố cục web.

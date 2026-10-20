@@ -28,7 +28,7 @@ Mỗi dòng trong `notes/assets.md`: file gốc · loại · định dạng gố
 ## 3. Nháp asset-manifest.json
 `gamekit assets scan` (mặc định quét `assets/` với `own`, `reference/` với `third-party`; đổi bằng `--from reference|assets`). Chỉ nhận ảnh `png/jpg/webp/gif` và âm thanh `ogg/mp3/wav/m4a/aac`, bỏ qua thư mục con `i18n/` và file đã có trong manifest. Không có `--write` thì chỉ in tối đa 30 file và cảnh báo tên file gợi ý có chữ; `--write` thêm mục `id, kind` (đoán theo tên, phải sửa lại), `path`, `width/height/alpha`, `brief: "TODO: …"`. Với `third-party`, `path` là đích giả định `assets/img/….png` / `assets/audio/….ogg` kèm `ref` trỏ về file gốc.
 - Font, video, shader không có `kind` trong schema: chỉ ghi trong `notes/assets.md`.
-- `own` không bắt buộc có manifest, nhưng ảnh có chữ và lời thoại phải được khai báo ở đây (`validate` kiểm). Brief chi tiết cho asset mới là việc của asset-spec ở P3 (`third-party`).
+- `own` không bắt buộc có manifest, nhưng ảnh có chữ và lời thoại phải được khai báo ở đây (`validate` chỉ kiểm mục đã có trong manifest, không phát hiện file thiếu mục — tự đối chiếu). Brief chi tiết cho asset mới là việc của asset-spec ở P3 (`third-party`).
 
 ## 4. Chữ trong ảnh, lời thoại
 Mở từng ảnh, không chỉ tin cảnh báo theo tên file. Ảnh có chữ (logo, nút, banner, tutorial):

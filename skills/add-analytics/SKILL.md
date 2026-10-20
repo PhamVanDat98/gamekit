@@ -45,4 +45,4 @@ Làm như `src/main.ts` của template:
 - `own` và `third-party` giống nhau ở đây; với `third-party`, giá trị chuỗi trong `data` không được chứa tên game gốc.
 
 ## 6. Kết thúc
-`npm test`, `npm run typecheck`, `npm run lint`, `npm run gk -- validate`, rồi `npm run gk -- gate` (P4: mục "Event analytics chỉ dùng tên trong `src/platform/events.ts`" là mục tay — báo người dùng kết quả kiểm tra để tick). Báo người dùng: event game gửi, ở đâu, tham số gì, event mới (nếu có) kèm `D-n`. Tiếp theo: **add-leaderboard**, **add-save**.
+`npm test`, `npm run typecheck`, `npm run lint`, `npm run gk -- validate`, rồi `npm run gk -- gate` (P4: mục "Event analytics chỉ dùng tên trong `src/platform/events.ts`" là mục tay, không phải `(bạn)` — kiểm xong thì tick). Báo người dùng: event game gửi, ở đâu, tham số gì, event mới (nếu có) kèm `D-n`. Tiếp theo: **add-leaderboard**, **add-save**.

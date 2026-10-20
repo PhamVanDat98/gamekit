@@ -49,4 +49,4 @@ Thêm "Xoá tiến trình" (vd trong popup Settings, chữ qua `t()`, có bướ
 - `npm run dev`: chơi, tải lại trang → tiến trình và âm thanh còn; DevTools → Application → Local Storage thấy key `<name>:progress`; sửa tay thành chuỗi rác → game vẫn vào với bản mặc định; thử cửa sổ ẩn danh.
 
 ## 7. Kết thúc
-`npm test`, `npm run typecheck`, `npm run lint`, `npm run gk -- validate`, `npm run gk -- gate`. Báo người dùng: lưu những gì, version hiện tại, cách reset, portal nào có cloud save (hiện: chưa có). Tiếp theo: **package-web-build**, rồi **perf-budget**.
+`npm test`, `npm run typecheck`, `npm run lint`, `npm run gk -- validate`, `npm run gk -- gate`. Báo người dùng: lưu những gì, version hiện tại, cách reset, portal nào có cloud save (hiện: chưa có). Tiếp theo: **add-i18n** (nếu còn ngôn ngữ cần thêm), rồi P5 (**package-web-build**).

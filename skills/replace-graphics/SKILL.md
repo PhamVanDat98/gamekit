@@ -43,4 +43,4 @@ description: Dùng ở pha P3 khi làm lại game người khác (third-party) �
 ## 6. Hoàn tất
 - Không còn file nhãn `reference` trong `assets/`, `public/` (từ P3 `validate` báo lỗi); `placeholder` phải hết trước P5. Mọi file có nhãn.
 - Chạy `gamekit validate` (kích thước, alpha, `text`/`textKey`), `npm run lint`, `npm run typecheck`, `npm test`, `npm run dev` xem trong game, rồi `gamekit gate`.
-- Báo người dùng: số asset theo nhãn, số lần gọi API đã dùng, mục còn cần sửa, ảnh có chữ chưa đủ ngôn ngữ. Tiếp theo: skill replace-audio, rename-and-text.
+- Báo người dùng: số asset theo nhãn, số lần gọi API đã dùng, mục còn cần sửa, ảnh có chữ chưa đủ ngôn ngữ. Tiếp theo: skill replace-audio.

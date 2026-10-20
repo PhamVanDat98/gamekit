@@ -21,7 +21,7 @@ Lưu ý: với Flutter, recon có thể chỉ tới `classes*.dex`/jadx — ph�
 
 ## 2. GameMaker
 - UndertaleModTool mở `data.win`: code GML theo object/event (`gml_Object_<obj>_Create_0`, `_Step_0`, `_Alarm_<n>`, `gml_Script_<tên>`), sprite, âm thanh, room. Dùng các script Export trong menu Scripts để xuất hàng loạt vào `decompiled/gamemaker/` (code) và `reference/` (asset `third-party`).
-- Thời gian theo **step**: Step event chạy mỗi step ở `room_speed` (GMS1: Speed của room; GMS2: tốc độ game trong Options). `hspeed`, `vspeed`, `gravity`, `friction` là px/step, `alarm[n]` đếm step, `image_speed` theo frame/step. Ghi `unit: "px/step@<fps>"`; khớp nhất là đặt `runtime.fixedStepHz` = tốc độ gốc (và `FIXED_HZ` trong `src/main.ts`, template đặt cứng 60).
+- Thời gian theo **step**: Step event chạy mỗi step ở `room_speed` (GMS1: Speed của room; GMS2: tốc độ game trong Options). `hspeed`, `vspeed`, `gravity`, `friction` là px/step, `alarm[n]` đếm step, `image_speed` theo frame/step. Ghi `unit: "px/step@<fps>"`; khớp nhất là đặt `runtime.fixedStepHz` = tốc độ gốc (chỉ đặt `runtime.fixedStepHz` trong game.yaml — `vite.config.ts` đưa giá trị này vào `FIXED_HZ` của `src/main.ts` lúc build, không sửa `main.ts`).
 - Room → dữ liệu level (instance, creation code, tile, view) trong `public/StreamingAssets/`. Va chạm: mask chính xác hay bbox — ghi lại. `random_set_seed` có thì ghi thuật toán và seed.
 
 ## 3. Defold

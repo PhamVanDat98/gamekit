@@ -30,7 +30,7 @@ Beautify bản sao vào `decompiled/laya/` (gitignored); có `bundle.js.map` th�
 | `onUpdate()` của Script | mỗi frame, không có dt | như frameLoop |
 | nhân `Laya.timer.delta` | ms giữa hai frame | đã theo thời gian thật → đổi sang giây |
 
-Fps gốc lấy từ `Laya.stage.frameRate` (`"fast"` = 60, `"slow"` = 30, `"mouse"` đổi theo chuột) và `Laya.timer.scale`. Logic theo frame: hoặc đặt `runtime.fixedStepHz` = fps gốc (và `FIXED_HZ` trong `src/main.ts`, template đặt cứng 60) để giữ nguyên đơn vị, hoặc đổi sang giây (`derived`); ghi lựa chọn vào `DECISIONS.md`. Timer của Laya dùng giờ thật và `Math.random` không seed: core dùng fixed step + `Rng`.
+Fps gốc lấy từ `Laya.stage.frameRate` (`"fast"` = 60, `"slow"` = 30, `"mouse"` đổi theo chuột) và `Laya.timer.scale`. Logic theo frame: hoặc đặt `runtime.fixedStepHz` = fps gốc (chỉ đặt `runtime.fixedStepHz` trong game.yaml — `vite.config.ts` đưa giá trị này vào `FIXED_HZ` của `src/main.ts` lúc build, không sửa `main.ts`) để giữ nguyên đơn vị, hoặc đổi sang giây (`derived`); ghi lựa chọn vào `DECISIONS.md`. Timer của Laya dùng giờ thật và `Math.random` không seed: core dùng fixed step + `Rng`.
 
 ## 4. Scene, asset
 - Scene/prefab → dữ liệu level của mình trong `public/StreamingAssets/` (vị trí, loại, tham số component). Giá trị trong props của script component là số gameplay → `params/` với `source`: `res/scenes/Level3.ls node Enemy#12 props.speed`.

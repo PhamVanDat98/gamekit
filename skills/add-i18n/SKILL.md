@@ -18,7 +18,7 @@ description: Dùng ở pha P4 khi thêm ngôn ngữ cho game — khai báo langu
 - Đủ mọi key của en. Giữ nguyên `{tham số}` — `validate` báo lỗi nếu khác en hoặc có key en không có; thiếu key chỉ là cảnh báo.
 - Số nhiều: `translate()` (`src/view/i18n.ts`) chọn `key.<dạng>` theo `Intl.PluralRules(mã)`, thiếu thì `key.other`, rồi `key`. Chuỗi có số đếm phải ở dạng số nhiều ngay trong en (`coins.one`, `coins.other`), gọi `t('coins', { count })` với `count` là số.
 - Dạng cần cho mỗi ngôn ngữ: `node -e "console.log(new Intl.PluralRules('ru').resolvedOptions().pluralCategories)"`. Ví dụ: en/de `one, other`; fr/es/pt `one, many, other`; ru/pl `one, few, many, other`; ar `zero, one, two, few, many, other`; vi/ja/zh/ko chỉ `other`.
-- Luôn có `key.other`: validate không cảnh báo khi một ngôn ngữ có `.one` mà thiếu `.other`, lúc đó game hiện bản `.other` tiếng Anh.
+- Luôn có `key.other`: thiếu thì `validate` báo lỗi (pack sẽ lấy bản `.other` tiếng Anh).
 - Dịch theo ngữ cảnh (nút ngắn, thoại, hướng dẫn), không dịch máy rồi để nguyên. Có người bản ngữ thì nhờ duyệt; không có thì báo rõ trong báo cáo.
 
 ## 3. Ảnh có chữ và lời thoại
@@ -36,4 +36,4 @@ description: Dùng ở pha P4 khi thêm ngôn ngữ cho game — khai báo langu
 `store/listing.yaml`: `title`, `short`, `description`, `controls` mỗi ngôn ngữ một bản (`en` bắt buộc). `gamekit store` cảnh báo ngôn ngữ còn thiếu (portal sẽ hiện bản en), lỗi khi còn `TODO` hoặc vượt giới hạn độ dài của portal.
 
 ## 6. Hoàn tất
-`gamekit validate`, `npm test`, `npm run typecheck`, `npm run lint`, `gamekit gate`. Báo người dùng: ngôn ngữ đã thêm, key còn thiếu, ảnh/lời thoại còn dùng bản en, chuỗi bị tràn, bản dịch nào chưa có người bản ngữ duyệt. Tiếp theo: skill P4 còn lại (platform-sdk), rồi P5 (package-web-build, release-check).
+`gamekit validate`, `npm test`, `npm run typecheck`, `npm run lint`, `gamekit gate`. Báo người dùng: ngôn ngữ đã thêm, key còn thiếu, ảnh/lời thoại còn dùng bản en, chuỗi bị tràn, bản dịch nào chưa có người bản ngữ duyệt. Tiếp theo: `gamekit gate` của P4, rồi P5 (package-web-build).

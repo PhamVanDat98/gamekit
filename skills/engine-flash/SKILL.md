@@ -31,7 +31,7 @@ Phần lớn game Flash cập nhật trong `ENTER_FRAME`, mỗi lần một fram
 | `Timer(500)`, `setInterval`, `getTimer()` | ms thật | `"unit": "ms"` |
 
 Hai cách dựng lại, chọn một và ghi `D-n` trong `DECISIONS.md`:
-1. **Giữ đơn vị frame**: `runtime.fixedStepHz` = fps gốc (game.yaml cho phép 10–240) và `FIXED_HZ` trong `src/main.ts` (template đặt cứng 60); view nội suy bằng `alpha` để vẫn mượt. Khớp tuyệt đối, kể cả làm tròn.
+1. **Giữ đơn vị frame**: `runtime.fixedStepHz` = fps gốc (game.yaml cho phép 10–240; chỉ đặt `runtime.fixedStepHz` trong game.yaml — `vite.config.ts` đưa giá trị này vào `FIXED_HZ` của `src/main.ts` lúc build, không sửa `main.ts`); view nội suy bằng `alpha` để vẫn mượt. Khớp tuyệt đối, kể cả làm tròn.
 2. **Đổi sang giây**: 4 px/frame × 24 = 96 px/s, gia tốc nhân fps². Ghi `derived` và công thức trong `source`. Cẩn thận: va chạm và nhảy có thể lệch vì bước khác.
 
 Toạ độ: y hướng xuống, `rotation` theo độ chiều kim đồng hồ; dữ liệu thô trong swf tính bằng twip (1/20 px), FFDec đã đổi ra px. `Math.random()` không seed được: core dùng `Rng`, parity chỉ so phân phối.

@@ -23,8 +23,8 @@ GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, 
 | --- | --- | --- | --- |
 | P0 Intake | Nhận diện engine, kiểm kê, chấm khả thi | game-recon, triage | Làm hay bỏ |
 | P1 Phân tích | Trích logic, số liệu, asset, UI từ game gốc | engine-<engine>, re-notes, gameplay-spec, asset-inventory, ui-extract | |
-| P2 Dựng lại | Dựng lại bằng JS/TS, chơi được (asset gốc nếu là game của người dùng, placeholder nếu làm lại) | runtime-select, module-plan, rebuild-game, integrate, parity-check | |
-| P3 Chuyển sang web | Điều khiển, bố cục web, nén asset. `third-party`: thêm reskin (style, asset mới theo spec) | web-relayout; `third-party`: style-direction, style-preview, asset-spec, apply-style, replace-graphics, replace-audio, rename-and-text | Duyệt bố cục; `third-party`: chọn style |
+| P2 Dựng lại | Dựng lại bằng JS/TS, chơi được (asset gốc nếu là game của người dùng, placeholder nếu làm lại) | runtime-select, parity-check, module-plan, rebuild-game, integrate | |
+| P3 Chuyển sang web | Điều khiển, bố cục web, nén asset. `third-party`: thêm reskin (style, asset mới theo spec) | web-relayout, asset-spec; `third-party`: style-direction, style-preview, apply-style, rename-and-text, asset-spec, replace-graphics, replace-audio | Duyệt bố cục; `third-party`: chọn style |
 | P4 Tích hợp | SDK portal, analytics, leaderboard, save, ngôn ngữ | platform-sdk, add-analytics, add-leaderboard, add-save, add-i18n | |
 | P5 Phát hành | Đóng gói, hiệu năng, QA, ảnh store | package-web-build, perf-budget, qa-smoke, store-assets, release-check | Playtest cuối |
 
@@ -42,7 +42,7 @@ Cổng tự bỏ các mục `{only: …}` không áp cho game này.
 1. **Dữ liệu và logic gameplay bám sát game gốc.** Mọi số gameplay nằm trong `params/*.json`, mỗi giá trị có `source` (file + hàm/offset, hoặc đo từ video). Không tự đặt số. Sai khác chỉ khi web bắt buộc (điều khiển cảm ứng, bố cục, hiệu năng): thêm `deviation` + mục `D-n` trong `DECISIONS.md`, chờ người dùng duyệt. `third-party`: không áp cho đồ hoạ, âm thanh, tên, text — phần đó phải làm mới.
 2. **Code gốc.** `own`: được dịch thẳng code gốc (C#, decompile của chính game này) sang TypeScript, nhưng viết lại cho hợp `core/`/`view/` chứ không dịch máy từng dòng; ghi chú trong `notes/` chỉ ra logic nằm ở đâu. `third-party`: bám hành vi, không chép code; ghi chú RE viết bằng lời của mình. Cả hai: không commit code gốc hay code decompile vào repo game (hook chặn).
 3. **Asset gốc.** `own`: xuất sang định dạng web, đưa vào `assets/`/`public/`, nhãn `own`. `third-party`: chỉ là tư liệu, nằm trong `reference/` (gitignored). Mọi file trong `assets/`, `public/` phải có nhãn provenance: `reference | generated | own | licensed | placeholder`. Bản phát hành không được còn `reference` hay `placeholder`.
-4. **Phân tích.** `own`: được chạy, debug, đo game gốc. `third-party`: chỉ phân tích file tĩnh, không can thiệp vào game đang chạy.
+4. **Phân tích.** `own`: được chạy, debug, đo game gốc. `third-party`: phân tích file tĩnh; được chơi bình thường bản người dùng có và quay video để đo; không debug, hook, sửa bộ nhớ, chặn mạng hay phá mã hoá.
 5. **Art brief** (`third-party`) mô tả thiết kế mới, không viết "vẽ lại nhân vật X của game gốc".
 6. **Mọi chữ người chơi thấy đổi theo ngôn ngữ.** Text qua `t()` + `Language/*.json` (lint chặn chữ viết cứng trong `src/view/`). Ảnh có chữ — ảnh gốc hay ảnh sinh ra — nằm trong `assets/i18n/<mã>/` (bản gốc `assets/i18n/en/`), lấy bằng `tAsset()`, `text: true` trong `asset-manifest.json`. Dữ liệu game chỉ giữ key.
 

@@ -7,11 +7,11 @@ description: Dùng ở pha P0 khi vừa nhận một game gốc (project, bản 
 
 Mục tiêu: biết game làm bằng gì, logic và dữ liệu nằm ở đâu, có bao nhiêu nội dung — đủ để triage. Chưa đào logic ở bước này (đó là P1: engine-*, re-notes).
 
-`own` (mặc định): được cài và chạy game gốc để quan sát — chơi qua các màn chính, quay video luồng chơi, ghi lại tính năng online (đăng nhập, IAP, bảng xếp hạng). `third-party`: chỉ đọc file tĩnh; không debug, hook, sửa bộ nhớ hay chặn mạng của game đang chạy; video chỉ dùng loại người dùng cung cấp.
+`own` (mặc định): được cài và chạy game gốc để quan sát — chơi qua các màn chính, quay video luồng chơi, ghi lại tính năng online (đăng nhập, IAP, bảng xếp hạng). `third-party`: đọc file tĩnh; được chơi bình thường bản người dùng có và quay màn hình; không debug, hook, sửa bộ nhớ, chặn mạng hay phá mã hoá.
 
 ## 1. Đặt game gốc đúng chỗ
 - Game gốc nằm **ngoài** thư mục game web (`recon` từ chối đường dẫn bên trong). Có project gốc thì trỏ vào project, không trỏ vào bản build.
-- Chưa có game web: chạy `gamekit recon <đường dẫn>` (chỉ in, không ghi) để biết engine, rồi `gamekit init <tên> --engine <engine> --set sourcePath=<đường dẫn>` (thêm `--third-party` nếu làm lại game người khác).
+- Chưa có game web: chạy `gamekit recon <đường dẫn>` (chỉ in, không ghi) để biết engine, rồi tạo game theo mục "Tạo game mới" của skill using-gamekit (hỏi người dùng từng câu; `--engine <engine> --set sourcePath=<đường dẫn>`, thêm `--third-party` nếu làm lại game người khác).
 
 ## 2. Chạy recon
 `npm run gk -- recon <đường dẫn> --write` trong thư mục game (bỏ đường dẫn thì dùng `source.path`; `--json` in kết quả thô).

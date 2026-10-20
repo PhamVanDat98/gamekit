@@ -24,9 +24,9 @@ Thư viện/công cụ: đọc điều khoản — được dùng thương mại
 
 ## 3. Lời thoại
 1. Manifest: `kind: audio`, `voice: true`, `textKey` (câu thoại trong `Language/en.json`), `path` trong `assets/i18n/en/`. Code lấy URL bằng `tAsset()`; người chơi chỉ tải file của ngôn ngữ mình.
-2. Chốt text và bản dịch trước (skill rename-and-text, add-i18n): mỗi file đọc đúng chuỗi trong `Language/<mã>.json`.
+2. Chốt text trước (skill rename-and-text): mỗi file đọc đúng chuỗi trong `Language/<mã>.json`. Ở P3 sinh bản `en` (`--lang en`); các ngôn ngữ khác sinh sau khi có bản dịch (skill add-i18n, P4).
 3. `gen voice --dry-run` liệt kê câu sẽ đọc. `gen voice [--id a,b] [--lang vi] [--voice <tên>]`: giọng lấy từ `--voice`, rồi `style.audio.voice` trong `style/style.json`, mặc định `alloy`; cách đọc lấy từ `prompt` của asset hoặc `style.audio.prompt`. Model mặc định `gpt-4o-mini-tts` (`--model`, `GAMEKIT_SPEECH_MODEL`).
-4. Chỉ sinh file chưa có (trừ khi `--id`); quá 5 lần gọi API cần `--yes`. Đuôi được hỗ trợ: `.mp3`, `.ogg`, `.aac`, `.m4a`, `.flac`, `.wav`. File được gắn nhãn `generated`.
+4. Chỉ sinh file chưa có (trừ khi `--id`); quá 5 lần gọi API cần `--yes`. Đuôi được hỗ trợ: `.mp3`, `.ogg`, `.aac`, `.wav`. File được gắn nhãn `generated`.
 5. Nghe từng ngôn ngữ: đọc sai tên riêng, nhấn sai, dài hơn chỗ dành cho nó.
 
 ## 4. Định dạng và âm lượng

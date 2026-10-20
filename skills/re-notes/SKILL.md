@@ -30,7 +30,7 @@ APK: nhìn `lib/*/` để nhận engine (`libunity.so`, `libil2cpp.so`, `libcoco
 
 Nếu phiên có công cụ MCP reverse engineering (ví dụ rea: `open_binary`, `analyze_function`, `analyze_javascript_application`, `inspect_managed_artifact`), dùng chúng cho bước phân tích tĩnh. Bắt đầu từ bản tóm tắt; chỉ đào sâu khi còn một câu hỏi cụ thể; không chạy lại một phân tích y hệt.
 
-Chỉ phân tích file tĩnh của bản mà người dùng có. Không can thiệp game đang chạy của người khác, không đụng server online.
+`third-party`: phân tích file tĩnh của bản người dùng có; được chơi bình thường và quay video để đo, không debug/hook game đang chạy. Cả hai: không đụng server online.
 
 ## 3. Đừng tin decompiler một mình
 - Pseudocode có thể **sai chữ ký hàm**: báo hàm không có tham số trong khi lệnh máy đọc tham số trên stack. Đối chiếu với assembly/IL, và xem **chỗ gọi hàm** để biết tham số thật là gì (vd `20 + 30 × tile_x`).

@@ -75,10 +75,10 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 .claude-plugin/   plugin.json, marketplace.json
 hooks/            SessionStart → using-gamekit + gamekit status
 commands/         /gamekit:status, /gamekit:next
-skills/           một skill cho mỗi bước của pipeline (P0 game-recon … P5 store-assets), engine-<engine> cho từng engine
+skills/           một skill cho mỗi bước của pipeline (P0 game-recon … P5 release-check), engine-<engine> cho từng engine
 portals/          vỏ portal dùng chung: azgames, dev-mock (portal.yaml, kit.mjs, shell.html, loader.entry.js, Icons/), shared/
 scripts/          CLI gamekit.mjs + lệnh; lib/ (PNG, zip, recon, style, store, OpenAI…); ghidra/GameKitExport.java
-schemas/          game, params, provenance, module-plan, asset-manifest, style, store-listing (JSON Schema)
+schemas/          game, params, provenance, module-plan, asset-manifest, obligations, oracle, style, store-listing (JSON Schema)
 templates/game/   Vite + TS: core/ (deterministic), view/, platform/ (interface, PauseBus, dev-mock), contracts/, tests, gates, .vscode, AGENTS.md
 tests/            node --test
 ```

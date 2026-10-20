@@ -18,7 +18,7 @@ Phương pháp chung (câu hỏi trước, đừng tin decompiler, cách ghi k�
 ## 2. IL2CPP: tên trước, decompile sau
 1. Il2CppDumper (binary + `global-metadata.dat`) → `decompiled/il2cpp/`: `dump.cs` (class, field kèm offset, method kèm RVA — không có thân hàm), `script.json`, `DummyDll/`. Il2CppDumper lỗi với metadata mới hoặc bị mã hoá (4 byte đầu không phải `AF 1B B1 FA`): thử Cpp2IL; vẫn không được → ghi vào `notes/QUESTIONS.md`, báo triage.
 2. `npm run gk -- ghidra <apk> --entry lib/arm64-v8a/libil2cpp.so --il2cpp decompiled/il2cpp/script.json --functions 'PlayerController\$\$'`
-   - Cần `GHIDRA_HOME` (Ghidra 11+, JDK 21) hoặc `--ghidra-home`. Thiếu `--entry` với file nén thì lệnh liệt kê các thư viện native để chọn. XAPK: `--entry` chỉ tìm trong file nén ngoài cùng — lấy APK con chứa `lib/` ra trước.
+   - Cần `GHIDRA_HOME` (Ghidra 11+, JDK 21) hoặc `--ghidra-home`. Thiếu `--entry` với file nén thì lệnh liệt kê các thư viện native để chọn. XAPK: thư viện nằm trong APK con, chọn bằng `--entry <apk con>.apk!/lib/<abi>/<lib>.so` (lệnh liệt kê sẵn khi thiếu `--entry`).
    - Lần đầu nhập + phân tích (libil2cpp lớn có thể mất hàng giờ; `--timeout <giây>`). Lần sau cùng tên file chỉ xuất lại: đổi `--functions` thoải mái, `--reanalyze` để phân tích lại. `--dry-run` in lệnh `analyzeHeadless`.
    - `--il2cpp` đọc `script.json` định dạng Il2CppDumper: đặt tên hàm từ `ScriptMethod`, gắn nhãn `ScriptString`, `ScriptMetadata`. IPA: `--entry Payload/<App>.app/Frameworks/UnityFramework.framework/UnityFramework`. `--functions` là regex trên tên đầy đủ (`all` = mọi hàm), tối đa `--max` hàm (mặc định 200).
    - Ra `decompiled/ghidra/<lib>/`: `functions.tsv`, `strings.tsv`, `c/<tên>@<địa chỉ>.c`; game.yaml ghi `ghidra.programs`.

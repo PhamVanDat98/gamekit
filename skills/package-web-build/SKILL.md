@@ -41,4 +41,4 @@ builds/<v>/
 ## Test local
 `npm run preview` (= `vite preview --outDir builds`) rồi mở `http://localhost:4173/<v>/dev-mock/<v>/index.html`. Bản `azgames` có sitelock nên không chạy local — đúng chủ ý.
 
-Sau khi pack: skill **release-check**.
+Sau khi pack: **perf-budget**, **qa-smoke**, **store-assets**, rồi **release-check**.

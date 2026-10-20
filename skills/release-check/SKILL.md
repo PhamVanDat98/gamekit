@@ -27,9 +27,9 @@ description: Dùng trước khi phát hành hoặc nộp game lên portal (cổn
 | còn tên/thương hiệu game gốc (text, tên file, chuỗi trong file nhị phân) — chỉ khi `release.forbiddenTerms` có mục, thường là `third-party` | Đổi text, tên file, metadata; kiểm tra `release.forbiddenTerms` đủ chưa |
 | link ngoài tới host X (kể cả localhost, IP, ws://, `//host` trong index.html) | Bỏ link; nếu là CDN SDK portal thì thêm vào `release.allowedHosts`. URL tài liệu nằm trong thư viện minified cũng bị báo — kiểm tra rồi thêm host vào allowedHosts nếu vô hại |
 | đường dẫn tuyệt đối | `<base href="<v>/">` ở index.html ngoài là đúng chủ ý, không phải lỗi. Lỗi là `src`/`href` bắt đầu bằng `/` trong trang hoặc code game: dùng đường dẫn tương đối, `base: './'` trong vite.config.ts |
-| tải đầu vượt ngân sách | Chuyển asset lớn sang `StreamingAssets/` tải sau, nén texture/audio, tách code |
+| tải đầu vượt ngân sách | Chuyển asset lớn sang `StreamingAssets/` tải sau, nén texture/audio, bỏ thư viện không cần (`framework.js` là một file, `import()` không tách được) |
 | source map | Tắt `build.sourcemap` |
 | `params`: source TODO / sai khác chưa duyệt | Hoàn tất nguồn hoặc xin người dùng duyệt `D-n` |
 
-3. Checklist tay trong `gates/P5.md`: ngân sách hiệu năng trên máy yếu, smoke test, ảnh store. Mục **playtest bản cuối (bạn)** do người dùng tick.
+3. `gates/P5.md`: smoke và store là mục `{auto}`; mục tay là thử trên điện thoại thật, tăng version + changelog. Mục **playtest bản cuối (bạn)** do người dùng tick.
 4. `gamekit gate` → khi người dùng đồng ý, `gamekit gate --advance` (phase = released).

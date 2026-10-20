@@ -5,12 +5,12 @@ export const PHASES = ['P0', 'P1', 'P2', 'P3', 'P4', 'P5'];
 export const PHASE_INFO = {
   P0: { name: 'Intake', skills: ['game-recon', 'triage'], human: 'Bạn quyết định làm hay bỏ (triage).' },
   P1: { name: 'Phân tích', skills: ['engine-<engine>', 're-notes', 'gameplay-spec', 'asset-inventory', 'ui-extract'] },
-  P2: { name: 'Dựng lại', skills: ['runtime-select', 'module-plan', 'rebuild-game', 'integrate', 'parity-check'] },
+  P2: { name: 'Dựng lại', skills: ['runtime-select', 'parity-check', 'module-plan', 'rebuild-game', 'integrate'] },
   P3: {
     name: 'Chuyển sang web',
     skills: ['web-relayout', 'asset-spec'],
     human: 'Bạn duyệt bố cục và điều khiển trên web.',
-    thirdParty: { name: 'Reskin', skills: ['web-relayout', 'style-direction', 'style-preview', 'asset-spec', 'apply-style', 'replace-graphics', 'replace-audio', 'rename-and-text'], human: 'Bạn chọn style.' },
+    thirdParty: { name: 'Reskin', skills: ['web-relayout', 'style-direction', 'style-preview', 'apply-style', 'rename-and-text', 'asset-spec', 'replace-graphics', 'replace-audio'], human: 'Bạn chọn style.' },
   },
   P4: { name: 'Tích hợp', skills: ['platform-sdk', 'add-analytics', 'add-leaderboard', 'add-save', 'add-i18n'] },
   P5: { name: 'Phát hành', skills: ['package-web-build', 'perf-budget', 'qa-smoke', 'store-assets', 'release-check'], human: 'Bạn playtest bản cuối.' },

@@ -19,7 +19,7 @@ Liệt kê từ `notes/`, `reference/`, trang store của game gốc: tên game,
 Đề xuất 3–5 tên kèm lý do; **người dùng chọn**. Nhắc người dùng tự tra trùng tên/nhãn hiệu (agent không kiểm được). Rồi:
 - `game.yaml` `title` (trang portal và `manifest.json` dùng trường này); `store/listing.yaml` `title` mọi ngôn ngữ.
 - `name` (tên gói zip, namespace save, nằm trong `framework.js`) không được chứa tên gốc. Đổi `name` sau khi đã phát hành sẽ mất save của người chơi — chỉ đổi trước P5.
-- `package.json` (`name`, `description`), `index.html`, chuỗi tên game trong `Language/*.json`.
+- `package.json` (`name`, `description`), `index.html` (trang dev), chuỗi tên game trong `Language/*.json`; trang trong bản build lấy `title` từ game.yaml.
 
 ## 3. Tên nhân vật, vật phẩm, màn chơi
 - Bảng đối chiếu cũ → mới trong `notes/naming.md` (không đóng gói). Tên mới theo style đã chọn, không phải biến thể của tên gốc (đổi một chữ, dịch nghĩa sát).
@@ -39,6 +39,6 @@ Liệt kê từ `notes/`, `reference/`, trang store của game gốc: tên game,
 
 ## 6. Hoàn tất
 1. `gamekit validate`, `npm run lint`, `npm run typecheck`, `npm test`.
-2. `gamekit pack --portal dev-mock` rồi `gamekit release-check`: quét tên file, file text và file nhị phân trong gói, báo từng chỗ còn tên gốc. Sửa đến khi sạch.
+2. `gamekit pack --portal dev-mock` rồi `gamekit release-check --portal dev-mock`: quét tên file, file text và file nhị phân trong gói, báo từng chỗ còn tên gốc. Ở P3 chỉ xét các dòng tên/thương hiệu gốc — lỗi icon placeholder hay bản build chưa commit là bình thường trước P5. Sửa đến khi không còn tên gốc.
 3. Báo người dùng: tên mới đã dùng, số chuỗi đã viết lại, từ cấm còn bị bắt (nếu có). Mục cổng P3 "Đồ hoạ, âm thanh, tên và text đã thay mới" chỉ tick khi replace-graphics và replace-audio cũng xong; rồi `gamekit gate`.
 4. Bản dịch cũ trong `Language/<mã>.json` không còn khớp en: làm lại theo skill add-i18n.
