@@ -372,7 +372,7 @@ test('game-animation library: every template loads, passes check and previews; n
   const lib = an(dir, 'library');
   assert.equal(lib.code, 0, lib.out);
   const names = lib.out.trim().split('\n').map((l) => l.split(/\s+/)[0]);
-  for (const n of ['humanoid/walk', 'humanoid/run', 'humanoid/jump', 'humanoid/attack', 'humanoid/hit', 'humanoid/idle', 'quadruped/walk', 'bird/flap', 'fish/swim', 'snake/slither', 'sprite/squash-hop', 'sprite/spin']) assert.ok(names.includes(n), n);
+  for (const n of ['humanoid/walk', 'humanoid/run', 'humanoid/jump', 'humanoid/zombie-walk', 'humanoid/attack', 'humanoid/hit', 'humanoid/idle', 'quadruped/walk', 'bird/flap', 'fish/swim', 'snake/slither', 'sprite/squash-hop', 'sprite/spin']) assert.ok(names.includes(n), n);
   for (const n of names) {
     const r = an(dir, 'check', path.join(LIB, `${n}.anim.json`));
     assert.equal(r.code, 0, `${n}: ${r.out}`);
@@ -420,7 +420,7 @@ test('game-animation: a project-specific skeleton and animation (inline), waves,
   bad({ keys: { body: { rot: [[0, 0, 'step'], [0.2, 170, 'step']] } } }, /xoay \d+° trong một frame/);
 });
 
-test('game-animation humanoid walk: planted foot on the ground moving back, knee bends, hips lowest after contact', { skip: skipPy }, () => {
+test('game-animation humanoid walk (mocap): starts at heel strike, planted foot on the ground moving back, feet never sink, knee bends, foot lifts', { skip: skipPy }, () => {
   const dir = tmpDir();
   const m = JSON.parse(py(dir, `
 import json, sys
@@ -429,18 +429,110 @@ import animate as A
 an = A.load_anim(${JSON.stringify(path.join(LIB, 'humanoid', 'walk.anim.json'))})
 an.frames = 16
 P = A.all_poses(an)
-stance = [i for i in range(16) if 0.15 < i / 16 < 0.42]
+ank = [p['shin_front']['end'] for p in P]
+planted = [i for i in range(16) if ank[i][1] > -0.08]
 print(json.dumps({
-  'ground': max(abs(P[i]['shin_front']['end'][1]) for i in stance),
-  'back': all(P[a]['shin_front']['end'][0] > P[b]['shin_front']['end'][0] for a, b in zip(stance, stance[1:])),
+  'first': max(range(16), key=lambda i: ank[i][0]),
+  'planted': planted,
+  'back': all(ank[a][0] > ank[b][0] for a, b in zip(planted, planted[1:]) if b == a + 1),
+  'sink': max(max(p[b + s]['end'][1] for b in ('shin_', 'foot_') for s in ('front', 'back')) for p in P),
   'knee': max(abs(p['shin_front']['angle'] - p['thigh_front']['angle']) for p in P),
-  'lift': -min(p['shin_front']['end'][1] for p in P),
-  'low': max(range(16), key=lambda i: P[i]['torso']['start'][1]) / 16}))`));
-  assert.ok(m.ground < 1e-3, `chân đỡ nằm trên đất: ${m.ground}`);
-  assert.ok(m.back, 'chân đỡ lùi đều, không trượt tới');
+  'lift': -min(a[1] for a in ank),
+  'arms': [P[0]['arm_front']['end'][0] - P[0]['arm_front']['start'][0], P[8]['arm_front']['end'][0] - P[8]['arm_front']['start'][0]]}))`));
+  assert.ok(m.first <= 1 || m.first >= 15, `vòng bắt đầu lúc chân trước ở xa nhất phía trước: frame ${m.first}`);
+  assert.ok(m.planted.length >= 5, `chân trước chống đủ lâu: ${m.planted}`);
+  assert.ok(m.back, 'chân chống lùi đều, không trượt tới');
+  assert.ok(m.sink < 0.03, `chân không lún xuống đất: ${m.sink}`);
   assert.ok(m.knee > 20, `gối gập: ${m.knee}°`);
   assert.ok(m.lift > 0.15, `chân bước nhấc lên: ${m.lift}`);
-  assert.ok(m.low < 0.2 || (m.low > 0.5 && m.low < 0.7), `hông thấp nhất ngay sau tiếp đất: ${m.low}`);
+  assert.ok(m.arms[0] < 0 && m.arms[1] > 0, `tay trước vung ngược chân trước: ${m.arms}`);
+});
+
+test('game-animation mocap: BVH → anim on the humanoid skeleton; --cycle skips standing still; in place, facing forward, feet on the ground; chibi copies its skeleton; errors explained', { skip: skipPy }, () => {
+  const dir = tmpDir();
+  // a synthetic Y-up BVH (walks along +Z): 30 frames standing, then a 1-second stride cycle repeated
+  py(dir, `
+import math
+J = [('Hips', None, (0, 0, 0)), ('Spine', 'Hips', (0, 10, 0)), ('Neck', 'Spine', (0, 40, 0)), ('Head', 'Neck', (0, 8, 0)),
+     ('LeftArm', 'Spine', (15, 35, 0)), ('LeftForeArm', 'LeftArm', (0, -28, 0)), ('LeftHand', 'LeftForeArm', (0, -25, 0)),
+     ('RightArm', 'Spine', (-15, 35, 0)), ('RightForeArm', 'RightArm', (0, -28, 0)), ('RightHand', 'RightForeArm', (0, -25, 0)),
+     ('LeftUpLeg', 'Hips', (9, 0, 0)), ('LeftLeg', 'LeftUpLeg', (0, -42, 0)), ('LeftFoot', 'LeftLeg', (0, -42, 0)), ('LeftToeBase', 'LeftFoot', (0, -6, 14)),
+     ('RightUpLeg', 'Hips', (-9, 0, 0)), ('RightLeg', 'RightUpLeg', (0, -42, 0)), ('RightFoot', 'RightLeg', (0, -42, 0)), ('RightToeBase', 'RightFoot', (0, -6, 14))]
+kids = {n: [c for c, p, o in J if p == n] for n, _, _ in J}
+off = {n: o for n, _, o in J}
+lines = ['HIERARCHY']
+def emit(n, d, root=False):
+    pad = '  ' * d
+    lines.append(pad + ('ROOT ' if root else 'JOINT ') + n); lines.append(pad + '{')
+    lines.append(pad + '  OFFSET %g %g %g' % off[n])
+    lines.append(pad + ('  CHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation' if root else '  CHANNELS 3 Zrotation Xrotation Yrotation'))
+    for c in kids[n]: emit(c, d + 1)
+    if not kids[n]: lines.extend([pad + '  End Site', pad + '  {', pad + '    OFFSET 0 -5 0', pad + '  }'])
+    lines.append(pad + '}')
+emit('Hips', 0, True)
+order = [n for n, _, _ in J]
+fps, N = 60, 30 + 180
+rows = []
+for f in range(N):
+    t = max(0, f - 30) / fps
+    ph = 2 * math.pi * t  # one stride per second
+    walking = f >= 30
+    v = {n: (0, 0, 0) for n in order}
+    if walking:
+        for side, s in (('Left', 1), ('Right', -1)):
+            swing = 25 * math.sin(ph) * s
+            v[side + 'UpLeg'] = (0, -swing, 0)            # X rotation: + tips the leg backward (toward -Z)
+            v[side + 'Leg'] = (0, 20 + 20 * math.sin(ph + s * math.pi / 2) , 0)
+            v[side + 'Arm'] = (0, swing * 0.8, 0)
+    root = (0, 88 - (3 * abs(math.sin(ph)) if walking else 0), 40 * t)
+    vals = list(root)
+    for n in order:
+        z, x, y = v[n]
+        vals += [z, x, y]
+    rows.append(' '.join('%.4f' % a for a in vals))
+lines += ['MOTION', 'Frames: %d' % N, 'Frame Time: %f' % (1 / fps)] + rows
+open('walk.bvh', 'w').write('\\n'.join(lines) + '\\n')`);
+  let r = an(dir, 'mocap', 'walk.bvh', '--cycle', '--out', 'art/anim/hero/walk.anim.json', '--frames', '8');
+  assert.equal(r.code, 0, r.out);
+  const cyc = r.out.match(/frame (\d+)–(\d+) \(([\d.]+) giây\)/);
+  assert.ok(cyc && Number(cyc[1]) >= 25, `bỏ qua đoạn đứng yên: ${r.out}`);
+  assert.ok(Math.abs(Number(cyc[3]) - 1) < 0.1, `vòng lặp ~1 giây: ${cyc[3]}`);
+  assert.ok(fs.existsSync(path.join(dir, 'art/anim/hero/humanoid.skeleton.json')), 'chép khung xương thư viện về cạnh animation');
+  r = an(dir, 'check', 'art/anim/hero/walk.anim.json');
+  assert.equal(r.code, 0, r.out);
+  const text = fs.readFileSync(path.join(dir, 'art/anim/hero/walk.anim.json'), 'utf8');
+  assert.match(text, /\n\s+\[0\.0, -?[\d.]+, "linear"\],\n/, 'mỗi key nằm trên một dòng');
+  const m = JSON.parse(py(dir, `
+import json, sys
+sys.path.insert(0, ${JSON.stringify(path.join(ART, 'game-animation', 'scripts'))})
+import animate as A
+an = A.load_anim('art/anim/hero/walk.anim.json'); an.frames = 16
+P = A.all_poses(an)
+print(json.dumps({
+  'drift': max(abs(p['torso']['start'][0]) for p in P),
+  'toe': [p['foot_front']['end'][0] - p['foot_front']['start'][0] for p in P],
+  'ground': min(max(p['shin_front']['end'][1], p['shin_back']['end'][1]) for p in P),
+  'sink': max(p['foot_' + s]['end'][1] for p in P for s in ('front', 'back')),
+  'stride': max(p['shin_front']['end'][0] for p in P) - min(p['shin_front']['end'][0] for p in P)}))`));
+  assert.ok(m.drift < 0.3, `tại chỗ: ${m.drift}`);
+  assert.ok(m.toe.every((d) => d > 0), `mũi chân hướng về phía trước (bên phải): ${m.toe}`);
+  assert.ok(m.ground > -0.05, `luôn có một chân chạm đất: ${m.ground}`);
+  assert.ok(m.sink < 0.03, `mũi chân không lún: ${m.sink}`);
+  assert.ok(m.stride > 0.6, `bước chân đủ dài: ${m.stride}`);
+
+  r = an(dir, 'mocap', 'walk.bvh', '--once', '--start', '30', '--end', '120', '--skeleton', 'humanoid-chibi.skeleton.json', '--out', 'chibi/step.anim.json');
+  assert.equal(r.code, 0, r.out);
+  assert.ok(fs.existsSync(path.join(dir, 'chibi/humanoid-chibi.skeleton.json')));
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'chibi/step.anim.json'), 'utf8')).loop, false);
+  assert.equal(an(dir, 'preview', 'chibi/step.anim.json', '--out', 'step.gif').code, 0);
+
+  fs.writeFileSync(path.join(dir, 'arm.bvh'), 'HIERARCHY\nROOT Hips\n{\n  OFFSET 0 0 0\n  CHANNELS 3 Zrotation Xrotation Yrotation\n  End Site\n  {\n    OFFSET 0 1 0\n  }\n}\nMOTION\nFrames: 2\nFrame Time: 0.1\n0 0 0\n0 0 0\n');
+  r = an(dir, 'mocap', 'arm.bvh', '--out', 'x.anim.json');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /BVH thiếu khớp/);
+  r = an(dir, 'mocap', 'walk.bvh', '--start', '5', '--end', '6', '--out', 'x.anim.json');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /quá ngắn/);
 });
 
 test('game-animation rig + tween: parts follow bones; one sprite squashes and hops; a flat spin keeps a sliver', { skip: skipPy }, () => {

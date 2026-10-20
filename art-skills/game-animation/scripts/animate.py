@@ -12,6 +12,7 @@ sóng (đuôi, tóc, cánh, thân rắn), IK hai khúc (chân đặt lên điể
   tween <sprite.png> --anim <anim.json> --size WxH --out <png>  cả sprite chuyển động (nhún, nảy, lắc, xoay…)
   check <anim.json>                             kiểm file, báo chỗ giật (xương xoay > 100° hoặc cả người dời xa giữa hai frame)
   bake <anim.json> --out <json>                  góc/vị trí từng xương mỗi frame để game tự chạy animation
+  mocap <file.bvh> --out <anim.json> [--cycle]    chuyển động thật từ motion capture → animation cho khung humanoid
 
 Cần Python 3.9+ và Pillow.
 """
@@ -48,6 +49,23 @@ def load_json(path) -> dict:
         return json.loads(p.read_text(encoding="utf-8"))
     except ValueError as e:
         raise UserError(f"{path}: JSON hỏng ({e})")
+
+
+def dump_json(data) -> str:
+    """Indented JSON with every short list (a key [t, v, ease], a point [x, y]) kept on one line."""
+    def fmt(o, ind):
+        one = json.dumps(o, ensure_ascii=False)
+        if not isinstance(o, (dict, list)) or (isinstance(o, list) and len(one) < 80 and
+                                                  all(not isinstance(v, (dict, list)) or (isinstance(v, list) and
+                                                      all(not isinstance(w, (dict, list)) for w in v)) for v in o)):
+            return one
+        pad = " " * (ind + 1)
+        if isinstance(o, dict):
+            if not o:
+                return "{}"
+            return "{\n" + ",\n".join(f"{pad}{json.dumps(k, ensure_ascii=False)}: {fmt(v, ind + 1)}" for k, v in o.items()) + "\n" + " " * ind + "}"
+        return "[\n" + ",\n".join(pad + fmt(v, ind + 1) for v in o) + "\n" + " " * ind + "]" if o else "[]"
+    return fmt(data, 0) + "\n"
 
 
 def parse_size(s) -> tuple[int, int]:
@@ -371,7 +389,7 @@ def draw_pose(P: dict, sk: Skeleton, scale: float, origin, size, ss: int = 3) ->
             cx, cy = to(((p["start"][0] + p["end"][0]) / 2, (p["start"][1] + p["end"][1]) / 2))
             d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=c)
             if b["face"]:
-                fx, fy = _dir(p["angle"] - 90)  # the forward side of a bone pointing up
+                fx, fy = _dir(p["angle"] + 90)  # the forward side of a bone pointing up (180 + 90 → facing right)
                 d.ellipse([cx + fx * r * 0.62 - r * 0.2, cy + fy * r * 0.62 - r * 0.2, cx + fx * r * 0.62 + r * 0.2, cy + fy * r * 0.62 + r * 0.2], fill=(60, 60, 70, 255))
             continue
         a, e = to(p["start"]), to(p["end"])
@@ -569,6 +587,274 @@ def bake(anim: Anim) -> dict:
     return out
 
 
+# ---------- mocap: BVH → animation (chuyển động thật) ----------
+# Joint names per naming scheme → our humanoid bones. "front" = the character's LEFT side: facing right,
+# a person shows their left side to the viewer.
+BVH_NAMES = {
+    "hips": ["Hips", "hip", "pelvis", "Pelvis"],
+    "neck": ["Neck", "neck", "lowerneck", "Neck1"],
+    "head": ["Head", "head"],
+    "shoulder_front": ["LeftArm", "LeftShoulder", "lShldr", "LeftUpArm"], "elbow_front": ["LeftForeArm", "LeftElbow", "lForeArm"],
+    "wrist_front": ["LeftHand", "LeftWrist", "lHand"],
+    "shoulder_back": ["RightArm", "RightShoulder", "rShldr", "RightUpArm"], "elbow_back": ["RightForeArm", "RightElbow", "rForeArm"],
+    "wrist_back": ["RightHand", "RightWrist", "rHand"],
+    "hip_front": ["LeftUpLeg", "LeftHip", "lThigh"], "knee_front": ["LeftLeg", "LeftKnee", "lShin"],
+    "ankle_front": ["LeftFoot", "LeftAnkle", "lFoot"], "toe_front": ["LeftToeBase", "LeftToe", "lToe"],
+    "hip_back": ["RightUpLeg", "RightHip", "rThigh"], "knee_back": ["RightLeg", "RightKnee", "rShin"],
+    "ankle_back": ["RightFoot", "RightAnkle", "rFoot"], "toe_back": ["RightToeBase", "RightToe", "rToe"],
+}
+
+
+def _rotm(axis, deg):
+    r = math.radians(deg)
+    c, s = math.cos(r), math.sin(r)
+    if axis == "X":
+        return ((1, 0, 0), (0, c, -s), (0, s, c))
+    if axis == "Y":
+        return ((c, 0, s), (0, 1, 0), (-s, 0, c))
+    return ((c, -s, 0), (s, c, 0), (0, 0, 1))
+
+
+def _mm(a, b):
+    return tuple(tuple(sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)) for i in range(3))
+
+
+def _mv(a, v):
+    return tuple(sum(a[i][k] * v[k] for k in range(3)) for i in range(3))
+
+
+def parse_bvh(path):
+    """Joints (name, parent, offset, channels, end site) and frames of channel values."""
+    text = Path(path).read_text(encoding="utf-8", errors="replace").split()
+    joints, stack, i = [], [], 0
+    while text[i] != "MOTION":
+        tok = text[i]
+        if tok in ("ROOT", "JOINT"):
+            joints.append({"name": text[i + 1], "parent": stack[-1] if stack else None, "offset": (0, 0, 0), "channels": [], "end": None})
+            i += 2
+        elif tok == "End":
+            i += 2
+            assert text[i] == "{"
+            j = joints[stack[-1]]
+            j["end"] = tuple(float(v) for v in text[i + 2:i + 5])
+            i += 6
+        elif tok == "{":
+            stack.append(len(joints) - 1)
+            i += 1
+        elif tok == "}":
+            stack.pop()
+            i += 1
+        elif tok == "OFFSET":
+            joints[stack[-1]]["offset"] = tuple(float(v) for v in text[i + 1:i + 4])
+            i += 4
+        elif tok == "CHANNELS":
+            n = int(text[i + 1])
+            joints[stack[-1]]["channels"] = text[i + 2:i + 2 + n]
+            i += 2 + n
+        else:
+            i += 1
+    n_frames = int(text[i + 2])
+    dt = float(text[i + 5])
+    vals = [float(v) for v in text[i + 6:]]
+    width = sum(len(j["channels"]) for j in joints)
+    frames = [vals[k * width:(k + 1) * width] for k in range(n_frames)]
+    return joints, frames, dt
+
+
+def bvh_positions(joints, frame):
+    """World position of every joint (and of end sites as '<name>_end') for one frame."""
+    pos, rot, k = {}, {}, 0
+    for idx, j in enumerate(joints):
+        t = list(j["offset"])
+        r = ((1, 0, 0), (0, 1, 0), (0, 0, 1))
+        for ch in j["channels"]:
+            v = frame[k]
+            k += 1
+            if ch.endswith("position"):
+                t["XYZ".index(ch[0])] = v
+            else:
+                r = _mm(r, _rotm(ch[0], v))
+        if j["parent"] is None:
+            pos[idx], rot[idx] = tuple(t), r
+        else:
+            pr, pp = rot[j["parent"]], pos[j["parent"]]
+            o = _mv(pr, t)
+            pos[idx] = (pp[0] + o[0], pp[1] + o[1], pp[2] + o[2])
+            rot[idx] = _mm(pr, r)
+        if j["end"]:
+            o = _mv(rot[idx], j["end"])
+            pos[f"{idx}_end"] = (pos[idx][0] + o[0], pos[idx][1] + o[1], pos[idx][2] + o[2])
+    return pos
+
+
+def bvh_to_anim(path, skeleton: str = "humanoid.skeleton.json", start: int = 0, end: int | None = None, keys: int = 24,
+                frames: int = 8, fps: float | None = None, loop: bool = True, in_place: bool = True, flip: bool = False,
+                sk: Skeleton | None = None) -> dict:
+    """Side view of a BVH clip on a humanoid skeleton (bones torso, head, arm_*, forearm_*, thigh_*, shin_*, foot_*):
+    body and arms as rotation keys, legs as IK targets so the feet land where the actor's did."""
+    joints, data, dt = parse_bvh(path)
+    sk = sk or load_skeleton(LIBRARY / "humanoid" / "humanoid.skeleton.json")
+    need = [b for b in ("torso", "head", "thigh_front", "shin_front", "thigh_back", "shin_back") if b not in sk.bones]
+    if need:
+        raise UserError(f"khung xương thiếu xương {', '.join(need)} — mocap cần khung kiểu humanoid")
+    names = {j["name"]: i for i, j in enumerate(joints)}
+
+    def find(role):
+        for n in BVH_NAMES[role]:
+            if n in names:
+                return names[n]
+        return None
+    roles = {r: find(r) for r in BVH_NAMES}
+    missing = [r for r in ("hips", "neck", "hip_front", "knee_front", "ankle_front", "hip_back", "knee_back", "ankle_back") if roles[r] is None]
+    if missing:
+        raise UserError(f"BVH thiếu khớp cho {', '.join(missing)} — tên khớp có: {', '.join(list(names)[:20])}…")
+    head_end = f"{roles['head']}_end" if roles["head"] is not None and joints[roles["head"]]["end"] else roles["head"] or roles["neck"]
+    end = len(data) if end is None else min(end, len(data))
+    if end - start < 2:
+        raise UserError(f"đoạn {start}–{end} quá ngắn (BVH có {len(data)} frame)")
+    P = [bvh_positions(joints, data[f]) for f in range(start, end)]
+    sub = lambda a, b: (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+    dot = lambda a, b: a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+    norm = lambda a: (lambda l: (a[0] / l, a[1] / l, a[2] / l))(math.sqrt(dot(a, a)) or 1)
+    # up: the world axis (BVH files are Y-up or Z-up) closest to hips → neck; a leaning spine must not tilt it,
+    # or travel leaks into height. forward: toes ahead of ankles, flattened onto the ground plane
+    spine = norm(tuple(sum(sub(p[roles["neck"]], p[roles["hips"]])[i] for p in P) for i in range(3)))
+    ax = max(range(3), key=lambda i: abs(spine[i]))
+    up = tuple((1.0 if spine[ax] > 0 else -1.0) if i == ax else 0.0 for i in range(3))
+    fw = (0.0, 0.0, 0.0)
+    for side in ("front", "back"):
+        if roles[f"toe_{side}"] is not None:
+            fw = tuple(fw[i] + sum(sub(p[roles[f"toe_{side}"]], p[roles[f"ankle_{side}"]])[i] for p in P) for i in range(3))
+    if dot(fw, fw) < 1e-9:  # no toes: use the direction the hips travel
+        fw = sub(P[-1][roles["hips"]], P[0][roles["hips"]])
+    fw = norm(tuple(fw[i] - dot(fw, up) * up[i] for i in range(3)))
+    if flip:
+        fw = (-fw[0], -fw[1], -fw[2])
+    leg = sum(math.dist(p[roles["hip_front"]], p[roles["knee_front"]]) + math.dist(p[roles["knee_front"]], p[roles["ankle_front"]]) for p in P) / len(P)
+    s = (sk.bones["thigh_front"]["length"] + sk.bones["shin_front"]["length"]) / leg  # the actor's leg → ours
+    to2 = lambda v: (dot(v, fw) * s, -dot(v, up) * s)
+    pts = [{r: to2(p[i]) for r, i in roles.items() if i is not None} | {"head_end": to2(p[head_end])} for p in P]
+    ground = max(max(q["ankle_front"][1], q["ankle_back"][1]) for q in pts)
+    for q in pts:
+        for r in q:
+            q[r] = (q[r][0], q[r][1] - ground)
+    # in place: remove the travel of the hips so the animation stays put (the game moves the character).
+    # A loop loses only its steady drift (the hips still surge within a step); a one-shot move (jump, lunge)
+    # travels unevenly, so its hips are held at x = 0 throughout
+    if in_place:
+        n = len(pts)
+        x0, x1 = pts[0]["hips"][0], pts[-1]["hips"][0]
+        for k, q in enumerate(pts):
+            shift = x0 + (x1 - x0) * k / max(1, n - 1) if loop else q["hips"][0]
+            for r in q:
+                q[r] = (q[r][0] - shift, q[r][1])
+    if loop:  # start the loop where the front foot reaches furthest ahead (heel strike), like the hand-keyed cycles
+        k0 = max(range(len(pts)), key=lambda k: pts[k]["ankle_front"][0] - pts[k]["hips"][0])
+        pts = pts[k0:] + pts[:k0]
+    rest_y = sk.root_pos[1]
+    ang = lambda a, b: _ang(b[0] - a[0], b[1] - a[1])
+    out_keys = {"torso": {"x": [], "y": [], "rot": []}, "head": {"rot": []}}
+    for side in ("front", "back"):
+        out_keys[f"arm_{side}"] = {"rot": []}
+        out_keys[f"forearm_{side}"] = {"rot": []}
+    ik = {side: {"target": [], "foot_angle": []} for side in ("front", "back")}
+
+    def unwrap(prev, a):
+        while prev is not None and a - prev > 180:
+            a -= 360
+        while prev is not None and a - prev < -180:
+            a += 360
+        return a
+    # a limb pointing at the camera projects short and its side-view angle spins; trust the angle only as much
+    # as the limb shows its length (longest projection over the clip ≈ the real length)
+    seg = {}
+    for side in ("front", "back"):
+        if roles[f"elbow_{side}"] is not None and roles[f"wrist_{side}"] is not None:
+            seg[f"arm_{side}"] = (f"shoulder_{side}", f"elbow_{side}")
+            seg[f"forearm_{side}"] = (f"elbow_{side}", f"wrist_{side}")
+    full = {b: max(math.dist(q[a], q[c]) for q in pts) or 1 for b, (a, c) in seg.items()}
+    last = {}
+    for k in range(keys):
+        t = k / keys if loop else k / max(1, keys - 1)
+        f = min(len(pts) - 1, round(t * (len(pts) - (0 if loop else 1))) if not loop else int(t * len(pts)))
+        q = pts[f]
+        hip = ((q["hip_front"][0] + q["hip_back"][0]) / 2, (q["hip_front"][1] + q["hip_back"][1]) / 2)
+        torso_w = ang(hip, q["neck"])
+        vals = {"torso": torso_w - 180}
+        vals["head"] = ang(q["neck"], q["head_end"]) - 180 - vals["torso"]
+        for side in ("front", "back"):
+            if roles[f"elbow_{side}"] is not None and roles[f"wrist_{side}"] is not None:
+                sh = q[f"shoulder_{side}"]
+                aw = ang(sh, q[f"elbow_{side}"])
+                fw_ = ang(q[f"elbow_{side}"], q[f"wrist_{side}"])
+                vals[f"arm_{side}"] = aw - vals["torso"]
+                vals[f"forearm_{side}"] = fw_ - aw
+        for name in list(vals):
+            vals[name] = unwrap(last.get(name), vals[name])
+            if name in seg and name in last:
+                shown = math.dist(q[seg[name][0]], q[seg[name][1]]) / full[name]
+                vals[name] = last[name] + (vals[name] - last[name]) * min(1.0, shown / 0.6)
+            last[name] = vals[name]
+        out_keys["torso"]["x"].append([round(t, 4), round(hip[0], 4), "linear"])
+        out_keys["torso"]["y"].append([round(t, 4), round(hip[1] - rest_y, 4), "linear"])
+        out_keys["torso"]["rot"].append([round(t, 4), round(vals["torso"], 3), "linear"])
+        out_keys["head"]["rot"].append([round(t, 4), round(vals["head"], 3), "linear"])
+        for side in ("front", "back"):
+            for b in ("arm", "forearm"):
+                if f"{b}_{side}" in vals:
+                    out_keys[f"{b}_{side}"]["rot"].append([round(t, 4), round(vals[f"{b}_{side}"], 3), "linear"])
+            a = q[f"ankle_{side}"]
+            # IK target relative to OUR hip: keep the mocap leg pose but on our leg lengths
+            ik[side]["target"].append([round(t, 4), [round(a[0], 4), round(a[1], 4)], "linear"])
+            if roles[f"toe_{side}"] is not None:
+                fa = ang(a, q[f"toe_{side}"])
+                # our ankle stands on the ground (the actor's floats a few cm up): tilt the foot up just enough
+                # that its tip never sinks below y = 0
+                flen = sk.bones[f"foot_{side}"]["length"] if f"foot_{side}" in sk.bones else 0
+                if flen and a[1] + flen * math.cos(math.radians(fa)) > 0:
+                    fa = -math.degrees(math.acos(max(-1.0, min(1.0, -a[1] / flen))))
+                ik[side]["foot_angle"].append([round(t, 4), round(fa, 3), "linear"])
+    out_keys = {b: {c: v for c, v in ch.items() if v} for b, ch in out_keys.items()}
+    out_keys = {b: ch for b, ch in out_keys.items() if ch}
+    return {"note": f"mocap từ {Path(path).name} (frame {start}–{end})", "skeleton": skeleton, "frames": frames,
+            "fps": fps or round(frames / ((end - start) * dt), 2), "loop": loop, "keys": out_keys,
+            "ik": [{"bones": [f"thigh_{s_}", f"shin_{s_}"], "knee": "forward", "target": ik[s_]["target"],
+                    **({"foot": f"foot_{s_}", "foot_angle": ik[s_]["foot_angle"]} if ik[s_]["foot_angle"] else {})} for s_ in ("front", "back")]}
+
+
+def find_cycle(path, min_len: float = 0.5, max_len: float = 2.0, start: int = 0, end: int | None = None):
+    """Best loop: among windows that move at least half as much as the liveliest one, the frame pair (i, i + P)
+    whose limb poses (relative to the hips) match most closely."""
+    joints, data, dt = parse_bvh(path)
+    names = {j["name"]: i for i, j in enumerate(joints)}
+    pick = [names[n] for role in ("ankle_front", "ankle_back", "knee_front", "knee_back", "wrist_front", "wrist_back")
+            for n in BVH_NAMES[role] if n in names][:6]
+    hips = next(names[n] for n in BVH_NAMES["hips"] if n in names)
+    end = len(data) if end is None else min(end, len(data))
+    step = max(1, round(1 / 30 / dt))
+    idx = list(range(start, end, step))
+    feats = []
+    for f in idx:
+        p = bvh_positions(joints, data[f])
+        h = p[hips]
+        feats.append([c for j in pick for c in (p[j][0] - h[0], p[j][1] - h[1], p[j][2] - h[2])])
+    lo, hi = max(2, round(min_len / (dt * step))), round(max_len / (dt * step))
+    # a standing-still stretch matches itself perfectly: score the seam against how much the limbs move inside
+    # the window, and skip windows that hardly move at all
+    spread = lambda fs: sum(math.dist(f, [sum(c) / len(fs) for c in zip(*fs)]) for f in fs) / len(fs)
+    moves = {(a, a + P_): spread(feats[a:a + P_]) for a in range(len(feats)) for P_ in range(lo, min(hi, len(feats) - 1 - a) + 1)}
+    top = max((v for v in moves.values()), default=0)
+    if top <= 0:
+        raise UserError("đoạn mocap quá ngắn hoặc không có chuyển động để tìm vòng lặp")
+    best = None
+    for (a, b), m in moves.items():
+        if m >= 0.5 * top:
+            d = math.dist(feats[a], feats[b]) / m
+            if best is None or d < best[0]:
+                best = (d, idx[a], idx[b])
+    return best[1], best[2], dt
+
+
 # ---------- CLI ----------
 def list_library() -> list[str]:
     return sorted(str(p.relative_to(LIBRARY)).replace("\\", "/").removesuffix(".anim.json") for p in LIBRARY.rglob("*.anim.json"))
@@ -587,6 +873,14 @@ def main(argv=None) -> int:
         p = sub.add_parser(cmd); p.add_argument("rig" if cmd == "rig" else "sprite"); p.add_argument("--anim", required=True)
         p.add_argument("--size", required=True); p.add_argument("--out", required=True); p.add_argument("--frames", type=int)
         p.add_argument("--gif"); p.add_argument("--frames-dir"); p.add_argument("--pad", type=int, default=2)
+    p = sub.add_parser("mocap"); p.add_argument("bvh"); p.add_argument("--out", required=True)
+    p.add_argument("--start", type=int, default=0); p.add_argument("--end", type=int)
+    p.add_argument("--cycle", action="store_true", help="tự tìm một vòng lặp khớp nhất trong đoạn")
+    p.add_argument("--once", action="store_true", help="động tác một lần (không lặp)")
+    p.add_argument("--frames", type=int, default=8); p.add_argument("--keys", type=int, default=24)
+    p.add_argument("--keep-travel", action="store_true", help="giữ quãng đường đi (mặc định: tại chỗ)")
+    p.add_argument("--flip", action="store_true", help="lật hướng mặt nếu nhân vật quay ngược")
+    p.add_argument("--skeleton", default="humanoid.skeleton.json", help="khung humanoid, tính từ thư mục --out (vd humanoid-chibi.skeleton.json)")
     p = sub.add_parser("check"); p.add_argument("anim")
     p = sub.add_parser("bake"); p.add_argument("anim"); p.add_argument("--out", required=True); p.add_argument("--frames", type=int)
     a = ap.parse_args(argv)
@@ -609,7 +903,7 @@ def main(argv=None) -> int:
                 if not (out / Path(sk_name).name).exists():
                     shutil.copy(sk_src, out / Path(sk_name).name)
                 data["skeleton"] = Path(sk_name).name
-            dst.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+            dst.write_text(dump_json(data), encoding="utf-8")
             print(f"✔ {dst}" + (f" + {out / Path(sk_name).name}" if sk_name else "") + " — sửa rồi `preview` để xem")
         elif a.cmd == "preview":
             an = load_anim(a.anim)
@@ -664,6 +958,24 @@ def main(argv=None) -> int:
             if a.gif:
                 save_gif(frames, a.gif, an.fps)
             print(f"✔ {a.out} {out.width}×{out.height} ({an.frames} frame, {len(parts)} phần)")
+        elif a.cmd == "mocap":
+            start, end = a.start, a.end
+            if a.cycle:
+                start, end, dt = find_cycle(a.bvh, start=a.start, end=a.end)
+                print(f"vòng lặp: frame {start}–{end} ({(end - start) * dt:.2f} giây)")
+            out_dir = Path(a.out).parent
+            out_dir.mkdir(parents=True, exist_ok=True)
+            sk_path = out_dir / a.skeleton
+            if not sk_path.exists():  # a library skeleton: copy it next to the animation, as `new` does
+                lib = LIBRARY / "humanoid" / Path(a.skeleton).name
+                if not lib.exists():
+                    raise UserError(f"không thấy khung xương {sk_path} (hoặc {Path(a.skeleton).name} trong thư viện humanoid)")
+                shutil.copy(lib, out_dir / lib.name)
+                sk_path = out_dir / lib.name
+            data = bvh_to_anim(a.bvh, sk_path.name if sk_path.parent == out_dir else str(sk_path), start, end, a.keys,
+                               a.frames, None, not a.once, not a.keep_travel, a.flip, load_skeleton(sk_path))
+            Path(a.out).write_text(dump_json(data), encoding="utf-8")
+            print(f"✔ {a.out} ({data['frames']} frame, {data['fps']} fps, {'lặp' if data['loop'] else 'một lần'}) — `preview` để xem, sửa key nếu cần")
         elif a.cmd == "check":
             an = load_anim(a.anim)
             ws = check_anim(an)
