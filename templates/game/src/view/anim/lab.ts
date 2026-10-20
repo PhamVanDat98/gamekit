@@ -24,7 +24,10 @@ const KEYS: Record<string, string> = { ' ': 'hop', a: 'attack', h: 'hit', c: 'ce
 
 const q = new URLSearchParams(location.search);
 const names = Object.keys(MOTIONS).sort();
-let mode: 'view' | 'play' | 'frames' = q.get('play') === '1' ? 'play' : q.has('frames') ? 'frames' : 'view';
+type Mode = 'view' | 'play' | 'frames';
+// ?play=1 / ?frames=<name>, else <canvas data-mode> (a page embedding the lab picks its opening view).
+const startMode = document.getElementById('lab')?.dataset.mode as Mode | undefined;
+let mode: Mode = q.get('play') === '1' ? 'play' : q.has('frames') ? 'frames' : (startMode ?? 'view');
 let current: Motion | undefined = MOTIONS[q.get('m') ?? ''] ?? MOTIONS['hop'] ?? MOTIONS[names[0] ?? ''];
 let speed = Number(q.get('speed') ?? 1);
 let onion = q.get('onion') === '1';
@@ -158,10 +161,15 @@ viewControls.append(
     button('khung ▶', () => (frozen = (frozen ?? Math.round(t * fps())) + 1)),
     button('↺', () => ((t = 0), (frozen = null))),
   ),
-  row(
-    ...[12, 24, 30].map((n) => button(`${n} fps`, () => (bakeFps = n), () => bakeFps === n)),
-    button('Xuất frame', () => void bakeCurrent()),
-  ),
+  // Writing files needs the dev server (vite.config.ts bakeFrames); a built lab only plays.
+  ...(import.meta.env.DEV
+    ? [
+        row(
+          ...[12, 24, 30].map((n) => button(`${n} fps`, () => (bakeFps = n), () => bakeFps === n)),
+          button('Xuất frame', () => void bakeCurrent()),
+        ),
+      ]
+    : []),
 );
 const framesControls = group();
 framesControls.append(
