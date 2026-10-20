@@ -57,4 +57,4 @@ Các mục trong `gates/P0.md` mà skill này lo:
 - `{auto: field:source.engine}`, `{auto: field:source.path}`: tự đạt khi `recon --write` đã điền.
 - `third-party`: điền `release.forbiddenTerms` bằng tên, thương hiệu game gốc.
 
-Rồi chuyển sang skill **triage**. Mục "Đồng ý làm game này (bạn)" chỉ người dùng tick.
+Rồi chuyển sang skill **triage** (game nhỏ: xem mục 0 của skill đó, có thể bỏ qua báo cáo đầy đủ). Mục "Đồng ý làm game này (bạn)" chỉ người dùng tick.

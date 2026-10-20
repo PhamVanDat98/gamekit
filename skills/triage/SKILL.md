@@ -7,6 +7,25 @@ description: Dùng ở P0 sau game-recon, để chấm độ khả thi của vi�
 
 Đầu vào: `spec/recon.json`, `notes/recon.md`, `spec/asset-inventory.json` (skill **game-recon**). Đầu ra: `notes/triage.md` + `budget.plannedDays` trong `game.yaml`. Quyết định cuối là của người dùng.
 
+## 0. Game nhỏ: bỏ qua báo cáo triage
+Được bỏ qua `notes/triage.md` (mục 1–4) khi **mọi** điều sau đúng, mỗi điều có bằng chứng từ recon:
+- Game của người dùng (`own`). `third-party` luôn làm triage đủ: rủi ro clone phải được đánh giá.
+- Đọc được logic: `flavour` là `unity-project`, `unity-mono`, hoặc bundle JS có source map.
+- 2D, không server/tài khoản/multiplayer, không IAP, vật lý không có hoặc đơn giản.
+- Ít nội dung: vài cơ chế, ít màn; ước lượng cả P0–P5 không quá khoảng 5 ngày.
+
+Khi bỏ qua, vẫn phải làm hai việc:
+1. Ghi một mục trong `DECISIONS.md`:
+   ```markdown
+   ## D-n Bỏ qua báo cáo triage (game nhỏ)
+   - Bối cảnh: <engine/flavour, số cơ chế, số màn, dung lượng asset — trích spec/recon.json>
+   - Quyết định: không viết notes/triage.md; ước lượng nhanh ghi trong budget.plannedDays
+   - Sai khác game gốc: không
+   ```
+2. Ghi `budget.plannedDays` (ước lượng nhanh từng pha). Luật cắt lỗ (mục 6) dựa vào con số này.
+
+Sau đó tick mục "Có báo cáo triage…" của cổng P0 (mục này cho phép thay bằng `D-n`). Báo người dùng là đã bỏ qua triage, kèm lý do và ước lượng. Mục "Đồng ý làm game này (bạn)" vẫn do người dùng tick. Chỉ cần một điều kiện trên sai là làm triage đủ.
+
 ## 1. Chấm từng yếu tố
 Mỗi yếu tố ghi mức và **bằng chứng** (file, số liệu từ recon). Không có bằng chứng thì ghi "chưa biết", không chấm bừa.
 

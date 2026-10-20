@@ -7,6 +7,8 @@ description: Dùng ở P1 khi cần ghi lại giao diện của game gốc trư�
 
 Mục tiêu cổng P1: có `ui-kit/` hoặc ghi chú UI từng màn. Ghi chú này là đầu vào cho **rebuild-game** (P2) và **web-relayout** (P3). Bản web phải dựng lại được từng màn mà không cần mở game gốc thêm lần nào.
 
+**Game ít màn**: chỉ có khoảng 3–4 màn đơn giản (ví dụ màn bắt đầu, HUD lúc chơi, game over, Settings), không shop, không kho đồ, không chuỗi popup. Khi đó bỏ được mục 1–2 chi tiết, chỉ cần một `notes/ui.md`: bảng một dòng mỗi màn (tên, thành phần chính, key text `t()`, nút bấm đi đâu, ảnh chụp) và luồng một dòng. Ghi một mục `D-n` trong `DECISIONS.md` (bối cảnh: số màn và tên từng màn; quyết định: ghi chú UI rút gọn trong `notes/ui.md`; sai khác game gốc: không). Mục 3–4 (text qua `t()`, điểm chạm) vẫn áp dụng. Có màn phức tạp thì màn đó vẫn ghi đủ theo mục 2.
+
 Game của người dùng (`own`): chụp màn hình trực tiếp, được đưa hình gốc vào `ui-kit/`. Làm lại game người khác (`third-party`): ảnh chụp chỉ nằm trong `reference/` (gitignored); ghi chú mô tả **chức năng và bố cục**, không mô tả lại hình vẽ để vẽ theo.
 
 ## 1. Danh sách màn và luồng

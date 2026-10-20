@@ -12,6 +12,8 @@ Bằng chứng từ game gốc:
 - Lệnh `oracle import`: trace CSV/JSONL/JSON → `spec/oracles/<id>.json` (chọn dòng `--at`, `--every`, `--max`; bắt buộc `--source`; `inferred` cần `--tolerance`). Công cụ ghi trace: `GkTraceRecorder.cs` (Unity), `gk-trace.js` (game web).
 - Lệnh `assets`: `scan` (kiểm kê, kích thước PNG, sprite sheet Unity, gợi ý định dạng), `unity-atlas` (.png + .meta → atlas JSON cho Pixi/Phaser: lật trục y, pivot → anchor, 9-slice), `convert` (WebP, MP3/OGG/M4A qua ffmpeg; `--label` gắn provenance).
 
+Game nhỏ được bỏ qua báo cáo triage và ghi chú UI chi tiết, như `module-plan`: tiêu chí trong skill triage (mục 0) và ui-extract, lý do ghi thành `D-n` trong `DECISIONS.md`; game `third-party` luôn làm triage đủ, `budget.plannedDays` vẫn bắt buộc. Câu chữ cổng P0/P1 đã ghi rõ lựa chọn này.
+
 Skill mới: game-recon, triage (P0); engine-unity, gameplay-spec, asset-inventory, ui-extract (P1); runtime-select (P2); web-relayout (P3); perf-budget, qa-smoke (P5). Skill cũ trỏ sang lệnh và skill mới.
 
 Đo chính harness:
