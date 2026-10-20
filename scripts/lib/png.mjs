@@ -255,3 +255,37 @@ export function colourCount(img, cap = 64) {
   for (let i = 0; i < data.length && seen.size < cap; i += step) seen.add((data[i] << 16) | (data[i + 1] << 8) | data[i + 2]);
   return seen.size;
 }
+
+/** { width, height, alpha } of a PNG, JPEG, WebP or GIF from its header; null for anything else. */
+export function imageSize(file) {
+  const fd = fs.openSync(file, 'r');
+  try {
+    const buf = Buffer.alloc(64 * 1024);
+    const n = fs.readSync(fd, buf, 0, buf.length, 0);
+    const b = buf.subarray(0, n);
+    if (n >= 26 && b.subarray(0, 8).equals(SIG)) return { width: b.readUInt32BE(16), height: b.readUInt32BE(20), alpha: b[25] === 4 || b[25] === 6 ? true : b[25] === 3 ? null : false };
+    if (n >= 10 && b.toString('latin1', 0, 3) === 'GIF') return { width: b.readUInt16LE(6), height: b.readUInt16LE(8), alpha: null };
+    if (n >= 30 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') {
+      const chunk = b.toString('latin1', 12, 16);
+      if (chunk === 'VP8X') return { width: 1 + b.readUIntLE(24, 3), height: 1 + b.readUIntLE(27, 3), alpha: Boolean(b[20] & 0x10) };
+      if (chunk === 'VP8L') {
+        const v = b.readUInt32LE(21);
+        return { width: 1 + (v & 0x3fff), height: 1 + ((v >> 14) & 0x3fff), alpha: Boolean((v >> 28) & 1) };
+      }
+      if (chunk === 'VP8 ') return { width: b.readUInt16LE(26) & 0x3fff, height: b.readUInt16LE(28) & 0x3fff, alpha: false };
+      return null;
+    }
+    if (n >= 4 && b[0] === 0xff && b[1] === 0xd8) {
+      // JPEG: walk the segments to the first start-of-frame marker.
+      for (let i = 2; i + 9 < n; ) {
+        if (b[i] !== 0xff) return null;
+        const m = b[i + 1];
+        if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { width: b.readUInt16BE(i + 7), height: b.readUInt16BE(i + 5), alpha: false };
+        i += 2 + b.readUInt16BE(i + 2);
+      }
+    }
+    return null;
+  } finally {
+    fs.closeSync(fd);
+  }
+}

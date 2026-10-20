@@ -11,8 +11,10 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "path", "kind", "width", "height"],
+        "required": ["id", "path", "kind"],
         "additionalProperties": false,
+        "if": { "properties": { "kind": { "not": { "const": "audio" } } } },
+        "then": { "required": ["width", "height"] },
         "properties": {
           "id": { "type": "string" },
           "path": { "type": "string", "description": "File @1x" },
@@ -42,6 +44,22 @@
           "minDisplayPx": { "type": "integer", "description": "Kích thước nhỏ nhất thật sự hiển thị (icon)" },
           "noText": { "type": "boolean", "description": "Không in chữ vào ảnh" },
           "text": { "type": "boolean", "description": "Ảnh có chữ (logo, nút, banner…): path phải ở assets/i18n/en/, mỗi ngôn ngữ một bản cùng đường dẫn trong assets/i18n/<mã>/" },
+          "textKey": { "type": "string", "description": "Key trong Language/*.json: chữ in trong ảnh (text: true) hoặc lời thoại (voice: true)" },
+          "voice": { "type": "boolean", "description": "Lời thoại đọc từ textKey (gamekit gen voice), mỗi ngôn ngữ một file trong assets/i18n/<mã>/" },
+          "ref": { "type": "string", "description": "File tham chiếu: asset gốc trong reference/ mà asset này thay thế (third-party), hoặc file gốc đã xuất (own)" },
+          "prompt": { "type": "string", "description": "Thêm vào prompt khi sinh (gamekit gen); brief vẫn là mô tả chính" },
+          "gen": {
+            "type": "object",
+            "description": "Lần sinh gần nhất (gamekit gen ghi)",
+            "properties": { "model": { "type": "string" }, "at": { "type": "string" }, "prompt": { "type": "string" }, "langs": { "type": "array", "items": { "type": "string" } } }
+          },
+          "review": {
+            "type": "object",
+            "required": ["status"],
+            "additionalProperties": false,
+            "description": "Kết quả duyệt (gamekit review --apply)",
+            "properties": { "status": { "enum": ["ok", "fix"] }, "note": { "type": ["string", "null"] }, "at": { "type": ["string", "null"] } }
+          },
           "brief": { "type": "string" }
         }
       }

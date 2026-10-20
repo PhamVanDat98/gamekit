@@ -7,6 +7,7 @@ import { t } from './view/i18n';
 import { bindInput } from './view/input-dom';
 import { Renderer } from './view/renderer';
 import { mountSettings } from './view/settings';
+import { applyTheme } from './view/theme';
 import { BUILD_ID, PauseBus, bootPlatform } from './platform';
 import { installWebGuard } from './platform/web-guard';
 
@@ -32,6 +33,7 @@ async function main(): Promise<void> {
   // npm run dev has no portal loader.js; dropped from builds (import.meta.env.DEV is false there).
   if (import.meta.env.DEV) (await import('./platform/dev-loader')).installDevLoader();
   const { stage, canvas } = ensureStage();
+  await applyTheme(); // style colours and font files before the first frame
   const devLoader = document.getElementById('loader'); // only in index.html for npm run dev
 
   const bus = new PauseBus();

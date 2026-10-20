@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gamekit/style.schema.json",
+  "title": "style/options/<id>.json, style/style.json — một hướng style (P3): màu, font, hình khối, prompt cho ảnh và âm thanh",
+  "type": "object",
+  "required": ["id", "name", "palette", "fonts"],
+  "additionalProperties": false,
+  "definitions": {
+    "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+    "font": {
+      "type": "object",
+      "required": ["family"],
+      "additionalProperties": false,
+      "properties": {
+        "family": { "type": "string", "minLength": 1, "description": "Tên font, vd Baloo 2" },
+        "file": { "type": "string", "description": "File font trong assets/fonts/ (woff2), có nhãn provenance licensed — game không được tải font từ CDN" },
+        "weight": { "type": "integer", "minimum": 100, "maximum": 900 }
+      }
+    }
+  },
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "name": { "type": "string", "minLength": 1 },
+    "mood": { "type": "string", "description": "Cảm giác, đối tượng người chơi, từ khoá" },
+    "palette": {
+      "type": "object",
+      "required": ["bg", "surface", "primary", "secondary", "text", "muted"],
+      "additionalProperties": false,
+      "properties": {
+        "bg": { "$ref": "#/definitions/color" },
+        "surface": { "$ref": "#/definitions/color" },
+        "primary": { "$ref": "#/definitions/color" },
+        "secondary": { "$ref": "#/definitions/color" },
+        "text": { "$ref": "#/definitions/color" },
+        "muted": { "$ref": "#/definitions/color" },
+        "onPrimary": { "$ref": "#/definitions/color", "description": "Chữ trên nút primary (mặc định tự chọn đen/trắng)" },
+        "danger": { "$ref": "#/definitions/color" },
+        "success": { "$ref": "#/definitions/color" }
+      }
+    },
+    "fonts": {
+      "type": "object",
+      "required": ["display", "body"],
+      "additionalProperties": false,
+      "properties": { "display": { "$ref": "#/definitions/font" }, "body": { "$ref": "#/definitions/font" } }
+    },
+    "shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "radius": { "type": "integer", "minimum": 0, "maximum": 64 },
+        "stroke": { "type": "integer", "minimum": 0, "maximum": 12, "description": "Viền nút/panel (px)" },
+        "shadow": { "enum": ["none", "soft", "hard"] }
+      }
+    },
+    "art": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prompt": { "type": "string", "description": "Mô tả phong cách vẽ, đưa vào mọi prompt sinh ảnh" },
+        "negative": { "type": "string", "description": "Những thứ phải tránh" },
+        "references": { "type": "array", "items": { "type": "string" }, "description": "Ảnh mẫu do bạn cung cấp (không phải ảnh game gốc khi làm lại game người khác)" }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prompt": { "type": "string", "description": "Phong cách nhạc/hiệu ứng" },
+        "voice": { "type": "string", "description": "Giọng đọc cho lời thoại (gamekit gen voice), vd alloy, nova" }
+      }
+    }
+  }
+}

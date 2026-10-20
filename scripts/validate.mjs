@@ -7,9 +7,10 @@ import { Problems, GkError } from './lib/log.mjs';
 import { git } from './lib/git.mjs';
 import { requireGameRoot, loadGame } from './lib/game.mjs';
 import { PHASES } from './lib/phases.mjs';
-import { pngInfo, isWebp } from './lib/png.mjs';
+import { pngInfo, isWebp, imageSize } from './lib/png.mjs';
 import { loadLanguages, placeholders } from './lib/languages.mjs';
 import { checkSetting, loadPortal, missingSettings } from './lib/portals.mjs';
+import { loadChosenStyle, loadStyleOptions, styleProblems, themeSource } from './lib/style.mjs';
 
 /** Folders whose files end up in a build and therefore need provenance. */
 export const SHIPPED_DIRS = ['assets', 'public'];
@@ -45,6 +46,7 @@ export function validateGame(root, { stage } = {}) {
   validateProvenance(root, st, pr);
   validateModulePlan(root, pr);
   validateAssetManifest(root, pr);
+  validateStyles(root, pr);
   return { problems: pr, game };
 }
 
@@ -389,6 +391,10 @@ function validateAssetManifest(root, pr) {
     return;
   }
   for (const e of check('asset-manifest', man)) pr.error(where, e);
+  const todo = (man.assets ?? []).filter((a) => /^TODO/.test(a.brief ?? '')).map((a) => a.id);
+  if (todo.length) pr.warn(where, `${todo.length} mục còn brief TODO: ${todo.slice(0, 10).join(', ')}${todo.length > 10 ? '…' : ''}`);
+  const fix = (man.assets ?? []).filter((a) => a.review?.status === 'fix').map((a) => a.id);
+  if (fix.length) pr.warn(where, `${fix.length} mục người duyệt yêu cầu sửa (review.status: fix): ${fix.slice(0, 10).join(', ')}${fix.length > 10 ? '…' : ''}`);
   for (const a of man.assets ?? []) {
     // Words in an image are text too: they need one version per language, like Language/*.json.
     const localized = a.path.startsWith('assets/i18n/');
@@ -397,10 +403,10 @@ function validateAssetManifest(root, pr) {
     if (localized && !a.text) pr.error(where, `${a.id}: ${a.path} nằm trong assets/i18n/ nên phải có text: true`);
     const file = path.join(root, a.path);
     if (!exists(file)) continue; // not generated yet
-    if (!a.path.toLowerCase().endsWith('.png')) continue;
-    const info = pngInfo(file);
+    if (a.kind === 'audio' || !/\.(png|jpe?g|webp|gif)$/i.test(a.path)) continue;
+    const info = imageSize(file);
     if (!info) {
-      pr.error(where, `${a.path} không phải PNG hợp lệ`);
+      pr.error(where, `${a.path} không đọc được kích thước (PNG/JPEG/WebP/GIF hỏng?)`);
       continue;
     }
     const w = a.frames ? a.frames.width * a.frames.count : a.width;
@@ -408,6 +414,33 @@ function validateAssetManifest(root, pr) {
       pr.error(where, `${a.id}: ${a.path} là ${info.width}×${info.height}, spec cần ${w}×${a.height}`);
     if (a.alpha === true && info.alpha === false) pr.error(where, `${a.id}: cần nền trong suốt nhưng PNG không có kênh alpha`);
   }
+}
+
+// ---------- style/: options for a reskin, the chosen one, and theme.ts generated from it ----------
+function validateStyles(root, pr) {
+  for (const o of loadStyleOptions(root)) {
+    if (o.error) {
+      pr.error(o.file, o.error);
+      continue;
+    }
+    const { errors, warnings } = styleProblems(root, o.data, o.file);
+    for (const e of errors) pr.error('style', e);
+    for (const w of warnings) pr.warn('style', w);
+  }
+  let chosen;
+  try {
+    chosen = loadChosenStyle(root);
+  } catch (e) {
+    pr.error('style/style.json', e.message);
+    return;
+  }
+  if (!chosen) return;
+  const { errors, warnings } = styleProblems(root, chosen, 'style/style.json');
+  for (const e of errors) pr.error('style', e);
+  for (const w of warnings) pr.warn('style', w);
+  const theme = path.join(root, 'src', 'view', 'theme.ts');
+  if (!errors.length && exists(theme) && fs.readFileSync(theme, 'utf8') !== themeSource(chosen))
+    pr.warn('src/view/theme.ts', `khác style/style.json — chạy gamekit style choose ${chosen.id} (hoặc sửa style.json cho khớp)`);
 }
 
 export async function run(args) {

@@ -24,6 +24,11 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)
   provenance add <file…> --label <nhãn>     Gắn nguồn gốc asset (reference|generated|own|licensed|placeholder)
   provenance list [--label]
+  style list | choose <id> | preview         Style cho reskin: style/options/<id>.json → style/style.json + src/view/theme.ts;
+                                            preview: .gamekit/local/preview/style.html (UI kit, chữ thật mọi ngôn ngữ)
+  assets scan [--from reference|assets] [--write]   Nháp asset-manifest.json từ file có sẵn (kích thước, alpha, loại, brief TODO)
+  review [--apply review.json]              Trang duyệt asset (.gamekit/local/review/): spec, bản gốc, nhãn, mọi ngôn ngữ;
+                                            --apply ghi kết quả vào asset-manifest.json và notes/review.md
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
   release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)
   fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
@@ -68,6 +73,9 @@ const COMMANDS = {
   precommit: () => import('./precommit.mjs').then((m) => m.run),
   recon: () => import('./recon.mjs').then((m) => m.run),
   ghidra: () => import('./ghidra.mjs').then((m) => m.run),
+  style: () => import('./style.mjs').then((m) => m.run),
+  assets: () => import('./assets.mjs').then((m) => m.run),
+  review: () => import('./review.mjs').then((m) => m.run),
 };
 
 export async function main(argv = process.argv.slice(2)) {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { gk, newGame, token, sh, write, read, editJson, editYaml, CLI } from './helpers.mjs';
+import { gk, newGame, token, sh, write, read, editJson, editYaml, CLI, solidPng } from './helpers.mjs';
 import { spawnSync } from 'node:child_process';
 import { zipDir } from '../scripts/lib/zip.mjs';
 import { parseGate } from '../scripts/gate.mjs';
@@ -720,6 +720,86 @@ mkdir -p "$last4/c" && printf 'address\tname\n001\tPlayer$$Update\n' > "$last4/f
   assert.deepEqual(g.ghidra.programs.map((p) => [p.name, p.il2cpp]), [['libil2cpp.so', true]]);
   assert.equal(gk(dir, 'validate').code, 0);
   assert.equal(sh(dir, 'git', 'status', '--porcelain', '--', '.gamekit', 'decompiled'), '', '.gamekit/ghidra và decompiled/ phải được gitignore');
+});
+
+test('style: options are checked, choose writes style/style.json + theme.ts the template compiles, preview builds a page', () => {
+  const dir = newGame('sty');
+  const opt = (id, extra = {}) =>
+    write(dir, `style/options/${id}.json`, JSON.stringify({
+      id, name: id,
+      palette: { bg: '#101010', surface: '#202020', primary: '#ff4f9a', secondary: '#7b5cff', text: '#f0f0f0', muted: '#a0a0a0' },
+      fonts: { display: { family: 'Baloo 2', file: 'assets/fonts/b.woff2', weight: 700 }, body: { family: 'Inter' } },
+      shape: { radius: 20, stroke: 3, shadow: 'hard' },
+      ...extra,
+    }));
+  opt('candy');
+  opt('dim', { palette: { bg: '#101010', surface: '#202020', primary: '#ff4f9a', secondary: '#7b5cff', text: '#303030', muted: '#a0a0a0' } });
+  let r = gk(dir, 'validate');
+  assert.match(r.out, /dim\.json: chữ text trên bg tương phản/);
+  assert.match(r.out, /thiếu assets\/fonts\/b\.woff2/);
+  assert.match(gk(dir, 'style', 'choose', 'candy').out, /thiếu assets\/fonts\/b\.woff2/, 'thiếu font thì không chọn được');
+  write(dir, 'assets/fonts/b.woff2', 'wOF2');
+  gk(dir, 'provenance', 'add', 'assets/fonts', '--label', 'licensed', '--license', 'OFL');
+  r = gk(dir, 'style', 'choose', 'candy');
+  assert.equal(r.code, 0, r.out);
+  const theme = read(dir, 'src/view/theme.ts');
+  assert.match(theme, /import font0 from '..\/..\/assets\/fonts\/b\.woff2';/);
+  assert.match(theme, /primary: '#ff4f9a'.*onPrimary: '#000000'/);
+  assert.match(theme, /display: '"Baloo 2", system-ui, sans-serif'/);
+  assert.match(theme, /\{ family: 'Baloo 2', url: font0, weight: 700 \}/);
+  assert.equal(JSON.parse(read(dir, 'style/style.json')).id, 'candy');
+  r = gk(dir, 'validate');
+  assert.doesNotMatch(r.out, /theme\.ts/);
+  editJson(dir, 'style/style.json', (d) => {
+    d.palette.primary = '#00ff00';
+  });
+  assert.match(gk(dir, 'validate').out, /theme\.ts: khác style\/style\.json/);
+  assert.equal(gk(dir, 'style', 'list').code, 0);
+  r = gk(dir, 'style', 'preview');
+  assert.equal(r.code, 0, r.out);
+  const html = read(dir, '.gamekit/local/preview/style.html');
+  assert.match(html, /gk-settings-panel/);
+  assert.match(html, /src: url\("..\/..\/..\/assets\/fonts\/b\.woff2"\)/);
+  assert.match(html, /"game\.start":"Tap or press Space to play"/);
+  assert.equal(sh(dir, 'git', 'status', '--porcelain', '--', '.gamekit'), '', '.gamekit/local phải được gitignore');
+});
+
+test('assets scan drafts manifest entries; review lists problems and --apply writes decisions back', () => {
+  const dir = newGame('rev', '--third-party');
+  fs.mkdirSync(path.join(dir, 'reference/UI'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'reference/UI/btn_play.png'), solidPng(40, 20));
+  fs.writeFileSync(path.join(dir, 'reference/bg.png'), solidPng(64, 32, [0, 0, 0, 255]));
+  let r = gk(dir, 'assets', 'scan');
+  assert.match(r.out, /2 asset chưa có/);
+  assert.match(r.out, /btn_play\.png/);
+  assert.ok(!fs.existsSync(path.join(dir, 'asset-manifest.json')), 'không --write thì không ghi');
+  r = gk(dir, 'assets', 'scan', '--write');
+  assert.equal(r.code, 0, r.out);
+  let man = JSON.parse(read(dir, 'asset-manifest.json'));
+  const btn = man.assets.find((a) => a.ref === 'reference/UI/btn_play.png');
+  assert.deepEqual([btn.kind, btn.width, btn.height, btn.alpha, btn.path], ['ui', 40, 20, true, 'assets/img/UI/btn_play.png']);
+  assert.match(btn.brief, /có chữ/);
+  assert.equal(man.assets.find((a) => a.ref === 'reference/bg.png').kind, 'background');
+  assert.match(gk(dir, 'assets', 'scan', '--write').out, /0 asset chưa có/, 'chạy lại không thêm trùng');
+  assert.match(gk(dir, 'validate').out, /2 mục còn brief TODO/);
+
+  fs.mkdirSync(path.join(dir, 'assets/img'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'assets/img/bg.png'), solidPng(10, 10));
+  gk(dir, 'provenance', 'add', 'assets/img/bg.png', '--label', 'generated');
+  r = gk(dir, 'review');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /assets\/img\/bg\.png: 10×10, spec 64×32/);
+  assert.match(r.out, /assets\/img\/UI\/btn_play\.png: chưa có file/);
+  assert.match(read(dir, '.gamekit/local/review/index.html'), /gốc: reference\/bg\.png/);
+  write(dir, 'review.json', JSON.stringify({ game: 'rev', items: { 'assets/img/bg.png': { status: 'fix', note: 'Sai kích thước' }, 'public/Icons/web.png': { status: 'ok' } } }));
+  r = gk(dir, 'review', '--apply', 'review.json');
+  assert.equal(r.code, 0, r.out);
+  man = JSON.parse(read(dir, 'asset-manifest.json'));
+  assert.deepEqual(man.assets.find((a) => a.path === 'assets/img/bg.png').review.status, 'fix');
+  assert.match(read(dir, 'notes/review.md'), /- \[ \] `assets\/img\/bg\.png` — Sai kích thước/);
+  assert.match(gk(dir, 'validate').out, /1 mục người duyệt yêu cầu sửa/);
+  write(dir, 'other.json', JSON.stringify({ game: 'khac', items: {} }));
+  assert.match(gk(dir, 'review', '--apply', 'other.json').out, /của game khac/);
 });
 
 test('validate: Icons/web.png must be PNG, loading.webp must be WebP; builds/ must be gitignored', () => {
