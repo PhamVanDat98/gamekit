@@ -10,7 +10,8 @@ GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, 
 ## Gọi CLI
 - Trong thư mục game: `npm run gk -- <lệnh>` (shim `scripts/gk.mjs` trỏ tới plugin).
 - Từ Claude Code ở bất kỳ đâu: `node "${CLAUDE_PLUGIN_ROOT}/scripts/gamekit.mjs" <lệnh>`.
-- Lệnh: `init`, `config`, `status`, `gate [--advance]`, `validate`, `parity`, `provenance add|list`, `pack`, `release-check`, `fanout`, `check-ownership`, `integrate`. `gamekit help` để xem đủ.
+- Lệnh: `init`, `config`, `status`, `gate [--advance]`, `recon`, `validate`, `parity`, `oracle import`, `assets scan|unity-atlas|convert`, `provenance add|list`, `pack`, `release-check`, `smoke`, `fanout`, `check-ownership`, `integrate`. `gamekit help` để xem đủ.
+- **Nhìn thấy game chạy**: `gamekit smoke` mở game trong trình duyệt headless (desktop, mobile dọc/ngang, ad giả, máy yếu) và chụp ảnh vào `.gamekit/smoke/`. Sau mỗi thay đổi ở `view/` hay bố cục, chạy nó và **mở ảnh ra xem**; đừng báo "xong" khi chưa nhìn thấy game.
 
 ## Tạo game mới (agent)
 1. `gamekit init <tên> --questions --json` → danh sách câu hỏi (label, description, example, default, required). Không có TTY thì init không tự hỏi.
@@ -21,12 +22,12 @@ GameKit là dây chuyền port game từ engine bất kỳ sang web game JS/TS, 
 ## Pipeline 6 pha
 | Pha | Việc | Skill | Người dùng quyết |
 | --- | --- | --- | --- |
-| P0 Intake | Nhận diện engine, kiểm kê, chấm khả thi | game-recon, triage | Làm hay bỏ |
-| P1 Phân tích | Trích logic, số liệu, asset, UI từ game gốc | engine-*, **re-notes**, gameplay-spec, asset-inventory, ui-extract | |
-| P2 Dựng lại | Dựng lại bằng JS/TS, chơi được (asset gốc nếu là game của người dùng, placeholder nếu làm lại) | runtime-select, **module-plan**, **rebuild-game**, **integrate**, **parity-check** | |
-| P3 Chuyển sang web | Điều khiển, bố cục web, nén asset. `third-party`: thêm reskin (style, asset mới theo spec) | web-relayout; `third-party`: style-*, asset-spec, apply-style, replace-* | Duyệt bố cục; `third-party`: chọn style |
+| P0 Intake | Nhận diện engine, kiểm kê, chấm khả thi | **game-recon**, **triage** | Làm hay bỏ |
+| P1 Phân tích | Trích logic, số liệu, asset, UI từ game gốc | engine-* (**engine-unity**), **re-notes**, **gameplay-spec**, **asset-inventory**, **ui-extract** | |
+| P2 Dựng lại | Dựng lại bằng JS/TS, chơi được (asset gốc nếu là game của người dùng, placeholder nếu làm lại) | **runtime-select**, **module-plan**, **rebuild-game**, **integrate**, **parity-check** | |
+| P3 Chuyển sang web | Điều khiển, bố cục web, nén asset. `third-party`: thêm reskin (style, asset mới theo spec) | **web-relayout**; `third-party`: style-*, asset-spec, apply-style, replace-* | Duyệt bố cục; `third-party`: chọn style |
 | P4 Tích hợp | SDK portal, analytics, leaderboard, save | **platform-sdk**, add-* | |
-| P5 Phát hành | Đóng gói, hiệu năng, QA, ảnh store | **package-web-build**, perf-budget, qa-smoke, store-assets, **release-check** | Playtest cuối |
+| P5 Phát hành | Đóng gói, hiệu năng, QA, ảnh store | **package-web-build**, **perf-budget**, **qa-smoke**, store-assets, **release-check** | Playtest cuối |
 
 Skill **in đậm** có trong bản này. Skill khác chưa có: làm theo luật dưới đây và checklist trong `gates/<pha>.md`, ghi lại cách làm để sau đúc thành skill.
 

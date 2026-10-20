@@ -5,7 +5,20 @@ import { log, GkError } from './lib/log.mjs';
 import { requireGameRoot, nowIso } from './lib/game.mjs';
 import { check } from './lib/schema.mjs';
 
-const LABELS = ['reference', 'generated', 'own', 'licensed', 'placeholder'];
+export const LABELS = ['reference', 'generated', 'own', 'licensed', 'placeholder'];
+
+/** Label game-relative paths in provenance.json (replaces an existing entry for the same path). */
+export function addProvenance(root, files, { label, source = null, license = null, note = null }) {
+  if (!LABELS.includes(label)) throw new GkError(`--label phải là một trong: ${LABELS.join(', ')}`);
+  const file = path.join(root, 'provenance.json');
+  const prov = exists(file) ? readJson(file) : { entries: [] };
+  const byPath = new Map(prov.entries.map((e) => [e.path, e]));
+  for (const f of files) byPath.set(f, { path: f, label, source, license, note, at: nowIso() });
+  prov.entries = [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));
+  const errs = check('provenance', prov);
+  if (errs.length) throw new GkError(`provenance không hợp lệ: ${errs.join('; ')}`);
+  writeJson(file, prov);
+}
 
 export async function run(args) {
   const root = requireGameRoot(args.cwd);
@@ -30,15 +43,7 @@ export async function run(args) {
       if (list.length) files.push(...list.map((f) => `${rel}/${f}`));
       else files.push(rel);
     }
-    const byPath = new Map(prov.entries.map((e) => [e.path, e]));
-    for (const f of files) {
-      const entry = { path: f, label: args.label, source: args.source ?? null, license: args.license ?? null, note: args.note ?? null, at: nowIso() };
-      byPath.set(f, entry);
-    }
-    prov.entries = [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));
-    const errs = check('provenance', prov);
-    if (errs.length) throw new GkError(`provenance không hợp lệ: ${errs.join('; ')}`);
-    writeJson(file, prov);
+    addProvenance(root, files, args);
     log.ok(`Đã gắn nhãn ${args.label} cho ${files.length} file`);
     return 0;
   }

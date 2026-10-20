@@ -47,7 +47,31 @@ export function gateItemsFor(game, text) {
   return parseGate(text).filter((it) => !it.only || it.only === ownership);
 }
 
-function runAuto(root, name, phase) {
+/**
+ * {auto: smoke} and {auto: perf} share one browser run per gate check (it takes about a minute).
+ * Run as a child process: smoke is async, the gate is not.
+ */
+function smokeOnce(root, memo) {
+  if (!memo.smoke) {
+    const r = spawnSync(process.execPath, [path.join(HERE, 'gamekit.mjs'), 'smoke', '--json'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    try {
+      memo.smoke = { report: JSON.parse(r.stdout) };
+    } catch {
+      memo.smoke = { error: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim().split('\n').slice(-3).join(' | ') || 'smoke không chạy được' };
+    }
+  }
+  return memo.smoke;
+}
+
+function smokeItem(root, memo, cat) {
+  const s = smokeOnce(root, memo);
+  if (s.error) return { ok: false, detail: s.error };
+  const bad = s.report.issues.filter((i) => i.level === 'error' && i.cat === cat);
+  return { ok: bad.length === 0, detail: bad.slice(0, 3).map((i) => `${i.where}: ${i.msg}`).join('; ') + (bad.length ? ' — xem .gamekit/smoke/' : '') };
+}
+
+function runAuto(root, name, phase, memo = {}) {
+  if (name === 'smoke' || name === 'perf') return smokeItem(root, memo, name);
   if (name === 'validate') {
     const { problems } = validateGame(root, { stage: PHASES.indexOf(phase) });
     return { ok: problems.ok, detail: problems.errors.slice(0, 5).join('; ') };
@@ -92,9 +116,10 @@ export function evaluateGate(root, phase) {
   const items = gateItemsFor(loadGame(root), fs.readFileSync(file, 'utf8'));
   // An empty checklist would pass vacuously; treat it as a broken gate file instead.
   if (!items.length) throw new GkError(`gates/${phase}.md không có mục nào dạng "- [ ] …" — cổng không thể rỗng`);
+  const memo = {};
   return items.map((it) => {
     if (it.auto) {
-      const r = runAuto(root, it.auto, phase);
+      const r = runAuto(root, it.auto, phase, memo);
       return { ...it, ok: r.ok, detail: r.detail };
     }
     return { ...it, ok: it.checked, detail: '' };

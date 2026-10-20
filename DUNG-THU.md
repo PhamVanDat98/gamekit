@@ -1,4 +1,4 @@
-# Dùng thử GameKit 0.2.0
+# Dùng thử GameKit 0.3.0
 
 GameKit là plugin cho Claude Code giúp **chuyển game di động (Unity, Cocos…) thành web game viết bằng TypeScript** rồi đóng gói lên portal. AI làm phần lớn việc; GameKit giữ trạng thái, đặt cổng kiểm tra giữa các bước và chặn những lỗi hay gặp khi phát hành.
 
@@ -8,8 +8,9 @@ GameKit là plugin cho Claude Code giúp **chuyển game di động (Unity, Coco
 
 | Đã chạy | Chưa có |
 | --- | --- |
-| Tạo project game web, theo dõi 6 pha, chấm cổng | Hướng dẫn riêng cho AI ở P0 (nhận diện, đánh giá), P1 (phân tích game gốc), P3 (chuyển sang web) — AI tự làm theo checklist, chất lượng chưa đều |
-| Hướng dẫn cho AI ở P2 (dựng lại, test đối chiếu với game gốc), P4 (SDK portal), P5 (đóng gói) | Quảng cáo, leaderboard thật trên azgames |
+| Tạo project game web, theo dõi 6 pha, chấm cổng | Quảng cáo, leaderboard thật trên azgames |
+| Hướng dẫn cho AI ở mọi pha chính: nhận diện và đánh giá game gốc (P0), phân tích Unity, spec, asset, UI (P1), dựng lại (P2), chuyển sang web (P3), SDK portal (P4), hiệu năng, QA, đóng gói (P5) | Hướng dẫn riêng cho Cocos, Godot… (đã nhận diện được, chưa có skill phân tích riêng) |
+| AI tự mở game trong trình duyệt, chụp ảnh desktop/điện thoại, đo FPS trên máy yếu (`smoke`) | Reskin cho game của người khác (style, asset mới) |
 | Đóng gói cho azgames và bản chạy thử ở máy (`dev-mock`), kiểm tra trước khi phát hành | Game 3D: chưa thử với game thật |
 
 ## Cần có
@@ -67,6 +68,7 @@ Lúc nào cũng có thể gõ `/gamekit:status` (đang ở đâu, còn gì) ho�
 
 ```bash
 npm run dev                          # chơi thử trong trình duyệt, có portal giả
+npm run gk -- smoke                  # AI tự chơi thử trên desktop + điện thoại, ảnh trong .gamekit/smoke/
 npm run gk -- pack --all --zip       # đóng gói vào builds/<số phiên bản>/
 npm run gk -- release-check          # kiểm tra trước khi phát hành
 ```
@@ -74,6 +76,8 @@ npm run gk -- release-check          # kiểm tra trước khi phát hành
 Gói `azgames` có khóa tên miền, chỉ chạy trên azgames.io. Muốn chạy thử gói ở máy, mở gói `dev-mock` nằm cùng thư mục: `npm run preview` rồi vào địa chỉ nó in ra. Không có mã game và token azgames thì vẫn thử được hết, chỉ không đóng gói được cho azgames.
 
 ## Đã biết
+
+- `smoke` cần một trình duyệt Chromium: Chrome hoặc Edge đã cài trên máy là đủ. Không có thì chạy `npx playwright-core install chromium` trong thư mục game.
 
 - `release-check` cảnh báo `Icons/domain.webp của bộ vỏ azgames còn là placeholder`. Đây là lỗi của bản thử, bỏ qua được.
 - Icon `public/Icons/web.png` và `loading.webp` của game mới là ảnh tạm. Trước khi phát hành phải thay bằng icon thật, rồi gắn nhãn: `npm run gk -- provenance add public/Icons/web.png public/Icons/loading.webp --label own`.

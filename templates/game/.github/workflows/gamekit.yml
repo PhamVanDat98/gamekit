@@ -1,0 +1,48 @@
+# Kiểm tra game GameKit trên mỗi lần push / pull request: dữ liệu, test, typecheck, lint, parity (từ P3),
+# smoke trong Chromium headless (ảnh chụp tải về ở mục Artifacts của lần chạy).
+# Plugin GameKit lấy từ GitHub; đổi GAMEKIT_REPO nếu bạn dùng bản fork.
+name: GameKit
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GAMEKIT_REPO: https://github.com/PhamVanDat98/gamekit
+  GAMEKIT_ROOT: ${{ github.workspace }}/../gamekit-plugin
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Plugin GameKit
+        run: |
+          git clone --depth 1 "$GAMEKIT_REPO" "$GAMEKIT_ROOT"
+          npm ci --omit=dev --prefix "$GAMEKIT_ROOT"
+      - run: npm ci
+      - run: npx playwright-core install --with-deps chromium
+      - run: npm run gk -- validate
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Parity (từ P3 — trong P2 nghĩa vụ còn mở là bình thường)
+        run: |
+          phase=$(sed -n 's/^phase: *\([A-Za-z0-9]*\).*/\1/p' game.yaml)
+          case "$phase" in P0|P1|P2) echo "Pha $phase: bỏ qua parity" ;; *) npm run gk -- parity ;; esac
+      - run: npm run gk -- smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke
+          path: .gamekit/smoke/
+          if-no-files-found: ignore

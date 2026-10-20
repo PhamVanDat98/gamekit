@@ -44,7 +44,7 @@ function buildError(text = '') {
 }
 
 /** Paths whose edits don't change the build (checklists, notes) — not counted as "dirty". */
-const DOC_PATHS = [':!gates', ':!notes', ':!spec', ':!DECISIONS.md', ':!game.yaml', ':!provenance.json'];
+const DOC_PATHS = [':!gates', ':!notes', ':!spec', ':!DECISIONS.md', ':!game.yaml', ':!provenance.json', ':!.gamekit/smoke'];
 
 /** esbuild + javascript-obfuscator from the game's node_modules — the plugin itself depends only on yaml and ajv. */
 export function gameTools(root) {
@@ -82,6 +82,26 @@ function settingProblems(game, kits) {
   return out;
 }
 
+/** vite build for one portal + assemble its package into outDir (layout az-v1). Shared by pack and smoke. */
+export async function buildPortal({ root, game, kit, version, buildId, outDir, tools = gameTools(root), languages = loadLanguages(root), quiet = false }) {
+  // Run vite's own bin with this node — no npx, no shell, so paths with spaces stay one argument.
+  const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
+  if (!exists(viteBin)) throw new GkError('Game chưa cài vite — chạy npm install');
+  const tmp = path.join(path.dirname(outDir), `.vite-${kit.id}`);
+  const r = spawnSync(process.execPath, [viteBin, 'build', '--outDir', tmp, '--emptyOutDir'], {
+    cwd: root,
+    stdio: quiet ? 'pipe' : 'inherit',
+    encoding: 'utf8',
+    env: { ...process.env, GK_PORTAL: kit.id, GK_BUILD: buildId, GK_PACK: '1' },
+  });
+  try {
+    if (r.status !== 0) throw new GkError(`vite build lỗi cho ${kit.id}${quiet ? `: ${buildError(`${r.stdout}\n${r.stderr}`)}` : ''}`);
+    await assemblePortal({ game, kit, settings: game.portalSettings?.[kit.id] ?? {}, version, viteOut: tmp, languages, outDir, ...tools });
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 export async function run(args) {
   const root = requireGameRoot(args.cwd);
   const game = loadGame(root);
@@ -98,9 +118,6 @@ export async function run(args) {
   const existing = exists(buildsDir) ? fs.readdirSync(buildsDir) : [];
   const version = args.version ? checkVersion(args.version, existing) : nextVersion(existing);
   const tools = gameTools(root);
-  // Run vite's own bin with this node — no npx, no shell, so paths with spaces stay one argument.
-  const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
-  if (!exists(viteBin)) throw new GkError('Game chưa cài vite — chạy npm install');
   const languages = loadLanguages(root);
   const commit = git(root, ['rev-parse', '--short', 'HEAD'], { allowFail: true }) ?? 'nogit';
   const dirty = (git(root, ['status', '--porcelain', '--', '.', ...DOC_PATHS], { allowFail: true }) ?? '') !== '';
@@ -110,17 +127,8 @@ export async function run(args) {
   try {
     for (const kit of kits) {
       log.head(`Đóng gói ${game.name} ${version} cho ${kit.id}`);
-      const tmp = path.join(base, `.vite-${kit.id}`);
-      const r = spawnSync(process.execPath, [viteBin, 'build', '--outDir', tmp, '--emptyOutDir'], {
-        cwd: root,
-        stdio: args.quiet ? 'pipe' : 'inherit',
-        encoding: 'utf8',
-        env: { ...process.env, GK_PORTAL: kit.id, GK_BUILD: `${version}+${commit}${dirty ? '.dirty' : ''}`, GK_PACK: '1' },
-      });
-      if (r.status !== 0) throw new GkError(`vite build lỗi cho ${kit.id}${args.quiet ? `: ${buildError(`${r.stdout}\n${r.stderr}`)}` : ''}`);
       const outDir = path.join(base, kit.id);
-      await assemblePortal({ game, kit, settings: game.portalSettings?.[kit.id] ?? {}, version, viteOut: tmp, languages, outDir, ...tools });
-      fs.rmSync(tmp, { recursive: true, force: true });
+      await buildPortal({ root, game, kit, version, buildId: `${version}+${commit}${dirty ? '.dirty' : ''}`, outDir, tools, languages, quiet: args.quiet });
       if (args.compress) compress(path.join(outDir, version));
       manifest.portals[kit.id] = { hash: hashDir(outDir), initialBytes: initialLoadBytes(outDir, version) };
       log.ok(`builds/${version}/${kit.id}`);

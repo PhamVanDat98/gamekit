@@ -6,5 +6,6 @@ decompiled/
 # Dữ liệu riêng từng máy
 .gamekit/local/
 .gamekit/ghidra/
+.gamekit/smoke/
 *.log
 .DS_Store

@@ -26,7 +26,7 @@ Trước khi mở công cụ, xem lại `notes/` và `params/` đã có gì. Kh�
 | Unreal | Blueprint / native trong `.pak` | `.uasset` | FModel / UModel; native: Ghidra |
 | Native cũ (C/C++) | exe/dll | file data riêng | Ghidra / IDA |
 
-APK: nhìn `lib/*/` để nhận engine (`libunity.so`, `libil2cpp.so`, `libcocos2djs.so`, `libgodot_android.so`).
+`gamekit recon <thư mục|.apk|.ipa|.zip> --write` nhận diện engine, phiên bản và nơi chứa logic tự động (skill **game-recon**); kết quả trong `spec/recon.json`. Unity: skill **engine-unity**.
 
 Nếu phiên có công cụ MCP reverse engineering (ví dụ rea: `open_binary`, `analyze_function`, `analyze_javascript_application`, `inspect_managed_artifact`), dùng chúng cho bước phân tích tĩnh. Bắt đầu từ bản tóm tắt; chỉ đào sâu khi còn một câu hỏi cụ thể; không chạy lại một phân tích y hệt.
 

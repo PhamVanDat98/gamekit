@@ -12,9 +12,8 @@ Mục tiêu cổng P2: chơi được trọn vẹn (`own`: với asset gốc nh�
 - `own` có source gốc (C#…): đọc thẳng code để lấy logic và số; vẫn viết test trước, viết lại cho hợp `core/`/`view/`, không dịch máy từng dòng.
 - Đã có (đi từ P0/P1): kiểm tra `gamekit status` báo P2.
 
-## 2. Chọn runtime (thay cho skill runtime-select chưa có)
-- 2D đơn giản, ít sprite: canvas thuần (template sẵn). Nhiều sprite, hiệu ứng: Pixi. Cần scene/physics có sẵn: Phaser. 3D: Three.js. Vật lý phức tạp: Rapier (wasm) hoặc viết riêng nếu game gốc dùng công thức đơn giản — ưu tiên **tái hiện đúng công thức gốc** hơn thay bằng engine vật lý khác.
-- Ghi lựa chọn + lý do vào `DECISIONS.md` và `runtime` trong game.yaml. Thư viện render chỉ được dùng trong `view/`.
+## 2. Chọn runtime
+Skill **runtime-select**: renderer, vật lý, kích thước bundle, deterministic. Ghi `runtime` trong game.yaml + `D-n`. Thư viện render chỉ được dùng trong `view/`.
 
 ## 3. Số liệu trước, code sau
 - Mọi số gameplay vào `params/*.json`: `{ "value", "unit", "source", "confidence"?, "tolerance"? }`. `source` trỏ tới chỗ trong game gốc; `confidence` là `observed | derived | inferred` (`inferred` phải có `tolerance`). Chưa biết thì `"TODO: …"` — validate sẽ chặn ở cổng P2.
@@ -31,10 +30,10 @@ Với mỗi cơ chế trong spec:
 Thêm replay test cho luồng chơi chính (`tests/replay/`). Thay `src/core/world.ts` demo bằng logic game thật; giữ `worldHash` cho replay.
 
 ## 5. View
-`src/view/` vẽ từ state, map input thiết bị → `Action` (`src/contracts/input.ts`). Không sửa state. Không unit test; kiểm tra bằng chạy thử `npm run dev` và screenshot.
+`src/view/` vẽ từ state, map input thiết bị → `Action` (`src/contracts/input.ts`). Không sửa state. Không unit test; kiểm tra bằng `gamekit smoke --quick` rồi **mở `.gamekit/smoke/desktop*.png` xem** (skill **qa-smoke**), và chơi thử `npm run dev`.
 
 ## 6. Game lớn → chia module
 Nếu game có nhiều cơ chế độc lập, dùng skill **module-plan** trước khi viết core, rồi **integrate**. Game nhỏ thì làm tuần tự, ghi lý do không chia vào DECISIONS.md.
 
 ## 7. Kết thúc
-`npm test`, `npm run typecheck`, `npm run lint`, `gamekit validate`, `gamekit parity` sạch → `gamekit gate`. Báo người dùng; chỉ `--advance` khi họ đồng ý.
+`npm test`, `npm run typecheck`, `npm run lint`, `gamekit validate`, `gamekit parity`, `gamekit smoke --quick` sạch → `gamekit gate`. Báo người dùng; chỉ `--advance` khi họ đồng ý.

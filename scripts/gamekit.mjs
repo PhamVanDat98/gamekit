@@ -16,12 +16,21 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   config [--portal p] [--set k=v…] [--questions --json]   Điền thông tin portal còn thiếu, thêm portal
   status | next                             Game đang ở pha nào, việc gì tiếp
   gate [--advance]                          Kiểm tra cổng của pha hiện tại
+  recon [<thư mục|.apk|.ipa|.zip>] [--write] [--json]   Nhận diện game gốc (không chạy nó): engine, phiên bản, logic/data ở đâu,
+                                            công cụ hợp, thống kê asset. --write ghi spec/recon.json + source.* trong game.yaml
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
   parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)
+  oracle import <trace> --to spec/oracles/<id>.json --in t --out speed --source "…" [--at t=0,5,10 | --every N] [--max 40]
+                                            Bảng oracle từ trace ghi được khi chạy game gốc (CSV, JSONL, JSON)
+  assets scan [<nguồn>] [--write]           Kiểm kê asset game gốc → spec/asset-inventory.json (kích thước, sprite sheet Unity, nên đổi sang gì)
+  assets unity-atlas <ảnh.png> [--meta] [--to]   Sprite sheet Unity (.png + .meta) → atlas JSON cho Pixi/Phaser
+  assets convert <file|thư mục…> [--to D] [--label own]   Ảnh → WebP, âm thanh → MP3/OGG/M4A (cần ffmpeg)
   provenance add <file…> --label <nhãn>     Gắn nguồn gốc asset (reference|generated|own|licensed|placeholder)
   provenance list [--label]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
   release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)
+  smoke [--quick] [--only a,b] [--no-perf] [--version [V]] [--json]   Mở game trong trình duyệt headless (desktop, mobile dọc/ngang,
+                                            ad giả, máy yếu): chụp ảnh vào .gamekit/smoke/, bắt lỗi console, kiểm bố cục, đo FPS/thời gian vào game
   fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
   check-ownership [--module id]             Module chỉ sửa trong thư mục được giao
   integrate --wave N [--test "cmd"] [--cleanup]   Merge theo phụ thuộc, test sau mỗi lần
@@ -29,7 +38,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'quick', 'no-perf', 'write', 'force', 'lossless']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -53,11 +62,15 @@ const COMMANDS = {
   status: () => import('./status.mjs').then((m) => m.run),
   next: () => import('./status.mjs').then((m) => m.run),
   gate: () => import('./gate.mjs').then((m) => m.run),
+  recon: () => import('./recon.mjs').then((m) => m.run),
   validate: () => import('./validate.mjs').then((m) => m.run),
   parity: () => import('./parity.mjs').then((m) => m.run),
+  oracle: () => import('./oracle.mjs').then((m) => m.run),
+  assets: () => import('./assets.mjs').then((m) => m.run),
   provenance: () => import('./provenance.mjs').then((m) => m.run),
   pack: () => import('./pack.mjs').then((m) => m.run),
   'release-check': () => import('./release-check.mjs').then((m) => m.run),
+  smoke: () => import('./smoke.mjs').then((m) => m.run),
   fanout: () => import('./parallel.mjs').then((m) => m.fanout),
   'check-ownership': () => import('./parallel.mjs').then((m) => m.checkOwnership),
   integrate: () => import('./parallel.mjs').then((m) => m.integrate),

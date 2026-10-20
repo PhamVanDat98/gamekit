@@ -15,7 +15,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 
 ## Cấu trúc
 - `src/core/` logic thuần, deterministic: không DOM, không thư viện render, thời gian từ fixed step, ngẫu nhiên từ `Rng` có seed. **Viết test trước** (TDD).
-- `src/view/` render và input thiết bị; chỉ đọc state. Kiểm tra bằng screenshot/checklist, không unit test.
+- `src/view/` render và input thiết bị; chỉ đọc state. Không unit test: kiểm tra bằng `gamekit smoke` (xem ảnh chụp) và checklist.
 - `src/platform/` interface chung cho mọi portal. Gameplay chỉ gọi `Platform`; adapter nằm trong `src/platform/adapters/`. Event analytics chỉ dùng tên trong `src/platform/events.ts`.
 - `src/contracts/` type dùng chung giữa các module — chỉ agent chính sửa.
 - `Language/` mỗi ngôn ngữ một file (`en.json` bắt buộc) · `public/Icons/` (`web.png`, `loading.webp`) · `builds/` đầu ra của pack (gitignored, không commit).
@@ -32,6 +32,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Dựng song song | `npm run gk -- fanout --wave N` → subagent làm theo `.gamekit/local/BRIEF.md` → `npm run gk -- integrate --wave N` |
 | Thông tin portal còn thiếu | `npm run gk -- config --portal <id>` |
 | Đóng gói, kiểm tra phát hành | `npm run gk -- pack --all` → `builds/<v>/<portal>/` (`--zip`, `--compress`, `--version`) · `npm run gk -- release-check` |
+| Xem game chạy thật (trình duyệt headless) | `npm run gk -- smoke` → ảnh trong `.gamekit/smoke/*.png` (**mở ra xem**), lỗi console, bố cục desktop/mobile, ad giả, FPS và thời gian vào game trên máy yếu. `--quick` chỉ desktop |
 | Chơi thử bản build | `npm run preview` → `http://localhost:4173/<v>/dev-mock/<v>/index.html` |
 
 ## Nếu bạn là subagent trong một worktree

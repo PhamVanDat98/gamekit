@@ -717,3 +717,40 @@ test('ownership: game.yaml without the field counts as own; unknown values are r
   assert.equal(r.code, 1);
   assert.match(r.out, /ownership/);
 });
+
+test('new commands: listed in help; usage errors name the fix', () => {
+  const help = gk(os.tmpdir(), 'help').out;
+  for (const c of ['recon', 'oracle import', 'assets scan', 'assets unity-atlas', 'assets convert', 'smoke']) assert.ok(help.includes(c), c);
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'gk-'));
+  assert.match(gk(outside, 'recon').out, /Dùng: gamekit recon/);
+  assert.match(gk(outside, 'assets').out, /scan \| unity-atlas \| convert/);
+  assert.match(gk(outside, 'smoke').out, /game\.yaml/);
+  const dir = newGame();
+  assert.match(gk(dir, 'oracle').out, /Dùng: gamekit oracle import/);
+  const only = gk(dir, 'smoke', '--only', 'tablet');
+  assert.equal(only.code, 1);
+  assert.match(only.out, /không có kịch bản "tablet".*desktop/);
+  assert.match(gk(dir, 'smoke', '--version').out, /pack --portal dev-mock/);
+});
+
+test('smoke: a game without its dependencies fails clearly; gate reports it on {auto: smoke} and {auto: perf} from one run', () => {
+  const dir = newGame();
+  const r = gk(dir, 'smoke', '--quick');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /npm install/);
+  editYaml(dir, (g) => (g.phase = 'P5'));
+  const gate = gk(dir, 'gate');
+  assert.equal(gate.code, 1);
+  assert.match(gate.out, /✘ Ngân sách hiệu năng.*\[auto: perf\] — .*npm install/);
+  assert.match(gate.out, /✘ Smoke: load, chơi.*\[auto: smoke\] — .*npm install/);
+});
+
+test('smoke: game.yaml smoke section is schema-checked', () => {
+  const dir = newGame();
+  editYaml(dir, (g) => (g.smoke = { start: ['click 0.5 0.5', 'press X'], playSec: 3 }));
+  const r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /smoke\/start\/1/);
+  editYaml(dir, (g) => (g.smoke = { start: ['tap 0.5 0.9', 'wait 200', 'key Enter'], keys: ['KeyA'], playSec: 3 }));
+  assert.equal(gk(dir, 'validate').code, 0);
+});

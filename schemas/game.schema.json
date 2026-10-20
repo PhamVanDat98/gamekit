@@ -178,6 +178,22 @@
         }
       }
     },
+    "smoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "gamekit smoke: cách vào game và chơi tự động trong trình duyệt headless",
+      "properties": {
+        "start": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^(click|tap) (0(\\.\\d+)?|1(\\.0+)?) (0(\\.\\d+)?|1(\\.0+)?)$|^key [A-Za-z0-9+]+$|^wait \\d+$" },
+          "description": "Bước từ màn đầu tới lúc chơi: click x y | tap x y (0..1 theo canvas) | key <Code> | wait <ms>"
+        },
+        "keys": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9+]+$" }, "description": "Phím (KeyboardEvent.code) bấm ngẫu nhiên khi chơi" },
+        "playSec": { "type": "number", "minimum": 1, "maximum": 120, "description": "Số giây chơi tự động mỗi kịch bản" },
+        "target": { "type": "string", "description": "CSS selector của canvas game (mặc định canvas)" },
+        "settings": { "type": "string", "description": "CSS selector nút mở Settings (mặc định .gk-gear)" }
+      }
+    },
     "gates": {
       "type": "object",
       "propertyNames": {

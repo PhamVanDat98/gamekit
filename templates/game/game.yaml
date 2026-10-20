@@ -27,6 +27,11 @@ budget:
   minFpsDesktop: 60
   minFpsMobile: 30
   plannedDays: {}
+smoke:                      # gamekit smoke: mở game trong trình duyệt headless như người chơi
+  start:                    # bước từ màn đầu vào tới lúc chơi: click x y | tap x y (0..1 theo canvas) | key <Code> | wait <ms>
+    - click 0.5 0.5
+  keys: [ArrowLeft, ArrowRight, Space]   # phím bấm ngẫu nhiên khi chơi (cùng với chạm/click ngẫu nhiên)
+  playSec: 6
 release:
   forbiddenTerms: []        # tên, thương hiệu game gốc — release-check chặn nếu còn trong gói
   allowedHosts: []          # host ngoài được phép (CDN SDK của portal)

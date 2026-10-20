@@ -19,13 +19,23 @@ export const PHASE_INFO = {
 // Skills that ship in this version of the plugin. Others are planned (later sub-projects).
 export const AVAILABLE_SKILLS = new Set([
   'using-gamekit',
+  'game-recon',
+  'triage',
+  'engine-unity',
   're-notes',
+  'gameplay-spec',
+  'asset-inventory',
+  'ui-extract',
+  'runtime-select',
   'rebuild-game',
   'parity-check',
   'module-plan',
   'integrate',
+  'web-relayout',
   'platform-sdk',
   'package-web-build',
+  'perf-budget',
+  'qa-smoke',
   'release-check',
 ]);
 

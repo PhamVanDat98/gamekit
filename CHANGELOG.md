@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.0 — 2026-10-20
+AI nhìn thấy game chạy:
+- Lệnh `smoke`: dựng bản dev-mock từ source (hoặc `--version` cho gói đã pack), mở trong Chromium headless (playwright-core của game; Chrome/Edge có sẵn, chromium của playwright, hoặc `GK_BROWSER`). 8 kịch bản: desktop, mobile dọc/ngang, ad giả fail/skip/slow/none (song song), máy yếu (CPU 4×, 1.6 Mbps/150 ms). Ảnh chụp trong `.gamekit/smoke/` để agent mở xem.
+- Bắt: lỗi console/JS/tải, loading không tắt, trang cuộn, canvas tràn hay quá nhỏ, màn một màu, hình đứng yên khi chơi, thiếu `loadingEnd`/`gameplayStart` (lỗi từ P4), footer Settings, đổi ngôn ngữ; đo thời gian vào game, FPS trung bình/p5, heap theo `budget`.
+- Cổng: P3 `{auto: smoke}`; P4 `{auto: smoke}` (ad giả không làm treo); P5 `{auto: perf}` + `{auto: smoke}` thay cho checklist tay. Gate chạy smoke một lần cho cả hai mục.
+- Template: `playwright-core`, mục `smoke:` trong `game.yaml` (bước vào game, phím, thời gian chơi), task VS Code, `.gamekit/smoke/` gitignored.
+
+Bằng chứng từ game gốc:
+- Lệnh `recon`: nhận diện engine/phiên bản/dạng build (Unity project, Mono, IL2CPP, WebGL; Cocos; Godot; Unreal; Flash; Construct; Laya; GameMaker; Defold; HTML5 Phaser/Pixi/RPG Maker) từ thư mục hoặc APK/XAPK/IPA/zip mà không chạy game; `--write` ghi `spec/recon.json` và điền `source.*` còn trống.
+- Lệnh `oracle import`: trace CSV/JSONL/JSON → `spec/oracles/<id>.json` (chọn dòng `--at`, `--every`, `--max`; bắt buộc `--source`; `inferred` cần `--tolerance`). Công cụ ghi trace: `GkTraceRecorder.cs` (Unity), `gk-trace.js` (game web).
+- Lệnh `assets`: `scan` (kiểm kê, kích thước PNG, sprite sheet Unity, gợi ý định dạng), `unity-atlas` (.png + .meta → atlas JSON cho Pixi/Phaser: lật trục y, pivot → anchor, 9-slice), `convert` (WebP, MP3/OGG/M4A qua ffmpeg; `--label` gắn provenance).
+
+Skill mới: game-recon, triage (P0); engine-unity, gameplay-spec, asset-inventory, ui-extract (P1); runtime-select (P2); web-relayout (P3); perf-budget, qa-smoke (P5). Skill cũ trỏ sang lệnh và skill mới.
+
+Đo chính harness:
+- CI `.github/workflows/ci.yml`: test trên Linux/Windows/macOS × Node 20/22 và lượt đầu-cuối (`GK_E2E=1`: game thật, npm install, smoke, game bị làm hỏng phải đỏ, gate, pack).
+- `evals/` cho `claude plugin eval`: dùng recon đúng, không tự tick mục "(bạn)", không kéo GameKit vào yêu cầu không liên quan.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.

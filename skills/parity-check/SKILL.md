@@ -36,6 +36,8 @@ Lấy `out` từ đâu (ghi vào `confidence`):
 
 Chạy code của game gốc để sinh oracle (harness, emulator, Unity Editor): với game của người dùng (`own`) cứ làm, đây là cách có oracle `observed` tốt nhất. Với `third-party` đó là chạy binary của người khác: chỉ làm khi người dùng đồng ý, và ghi lại thành `D-n`.
 
+Cách làm: ghi trace trong lúc chơi game gốc ([`references/gk-trace.js`](references/gk-trace.js) cho game chạy trên trình duyệt, `GkTraceRecorder.cs` của skill **engine-unity** cho Unity), rồi `gamekit oracle import <trace> --to spec/oracles/<id>.json --in t --out <cột> --source "…" --at t=0,5,10`. Định dạng trace và cách chọn dòng: [`references/trace-format.md`](references/trace-format.md). Đừng tự chép tay hàng trăm dòng: script chọn dòng, trace là bằng chứng.
+
 ## 3. Gắn thẻ test
 Tên test chứa `[id:case]`, viết ở `it` hoặc `describe`:
 

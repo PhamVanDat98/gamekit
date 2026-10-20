@@ -31,5 +31,5 @@ description: Dùng trước khi phát hành hoặc nộp game lên portal (cổn
 | source map | Tắt `build.sourcemap` |
 | `params`: source TODO / sai khác chưa duyệt | Hoàn tất nguồn hoặc xin người dùng duyệt `D-n` |
 
-3. Checklist tay trong `gates/P5.md`: ngân sách hiệu năng trên máy yếu, smoke test, ảnh store. Mục **playtest bản cuối (bạn)** do người dùng tick.
+3. `gamekit smoke` (skill **qa-smoke**) cho cổng `{auto: smoke}` và `{auto: perf}` (skill **perf-budget**). Checklist tay còn lại trong `gates/P5.md`: ảnh store, changelog. Mục **playtest bản cuối (bạn)** do người dùng tick.
 4. `gamekit gate` → khi người dùng đồng ý, `gamekit gate --advance` (phase = released).

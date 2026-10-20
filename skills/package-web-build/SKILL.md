@@ -39,6 +39,7 @@ builds/<v>/
 - Phiên bản có `dirty` nếu còn thay đổi chưa commit — phát hành thật thì commit hết trước khi pack.
 
 ## Test local
-`npm run preview` (= `vite preview --outDir builds`) rồi mở `http://localhost:4173/<v>/dev-mock/<v>/index.html`. Bản `azgames` có sitelock nên không chạy local — đúng chủ ý.
+- `gamekit smoke --version` mở gói `builds/<v>/dev-mock` mới nhất trong trình duyệt headless và chấm (skill **qa-smoke**); `--version <v>` cho bản khác.
+- Chơi tay: `npm run preview` (= `vite preview --outDir builds`) rồi mở `http://localhost:4173/<v>/dev-mock/<v>/index.html`. Bản `azgames` có sitelock nên không chạy local — đúng chủ ý.
 
 Sau khi pack: skill **release-check**.
