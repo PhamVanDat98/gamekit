@@ -66,7 +66,8 @@ export function styleProblems(root, data, file) {
   }
   for (const [slot, f] of Object.entries(data.fonts)) {
     if (!f.file) continue;
-    if (!/^assets\/fonts\/[^/]+\.(woff2?|ttf|otf)$/.test(f.file)) errors.push(`${file}: fonts.${slot}.file phải là file trong assets/fonts/ (woff2/woff/ttf/otf)`);
+    // The name goes into a TS import in theme.ts: letters, digits, . _ - and spaces only.
+    if (!/^assets\/fonts\/[A-Za-z0-9._ -]+\.(woff2?|ttf|otf)$/.test(f.file)) errors.push(`${file}: fonts.${slot}.file phải là file trong assets/fonts/ (woff2/woff/ttf/otf; tên chỉ gồm chữ, số, . _ - và dấu cách)`);
     else if (!exists(path.join(root, f.file))) (file === 'style/style.json' ? errors : warnings).push(`${file}: thiếu ${f.file}`);
   }
   return { errors, warnings };

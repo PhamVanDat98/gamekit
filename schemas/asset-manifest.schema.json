@@ -16,8 +16,8 @@
         "if": { "properties": { "kind": { "not": { "const": "audio" } } } },
         "then": { "required": ["width", "height"] },
         "properties": {
-          "id": { "type": "string" },
-          "path": { "type": "string", "description": "File @1x" },
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "description": "Chữ thường, số, . _ -" },
+          "path": { "type": "string", "pattern": "^(?!.*(^|/)\\.\\.?(/|$))(assets|public)/[^\\\\:*?\"<>|]+$", "description": "File @1x, đường dẫn từ gốc game trong assets/ hoặc public/, dùng /" },
           "kind": { "enum": ["sprite", "ui", "anim", "background", "tile", "icon", "texture", "model", "audio"] },
           "make": { "enum": ["vector", "image-gen", "own", "licensed"], "description": "UI nên là vector (SVG/CSS)" },
           "width": { "type": "integer", "minimum": 1 },

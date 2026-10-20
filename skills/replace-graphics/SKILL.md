@@ -22,7 +22,7 @@ description: Dùng ở pha P3 khi làm lại game người khác (third-party) �
 1. Xem trước, không tốn phí: `gen image --dry-run` (hoặc `gen prompt [--id a]`). Prompt in ra và lưu ở `.gamekit/local/gen/<id>[.<mã>].txt`. Đọc lại: đúng kích thước, nền trong suốt nếu `alpha`, không nhắc game gốc.
 2. Chạy: `gen image` chỉ sinh asset `make: image-gen` **chưa có file**. `--id a,b` chọn cụ thể và ghi đè file đã có. Quá 5 lần gọi API phải thêm `--yes` (báo người dùng số lần gọi trước).
 3. Model: mặc định `gpt-image-1.5` (`--model` hoặc biến `GAMEKIT_IMAGE_MODEL`). `gpt-image-2` không làm được nền trong suốt: lệnh dừng nếu có asset `alpha: true`. `--quality` truyền thẳng cho API.
-4. Kết quả được ép về đúng spec (sprite/ui/icon/anim/`alpha`: thu vừa khung; background/tile/texture: phủ kín rồi cắt), ghi PNG (`path` phải là `.png`), gắn nhãn `generated` kèm model, ghi `gen` (model, thời điểm, prompt) vào manifest. Sprite sheet (`frames`): kiểm tra các frame thẳng hàng, cùng tỉ lệ.
+4. Kết quả được ép về đúng spec: `alpha: true` thu vừa khung (không cắt vật thể); 9-slice và `seamless` kéo giãn (cắt sẽ hỏng viền/đường nối); còn lại phủ kín rồi cắt. Sprite sheet (`frames`): model chỉ làm ảnh 1:1, 3:2, 2:3 nên gen xin một lưới khung (vd 4×2) rồi cắt lại thành một hàng đúng spec — kiểm tra các khung cùng nhân vật, cùng tỉ lệ. Ghi PNG (`path` phải là `.png`, kiểm trước khi gọi API), gắn nhãn `generated` kèm model, ghi `gen` vào manifest sau từng file và xoá kết quả duyệt cũ. Ngôn ngữ chưa có bản dịch bị bỏ qua (không sinh ảnh mang chữ tiếng Anh).
 5. `third-party`: prompt chứa từ trong `release.forbiddenTerms` bị chặn. Sửa `brief`/`prompt` bằng lời mô tả thiết kế mới, không lách bằng cách viết sai chính tả.
 
 ## 3. Ảnh có chữ (logo, nút có chữ, banner)

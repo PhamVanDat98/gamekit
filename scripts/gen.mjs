@@ -11,8 +11,8 @@ import { log, GkError } from './lib/log.mjs';
 import { requireGameRoot, loadGame, nowIso, ownershipOf } from './lib/game.mjs';
 import { loadLanguages } from './lib/languages.mjs';
 import { loadChosenStyle } from './lib/style.mjs';
-import { decodePng, encodePng, fit } from './lib/png.mjs';
-import { labelFiles } from './lib/provenance.mjs';
+import { decodePng, encodePng, fit, resize } from './lib/png.mjs';
+import { LABELS, labelFiles } from './lib/provenance.mjs';
 import { generateImage, generateSpeech, imageSizeFor } from './lib/openai.mjs';
 import { check } from './lib/schema.mjs';
 
@@ -53,13 +53,46 @@ export function targets(ctx, a, only) {
   return ctx.codes
     .filter((c) => !only || only.includes(c))
     .map((c) => {
-      const words = ctx.langs[c]?.[a.textKey] ?? ctx.langs.en?.[a.textKey];
-      if (typeof words !== 'string') throw new GkError(`${a.id}: không có key ${a.textKey} trong Language/en.json`);
-      return { lang: c, path: c === 'en' ? a.path : `assets/i18n/${c}/${rest}`, words };
+      if (typeof ctx.langs.en?.[a.textKey] !== 'string') throw new GkError(`${a.id}: không có key ${a.textKey} trong Language/en.json`);
+      // No translation yet: never make a "vi" file with English words (it would hide the gap from validate).
+      const words = ctx.langs[c]?.[a.textKey];
+      return { lang: c, path: c === 'en' ? a.path : `assets/i18n/${c}/${rest}`, words: typeof words === 'string' ? words : null, untranslated: typeof words !== 'string' };
     });
 }
 
 const specSize = (a) => ({ w: a.frames ? a.frames.width * a.frames.count : a.width, h: a.height });
+
+const MODEL_SIZES = [
+  [1024, 1024],
+  [1536, 1024],
+  [1024, 1536],
+];
+
+/**
+ * Image models only make 1:1, 3:2 and 2:3 pictures, so an 8-frame strip is asked for as a grid of
+ * frames (the layout with the biggest cells) and cut back into one row afterwards.
+ */
+export function frameGrid(count, fw, fh, sizes = MODEL_SIZES) {
+  let best = null;
+  for (const [W, H] of sizes)
+    for (let cols = 1; cols <= count; cols++) {
+      const rows = Math.ceil(count / cols);
+      const scale = Math.min(W / cols / fw, H / rows / fh);
+      if (!best || scale > best.scale) best = { size: `${W}x${H}`, cols, rows, scale };
+    }
+  return best;
+}
+
+/** The grid an image of W×H most likely holds: cells closest to the frame's aspect ratio. */
+function gridOf(img, count, fw, fh) {
+  let best = null;
+  for (let cols = 1; cols <= count; cols++) {
+    const rows = Math.ceil(count / cols);
+    const err = Math.abs(Math.log(img.width / cols / (img.height / rows) / (fw / fh)));
+    if (!best || err < best.err) best = { cols, rows, err };
+  }
+  return best;
+}
 
 export function imagePrompt(ctx, a, t) {
   const s = ctx.style;
@@ -70,7 +103,10 @@ export function imagePrompt(ctx, a, t) {
   parts.push(`Make ${KIND_TEXT[a.kind] ?? 'a game asset'}: ${a.brief ?? a.id}.`);
   if (a.prompt) parts.push(a.prompt);
   parts.push(`Final size ${w}×${h} px — compose for that aspect ratio, keep important details large enough to read at that size.`);
-  if (a.frames) parts.push(`Sprite sheet: exactly ${a.frames.count} frames side by side in one row, each ${a.frames.width}×${a.frames.height} px, same character and scale in every frame, evenly spaced.`);
+  if (a.frames) {
+    const g = frameGrid(a.frames.count, a.frames.width, a.frames.height);
+    parts.push(`Sprite sheet: exactly ${a.frames.count} animation frames in a grid of ${g.cols} columns × ${g.rows} rows (left to right, top to bottom), equal cells, one frame per cell, same character and scale in every frame, nothing crossing cell borders${g.cols * g.rows > a.frames.count ? ', leftover cells empty' : ''}.`);
+  }
   if (a.nineSlice) parts.push('UI panel that will be 9-slice scaled: plain stretchable middle, all decoration in the borders and corners.');
   if (a.seamless) parts.push('Seamless, tileable on every edge.');
   if (a.alpha) parts.push('Transparent background, one isolated subject, nothing touching the edges, no ground shadow.');
@@ -89,15 +125,39 @@ function guard(ctx, a, text) {
   if (hit) throw new GkError(`${a.id}: prompt có "${hit}" (release.forbiddenTerms) — mô tả thiết kế mới, không nhắc game gốc`);
 }
 
-/** Decode, fit to the spec (objects are contained, backgrounds/tiles fill), write PNG. */
-export function writeFitted(root, rel, png, a) {
+/**
+ * Fit a picture to the spec and write it as PNG:
+ * - sprite sheets: cut the grid into frames, fit each frame into its cell, lay them out in one row;
+ * - 9-slice panels and seamless tiles: stretch (cropping would cut borders or break the seams);
+ * - transparent objects: contain (never crop the subject); everything else: cover.
+ */
+export function writeFitted(root, rel, png, a, grid) {
   if (!/\.png$/i.test(rel)) throw new GkError(`${rel}: gen chỉ ghi PNG — đổi path trong asset-manifest.json sang .png (nén WebP sau nếu cần)`);
   const { w, h } = specSize(a);
   const img = decodePng(png);
-  const mode = a.alpha || ['sprite', 'ui', 'icon', 'anim'].includes(a.kind) ? 'contain' : 'cover';
-  const out = path.join(root, rel);
-  fs.mkdirSync(path.dirname(out), { recursive: true });
-  fs.writeFileSync(out, encodePng(fit(img, w, h, mode)));
+  let out;
+  if (a.frames && a.frames.count > 1) {
+    const { width: fw, height: fh, count } = a.frames;
+    const g = grid ?? gridOf(img, count, fw, fh); // gen knows the grid it asked for; an imported sheet is guessed
+    const cw = Math.floor(img.width / g.cols);
+    const ch = Math.floor(img.height / g.rows);
+    out = { width: w, height: h, data: new Uint8Array(w * h * 4) };
+    for (let k = 0; k < count; k++) {
+      const cell = crop(img, (k % g.cols) * cw, Math.floor(k / g.cols) * ch, cw, ch);
+      const f = fit(cell, fw, fh, a.alpha === false ? 'cover' : 'contain');
+      for (let y = 0; y < fh; y++) out.data.set(f.data.subarray(y * fw * 4, (y + 1) * fw * 4), (y * w + k * fw) * 4);
+    }
+  } else if (a.nineSlice || a.seamless) out = resize(img, w, h);
+  else out = fit(img, w, h, a.alpha ? 'contain' : 'cover');
+  const file = path.join(root, rel);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, encodePng(out));
+}
+
+function crop(img, x0, y0, cw, ch) {
+  const data = new Uint8Array(cw * ch * 4);
+  for (let y = 0; y < ch; y++) data.set(img.data.subarray(((y0 + y) * img.width + x0) * 4, ((y0 + y) * img.width + x0 + cw) * 4), y * cw * 4);
+  return { width: cw, height: ch, data };
 }
 
 function pick(ctx, args, wanted) {
@@ -111,9 +171,22 @@ function pick(ctx, args, wanted) {
   return { list: ctx.man.assets.filter(wanted), force: Boolean(args.force) };
 }
 
-function record(ctx, a, model, prompt, langs) {
-  a.gen = { model, at: nowIso(), prompt, ...(langs.length ? { langs } : {}) };
+/** After every file: remember how it was made, and drop the old review (it judged the previous file). */
+function record(ctx, a, model, prompt, lang) {
+  const langs = [...new Set([...(a.gen?.model === model ? (a.gen.langs ?? []) : []), ...(lang ? [lang] : [])])];
+  a.gen = { model, at: nowIso(), prompt: !lang || lang === 'en' || !a.gen?.prompt ? prompt : a.gen.prompt, ...(langs.length ? { langs } : {}) };
+  delete a.review;
   writeJson(ctx.manFile, ctx.man);
+}
+
+/** Languages without the string yet are left out, loudly. */
+function translated(list) {
+  const out = [];
+  for (const t of list) {
+    if (t.untranslated) log.warn(`${t.path}: Language/${t.lang}.json chưa có bản dịch — bỏ qua, sinh lại sau khi dịch (skill add-i18n)`);
+    else out.push(t);
+  }
+  return out;
 }
 
 async function image(ctx, args) {
@@ -123,7 +196,8 @@ async function image(ctx, args) {
   for (const a of list) {
     if (a.kind === 'audio') throw new GkError(`${a.id}: là âm thanh — dùng gen voice (lời thoại) hoặc gen import`);
     if (!a.width || !a.height) throw new GkError(`${a.id}: thiếu width/height`);
-    for (const t of targets(ctx, a, only)) if (force || !exists(path.join(ctx.root, t.path))) jobs.push({ a, t, prompt: imagePrompt(ctx, a, t) });
+    if (!/\.png$/i.test(a.path)) throw new GkError(`${a.id}: gen chỉ ghi PNG — đổi path trong asset-manifest.json sang .png (nén WebP sau nếu cần)`);
+    for (const t of translated(targets(ctx, a, only))) if (force || !exists(path.join(ctx.root, t.path))) jobs.push({ a, t, prompt: imagePrompt(ctx, a, t) });
   }
   for (const j of jobs) guard(ctx, j.a, j.prompt);
   if (!jobs.length) {
@@ -136,16 +210,16 @@ async function image(ctx, args) {
   const needAlpha = jobs.filter((j) => j.a.alpha).map((j) => j.a.id);
   if (NO_ALPHA_MODEL.test(model) && needAlpha.length)
     throw new GkError(`${model} không làm được nền trong suốt (${[...new Set(needAlpha)].join(', ')}) — dùng --model gpt-image-1.5`);
-  const done = new Map();
   for (const [i, j] of jobs.entries()) {
     const { w, h } = specSize(j.a);
+    const grid = j.a.frames && j.a.frames.count > 1 ? frameGrid(j.a.frames.count, j.a.frames.width, j.a.frames.height) : null;
+    const size = grid ? grid.size : imageSizeFor(w, h);
     log.info(`[${i + 1}/${jobs.length}] ${j.a.id}${j.t.lang ? ` (${j.t.lang})` : ''} → ${j.t.path}`);
-    const png = await generateImage({ prompt: j.prompt, model, size: imageSizeFor(w, h), transparent: Boolean(j.a.alpha), quality: args.quality });
-    writeFitted(ctx.root, j.t.path, png, j.a);
+    const png = await generateImage({ prompt: j.prompt, model, size, transparent: Boolean(j.a.alpha), quality: args.quality });
+    writeFitted(ctx.root, j.t.path, png, j.a, grid);
     labelFiles(ctx.root, [j.t.path], { label: 'generated', source: `${model} — gamekit gen image ${j.a.id}` });
-    done.set(j.a, [...(done.get(j.a) ?? []), j]);
+    record(ctx, j.a, model, j.prompt, j.t.lang);
   }
-  for (const [a, js] of done) record(ctx, a, model, js.find((j) => !j.t.lang || j.t.lang === 'en')?.prompt ?? js[0].prompt, js.map((j) => j.t.lang).filter(Boolean));
   log.ok(`Đã sinh ${jobs.length} ảnh, nhãn generated. Xem lại: gamekit review`);
   return 0;
 }
@@ -155,10 +229,11 @@ async function voice(ctx, args) {
   const { list, force } = pick(ctx, args, (a) => a.voice === true);
   const jobs = [];
   for (const a of list) {
-    if (!a.voice) throw new GkError(`${a.id}: không phải lời thoại (cần voice: true, kind audio, textKey)`);
+    if (!a.voice || a.kind !== 'audio' || !a.textKey || !a.path.startsWith('assets/i18n/en/'))
+      throw new GkError(`${a.id}: lời thoại cần voice: true, kind audio, textKey và path trong assets/i18n/en/`);
     const ext = path.extname(a.path).slice(1).toLowerCase();
     if (!SPEECH_FORMAT[ext]) throw new GkError(`${a.id}: đuôi .${ext} không hỗ trợ — dùng .mp3, .ogg, .aac hoặc .wav`);
-    for (const t of targets(ctx, a, only)) if (force || !exists(path.join(ctx.root, t.path))) jobs.push({ a, t, format: SPEECH_FORMAT[ext] });
+    for (const t of translated(targets(ctx, a, only))) if (force || !exists(path.join(ctx.root, t.path))) jobs.push({ a, t, format: SPEECH_FORMAT[ext] });
   }
   if (!jobs.length) {
     log.info('Không có lời thoại nào cần sinh. Chọn cụ thể: --id a,b');
@@ -178,8 +253,8 @@ async function voice(ctx, args) {
     fs.mkdirSync(path.dirname(out), { recursive: true });
     fs.writeFileSync(out, audio);
     labelFiles(ctx.root, [j.t.path], { label: 'generated', source: `${model} (${voiceName}) — gamekit gen voice ${j.a.id}` });
+    record(ctx, j.a, model, `voice ${voiceName}`, j.t.lang);
   }
-  for (const a of new Set(jobs.map((j) => j.a))) record(ctx, a, model, `voice ${voiceName}`, jobs.filter((j) => j.a === a).map((j) => j.t.lang));
   log.ok(`Đã sinh ${jobs.length} file lời thoại, nhãn generated`);
   return 0;
 }
@@ -204,10 +279,14 @@ function importFile(ctx, args) {
   if (!a) throw new GkError(`Không có ${id} trong asset-manifest.json`);
   const src = path.resolve(args.cwd ?? process.cwd(), file);
   if (!exists(src)) throw new GkError(`Không có ${file}`);
+  const label = args.label ?? 'generated';
+  if (!LABELS.includes(label)) throw new GkError(`--label phải là một trong: ${LABELS.join(', ')}`);
+  if (label === 'licensed' && !args.license) throw new GkError('--label licensed cần --license');
+  const localized = (a.text || a.voice) && a.path.startsWith('assets/i18n/en/');
+  if (args.lang && !localized) throw new GkError(`${a.id}: không có chữ/lời thoại theo ngôn ngữ — bỏ --lang`);
   const ts = targets(ctx, a, args.lang ? [args.lang] : ['en']);
   if (!ts.length) throw new GkError(`${args.lang} không có trong languages của game.yaml`);
   const t = ts[0];
-  const label = args.label ?? 'generated';
   if (a.kind === 'audio') {
     if (path.extname(src).toLowerCase() !== path.extname(t.path).toLowerCase()) throw new GkError(`${file}: đuôi phải là ${path.extname(t.path)} như path trong asset-manifest.json`);
     fs.mkdirSync(path.dirname(path.join(ctx.root, t.path)), { recursive: true });
@@ -218,6 +297,10 @@ function importFile(ctx, args) {
     writeFitted(ctx.root, t.path, buf, a);
   }
   labelFiles(ctx.root, [t.path], { label, source: args.source ?? `import ${path.basename(src)}`, license: args.license ?? null });
+  if (a.review) {
+    delete a.review; // it judged the previous file
+    writeJson(ctx.manFile, ctx.man);
+  }
   log.ok(`${a.id}${t.lang ? ` (${t.lang})` : ''} → ${t.path}${a.kind === 'audio' ? '' : ` (${specSize(a).w}×${specSize(a).h})`}, nhãn ${label}`);
   return 0;
 }

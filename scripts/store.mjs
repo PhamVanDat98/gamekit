@@ -9,16 +9,16 @@ import { requireGameRoot, loadGame } from './lib/game.mjs';
 import { decodePng, encodePng, fit } from './lib/png.mjs';
 import { listingSkeleton, storePortals, storeProblems, storeSpec } from './lib/store.mjs';
 
-/** Newest smoke screenshot of a scenario, as a fallback source. */
+/** Most recently taken smoke screenshot of a scenario (the current look of the game), as a fallback source. */
 function smokeShot(root, name) {
   const dir = path.join(root, '.gamekit', 'local', 'smoke');
   if (!exists(dir)) return null;
-  const runs = fs.readdirSync(dir).sort().reverse();
-  for (const r of runs) {
-    const f = path.join(dir, r, name);
-    if (exists(f)) return f;
-  }
-  return null;
+  const shots = fs
+    .readdirSync(dir)
+    .map((r) => path.join(dir, r, name))
+    .filter(exists)
+    .map((f) => [f, fs.statSync(f).mtimeMs]);
+  return shots.sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 }
 
 export function sources(root) {

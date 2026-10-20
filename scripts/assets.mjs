@@ -81,12 +81,18 @@ export async function run(args) {
   const man = exists(file) ? readJson(file) : { $schema: './.gamekit/schemas/asset-manifest.schema.json', assets: [] };
   const known = new Set(man.assets.flatMap((a) => [a.path, a.ref].filter(Boolean)));
   const ids = new Set(man.assets.map((a) => a.id));
+  // hero.png + hero.jpg in reference/ both become assets/img/hero.png; Hero.png and hero.png are one file on Windows/macOS.
+  const paths = new Set(man.assets.map((a) => a.path.toLowerCase()));
   const fresh = scan(root, from).filter((e) => !known.has(e.ref ?? e.path));
   for (const e of fresh) {
     let id = e.id;
     for (let n = 2; ids.has(id); n++) id = `${e.id}-${n}`;
     e.id = id;
     ids.add(id);
+    let p = e.path;
+    for (let n = 2; paths.has(p.toLowerCase()); n++) p = e.path.replace(/(\.[^./]+)?$/, `-${n}$1`);
+    e.path = p;
+    paths.add(p.toLowerCase());
   }
   const byKind = {};
   for (const e of fresh) byKind[e.kind] = (byKind[e.kind] ?? 0) + 1;

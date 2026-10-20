@@ -8,6 +8,7 @@ import { exists, writeJson, toPosix } from './lib/io.mjs';
 import { log, GkError } from './lib/log.mjs';
 import { requireGameRoot, loadGame } from './lib/game.mjs';
 import { loadLanguages } from './lib/languages.mjs';
+import { check } from './lib/schema.mjs';
 import { contrast, loadChosenStyle, loadStyleOptions, onColour, styleProblems, themeSource } from './lib/style.mjs';
 
 export async function run(args) {
@@ -38,6 +39,7 @@ function choose(root, id) {
   if (errors.length) throw new GkError(errors.join('\n'));
   const { $schema: _, ...data } = opt.data;
   writeJson(path.join(root, 'style', 'style.json'), { $schema: '../.gamekit/schemas/style.schema.json', ...data });
+  fs.mkdirSync(path.join(root, 'src', 'view'), { recursive: true });
   fs.writeFileSync(path.join(root, 'src', 'view', 'theme.ts'), themeSource(data));
   log.ok(`Đã chọn style ${id}: style/style.json, src/view/theme.ts`);
   log.info('Chạy npm run dev để xem trong game; npm run typecheck && npm run lint trước khi commit.');
@@ -56,32 +58,36 @@ function settingsCss(root) {
 
 export function previewHtml(root) {
   const game = loadGame(root);
-  const options = loadStyleOptions(root).filter((o) => o.data);
+  // Only options that pass the schema: a broken one would crash the page or inject markup into it.
+  const all = loadStyleOptions(root);
+  const options = all.filter((o) => o.data && !check('style', o.data).length);
+  const skipped = all.filter((o) => !options.includes(o)).map((o) => o.file);
   const chosen = loadChosenStyle(root);
   if (chosen && !options.some((o) => o.data.id === chosen.id)) options.unshift({ file: 'style/style.json', data: chosen });
-  if (!options.length) throw new GkError('Chưa có style nào trong style/options/ (skill style-direction)');
+  if (!options.length) throw new GkError(`Chưa có style hợp lệ nào trong style/options/ (skill style-direction)${skipped.length ? ` — lỗi schema: ${skipped.join(', ')} (gamekit validate)` : ''}`);
   const langs = loadLanguages(root);
   const en = langs.en ?? {};
   const strings = Object.fromEntries((game.languages ?? ['en']).map((c) => [c, { ...en, ...(langs[c] ?? {}) }]));
   const rtl = Object.fromEntries(Object.entries(langs).map(([c, d]) => [c, d?._meta?.dir === 'rtl']));
   const out = path.join(root, '.gamekit', 'local', 'preview');
-  const rel = (f) => toPosix(path.relative(out, path.join(root, f)));
+  const rel = (f) => toPosix(path.relative(out, path.join(root, f))).split('/').map(encodeURIComponent).join('/');
+  const cssStr = (s) => `"${String(s).replace(/[\\"]/g, '\\$&').replace(/[\r\n<>]/g, '')}"`;
   const faces = [];
   const cards = options.map(({ file, data: s }) => {
     const p = { ...s.palette, onPrimary: s.palette.onPrimary ?? onColour(s.palette.primary) };
     const shape = { radius: 12, stroke: 0, shadow: 'soft', ...s.shape };
-    for (const f of Object.values(s.fonts)) if (f.file && exists(path.join(root, f.file))) faces.push(`@font-face { font-family: "${esc(f.family)}"; src: url("${rel(f.file)}"); ${f.weight ? `font-weight: ${f.weight};` : ''} }`);
+    for (const f of Object.values(s.fonts)) if (f.file && exists(path.join(root, f.file))) faces.push(`@font-face { font-family: ${cssStr(f.family)}; src: url("${rel(f.file)}"); ${f.weight ? `font-weight: ${f.weight};` : ''} }`);
     const vars = {
       ...Object.fromEntries(Object.entries(p).map(([k, v]) => [`--gk-${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`, v])),
-      '--gk-font-display': `"${s.fonts.display.family}", system-ui, sans-serif`,
-      '--gk-font-body': `"${s.fonts.body.family}", system-ui, sans-serif`,
+      '--gk-font-display': `${cssStr(s.fonts.display.family)}, system-ui, sans-serif`,
+      '--gk-font-body': `${cssStr(s.fonts.body.family)}, system-ui, sans-serif`,
       '--gk-radius': `${shape.radius}px`,
       '--gk-stroke': `${shape.stroke}px`,
       '--gk-shadow': { none: 'none', soft: '0 6px 18px rgba(0,0,0,.35)', hard: '0 4px 0 rgba(0,0,0,.55)' }[shape.shadow],
     };
     const style = Object.entries(vars).map(([k, v]) => `${k}:${v}`).join(';');
     const sw = Object.entries(p)
-      .map(([k, v]) => `<div class="sw"><span style="background:${v}"></span><b>${k}</b><small>${v}</small></div>`)
+      .map(([k, v]) => `<div class="sw"><span style="background:${esc(v)}"></span><b>${esc(k)}</b><small>${esc(v)}</small></div>`)
       .join('');
     const ratio = (a, b) => contrast(p[a], p[b]).toFixed(1);
     const imgDir = path.join(root, 'style', 'options', s.id);
@@ -164,6 +170,7 @@ sel.onchange = render; document.getElementById('longest').onchange = render; ren
 
 function preview(root) {
   const html = previewHtml(root);
+  for (const o of loadStyleOptions(root)) if (!o.data || check('style', o.data).length) log.warn(`${o.file}: không hợp lệ, không có trong trang — xem gamekit validate`);
   const out = path.join(root, '.gamekit', 'local', 'preview', 'style.html');
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, html);

@@ -413,8 +413,15 @@ function validateAssetManifest(root, game, pr) {
   if (todo.length) pr.warn(where, `${todo.length} mục còn brief TODO: ${todo.slice(0, 10).join(', ')}${todo.length > 10 ? '…' : ''}`);
   const fix = (man.assets ?? []).filter((a) => a.review?.status === 'fix').map((a) => a.id);
   if (fix.length) pr.warn(where, `${fix.length} mục người duyệt yêu cầu sửa (review.status: fix): ${fix.slice(0, 10).join(', ')}${fix.length > 10 ? '…' : ''}`);
+  const seen = { id: new Map(), path: new Map() };
   for (const a of man.assets) {
     if (!a || typeof a.path !== 'string') continue; // reported by the schema check
+    // Case-insensitive: Windows and macOS file systems treat Hero.png and hero.png as one file.
+    for (const k of ['id', 'path']) {
+      const key = String(a[k]).toLowerCase();
+      if (seen[k].has(key)) pr.error(where, `${a.id}: trùng ${k} với ${seen[k].get(key)} (${a[k]})`);
+      else seen[k].set(key, a.id);
+    }
     if (a.path.includes('\\')) pr.error(where, `${a.id}: path dùng "/" (không dùng "\\"): ${a.path}`);
     // Words in an image are text too: they need one version per language, like Language/*.json.
     const localized = a.path.startsWith('assets/i18n/');

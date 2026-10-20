@@ -44,9 +44,16 @@ export function loadPlaywright(root) {
 /** Static server for one package folder (what a portal hosts). */
 export function serve(dir) {
   const server = http.createServer((req, res) => {
-    const url = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    let url;
+    try {
+      url = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    } catch {
+      res.statusCode = 400;
+      return res.end();
+    }
     let f = path.join(dir, url);
-    if (!f.startsWith(dir)) {
+    const rel = path.relative(dir, f);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
       res.statusCode = 403;
       return res.end();
     }
@@ -76,8 +83,9 @@ async function openPage(browser, sc, url) {
   await page.addInitScript(READY_HOOK);
   const errors = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('console', (m) => m.type() === 'error' && errors.push(`console: ${m.text()}`));
-  page.on('requestfailed', (r) => errors.push(`request failed: ${r.url()} (${r.failure()?.errorText})`));
+  // "Failed to load resource" repeats the HTTP status below; aborted requests (media, cancelled fetches) are normal.
+  page.on('console', (m) => m.type() === 'error' && !/^Failed to load resource/.test(m.text()) && errors.push(`console: ${m.text()}`));
+  page.on('requestfailed', (r) => !/ERR_ABORTED/.test(r.failure()?.errorText ?? '') && errors.push(`request failed: ${r.url()} (${r.failure()?.errorText})`));
   page.on('response', (r) => r.status() >= 400 && errors.push(`HTTP ${r.status()}: ${r.url()}`));
   if (sc.cpu || sc.net) {
     const cdp = await ctx.newCDPSession(page);
@@ -93,7 +101,17 @@ async function openPage(browser, sc, url) {
 
 async function waitReady(page, timeout) {
   try {
-    await page.waitForFunction(() => window.__gkReady, null, { timeout });
+    // GM_LOADER.ready() (hooked), or — for a loader the hook cannot see — its loading screen hidden.
+    await page.waitForFunction(
+      () => {
+        if (window.__gkReady) return true;
+        const l = document.getElementById('gmLoader');
+        if (l && getComputedStyle(l).display === 'none') window.__gkReady = performance.now();
+        return Boolean(window.__gkReady);
+      },
+      null,
+      { timeout, polling: 50 },
+    );
     return await page.evaluate(() => Math.round(window.__gkReady));
   } catch {
     return null;
@@ -134,8 +152,9 @@ export async function smoke(root, { version, portal = 'dev-mock', quick = false,
   const report = { version, portal, at: nowIso(), scenarios: [], languages: [], settings: null, failures: [] };
   const fail = (s) => report.failures.push(s);
   const srv = await serve(pkg);
-  const browser = await pw.chromium.launch(executablePath || process.env.GAMEKIT_CHROMIUM ? { executablePath: executablePath ?? process.env.GAMEKIT_CHROMIUM } : {});
+  let browser;
   try {
+    browser = await pw.chromium.launch(executablePath || process.env.GAMEKIT_CHROMIUM ? { executablePath: executablePath ?? process.env.GAMEKIT_CHROMIUM } : {});
     for (const sc of quick ? SCENARIOS.slice(0, 1) : SCENARIOS) {
       const { ctx, page, errors } = await openPage(browser, sc, `${srv.url}/index.html`);
       const r = { name: sc.name, viewport: sc.viewport, timeToPlayMs: await waitReady(page, 60000), fps: null, blank: null, errors };
@@ -149,10 +168,11 @@ export async function smoke(root, { version, portal = 'dev-mock', quick = false,
         if (sc.mobile) await page.touchscreen.tap(box.width / 2, box.height / 2);
         else await page.keyboard.press('Space');
         await page.waitForTimeout(800);
-        r.fps = await fps(page, quick ? 1500 : 4000);
+        r.fps = await fps(page, quick ? 2500 : 4000);
         await shot(page, path.join(out, `${sc.name}-play.png`));
         const min = sc.mobile ? budget.minFpsMobile : budget.minFpsDesktop;
-        if (min && r.fps < min) fail(`${sc.name}: ${r.fps} FPS < ${min} (budget.${sc.mobile ? 'minFpsMobile' : 'minFpsDesktop'})`);
+        // A display runs at 60 Hz and one late frame reads as 59: allow 5 %.
+        if (min && r.fps < min * 0.95) fail(`${sc.name}: ${r.fps} FPS < ${min} (budget.${sc.mobile ? 'minFpsMobile' : 'minFpsDesktop'})`);
         if (budget.timeToPlaySec && r.timeToPlayMs > budget.timeToPlaySec * 1000) fail(`${sc.name}: vào game sau ${(r.timeToPlayMs / 1000).toFixed(1)} s > ${budget.timeToPlaySec} s (budget.timeToPlaySec)`);
         if (sc.name === 'desktop') report.settings = await checkSettings(page, out);
       }
@@ -173,8 +193,11 @@ export async function smoke(root, { version, portal = 'dev-mock', quick = false,
       report.languages.push(l);
       await ctx.close();
     }
+  } catch (e) {
+    if (!browser) throw new GkError(`Không mở được Chromium: ${e.message.split('\n')[0]} — chạy: npx playwright install chromium (hoặc --browser <đường dẫn>)`);
+    throw e;
   } finally {
-    await browser.close();
+    await browser?.close();
     srv.close();
   }
   writeJson(path.join(out, 'report.json'), report);

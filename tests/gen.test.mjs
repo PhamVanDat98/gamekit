@@ -130,3 +130,48 @@ test('gen import: a PNG made elsewhere is fitted, placed per language and labell
   r = await gkAsync(dir, {}, 'gen', 'import', 'hello', 'x.wav');
   assert.match(r.out, /đuôi phải là \.mp3/);
 });
+
+test('gen: sprite sheets are asked as a grid and cut back into one row; untranslated languages and non-PNG paths are refused before any call; per-file record survives a failure', async () => {
+  const dir = gameWithManifest();
+  editJson(dir, 'Language/vi.json', (d) => {
+    delete d['ui.play'];
+  });
+  const man = JSON.parse(read(dir, 'asset-manifest.json'));
+  man.assets.push(
+    { id: 'run', path: 'assets/img/run.png', kind: 'anim', make: 'image-gen', width: 64, height: 64, alpha: true, frames: { count: 8, width: 64, height: 64, fps: 12 }, brief: 'fox running' },
+    { id: 'web', path: 'assets/img/web.webp', kind: 'sprite', make: 'image-gen', width: 8, height: 8, brief: 'x' },
+  );
+  write(dir, 'asset-manifest.json', JSON.stringify(man));
+  const api = await mockOpenAI();
+  const env = { OPENAI_BASE_URL: api.url, OPENAI_API_KEY: 'sk-test' };
+  try {
+    let r = await gkAsync(dir, env, 'gen', 'image', '--yes');
+    assert.equal(r.code, 1);
+    assert.match(r.out, /web: gen chỉ ghi PNG/);
+    assert.equal(api.calls.length, 0, 'đuôi sai bị chặn trước khi gọi API');
+    const fixed = JSON.parse(read(dir, 'asset-manifest.json'));
+    fixed.assets = fixed.assets.filter((a) => a.id !== 'web');
+    write(dir, 'asset-manifest.json', JSON.stringify(fixed));
+    r = await gkAsync(dir, env, 'gen', 'image', '--id', 'run,play');
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /assets\/i18n\/vi\/ui\/play\.png: Language\/vi\.json chưa có bản dịch — bỏ qua/);
+    assert.ok(!fs.existsSync(path.join(dir, 'assets/i18n/vi/ui/play.png')), 'không sinh ảnh vi mang chữ tiếng Anh');
+    const sheetCall = api.calls.find((c) => c.body.prompt.includes('fox running'));
+    assert.match(sheetCall.body.prompt, /grid of 4 columns × 2 rows/);
+    assert.equal(sheetCall.body.size, '1536x1024', 'ô lớn nhất cho 8 khung vuông');
+    const sheet = decodePng(fs.readFileSync(path.join(dir, 'assets/img/run.png')));
+    assert.deepEqual([sheet.width, sheet.height], [512, 64]);
+    // The mock returns one 300×200 picture: every frame cell gets content (no empty half of the strip).
+    for (let k = 0; k < 8; k++) assert.equal(sheet.data[(32 * 512 + k * 64 + 32) * 4 + 3], 255, `khung ${k} có hình`);
+    let m = JSON.parse(read(dir, 'asset-manifest.json'));
+    assert.deepEqual(m.assets.find((a) => a.id === 'play').gen.langs, ['en']);
+    // A label typo must not replace the file first.
+    fs.writeFileSync(path.join(dir, 'other.png'), solidPng(10, 10));
+    const before = fs.readFileSync(path.join(dir, 'assets/img/run.png'));
+    r = await gkAsync(dir, {}, 'gen', 'import', 'run', 'other.png', '--label', 'generatd');
+    assert.match(r.out, /--label phải là/);
+    assert.ok(fs.readFileSync(path.join(dir, 'assets/img/run.png')).equals(before));
+  } finally {
+    api.close();
+  }
+});

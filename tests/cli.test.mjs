@@ -824,6 +824,12 @@ test('style: options are checked, choose writes style/style.json + theme.ts the 
   assert.match(html, /src: url\("..\/..\/..\/assets\/fonts\/b\.woff2"\)/);
   assert.match(html, /"game\.start":"Tap or press Space to play"/);
   assert.equal(sh(dir, 'git', 'status', '--porcelain', '--', '.gamekit'), '', '.gamekit/local phải được gitignore');
+  // A broken option is left out (with a warning), never injected into the page.
+  write(dir, 'style/options/bad.json', JSON.stringify({ id: 'bad', name: 'x', palette: { bg: '"><img src=x onerror=alert(1)>' } }));
+  r = gk(dir, 'style', 'preview');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /bad\.json: không hợp lệ/);
+  assert.doesNotMatch(read(dir, '.gamekit/local/preview/style.html'), /onerror=alert/);
 });
 
 test('assets scan drafts manifest entries; review lists problems and --apply writes decisions back', () => {
@@ -1003,4 +1009,17 @@ test('ownership: game.yaml without the field counts as own; unknown values are r
   const r = gk(dir, 'validate');
   assert.equal(r.code, 1);
   assert.match(r.out, /ownership/);
+});
+
+test('assets scan: two originals that map to one new path get distinct paths; validate reports duplicates', () => {
+  const dir = newGame('dup', '--third-party');
+  fs.mkdirSync(path.join(dir, 'reference'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'reference/hero.png'), solidPng(4, 4));
+  fs.writeFileSync(path.join(dir, 'reference/hero.gif'), Buffer.from('GIF89a\x04\x00\x04\x00', 'latin1'));
+  assert.equal(gk(dir, 'assets', 'scan', '--write').code, 0);
+  const man = JSON.parse(read(dir, 'asset-manifest.json'));
+  assert.deepEqual(man.assets.map((a) => a.path).sort(), ['assets/img/hero-2.png', 'assets/img/hero.png']);
+  man.assets[1].path = man.assets[0].path.toUpperCase().replace('ASSETS/', 'assets/');
+  write(dir, 'asset-manifest.json', JSON.stringify(man));
+  assert.match(gk(dir, 'validate').out, /trùng path/);
 });

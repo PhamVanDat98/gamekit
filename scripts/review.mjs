@@ -72,17 +72,20 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 export function reviewHtml(root) {
   const { game, items } = collect(root);
   const out = path.join(root, '.gamekit', 'local', 'review');
-  const url = (p) => esc(toPosix(path.relative(out, path.join(root, p))));
+  // Relative URL from the page, each segment percent-encoded (#, ?, % and spaces in file names).
+  const href = (p) => toPosix(path.relative(out, path.join(root, p))).split('/').map(encodeURIComponent).join('/');
+  const url = (p) => esc(href(p));
+  const fonts = new Map(items.filter((i) => i.media === 'font' && i.exists).map((i, n) => [i.path, `gkfont${n}`]));
   const media = (p, m) =>
-    m === 'image' ? `<img loading="lazy" src="${url(p)}" alt="">` : m === 'audio' ? `<audio controls preload="none" src="${url(p)}"></audio>` : m === 'font' ? `<span class="font" style="font-family:'f${esc(p).replace(/\W/g, '')}'">Aa Ăă Ññ 123</span>` : `<span class="file">${esc(path.basename(p))}</span>`;
-  const faces = items.filter((i) => i.media === 'font' && i.exists).map((i) => `@font-face{font-family:'f${esc(i.path).replace(/\W/g, '')}';src:url("${url(i.path)}")}`);
+    m === 'image' ? `<img loading="lazy" src="${url(p)}" alt="">` : m === 'audio' ? `<audio controls preload="none" src="${url(p)}"></audio>` : m === 'font' && fonts.has(p) ? `<span class="font" style="font-family:${fonts.get(p)}">Aa Ăă Ññ 123</span>` : `<span class="file">${esc(path.basename(p))}</span>`;
+  const faces = [...fonts].map(([p, id]) => `@font-face{font-family:${id};src:url("${href(p)}")}`);
   const rows = items.map((it) => {
     const variants = it.langs
       ? `<div class="langs">${Object.entries(it.langs)
           .map(([c, p]) => `<figure>${p ? media(p, it.media) : '<span class="miss">thiếu — dùng en</span>'}<figcaption>${esc(c)}</figcaption></figure>`)
           .join('')}</div>`
       : `<div class="langs"><figure>${it.exists ? media(it.path, it.media) : '<span class="miss">chưa có file</span>'}</figure></div>`;
-    return `<article class="item${it.issues.length ? ' bad' : ''}" data-path="${esc(it.path)}" data-kind="${esc(it.kind)}">
+    return `<article class="item${it.issues.length ? ' bad' : ''}" data-path="${esc(it.path)}" data-kind="${esc(it.kind)}" data-status="${esc(it.review?.status ?? '')}" data-note="${esc(it.review?.note ?? '')}">
   <div class="media">${it.ref ? `<figure class="ref">${media(it.ref, it.media)}<figcaption>gốc: ${esc(it.ref)}</figcaption></figure>` : ''}${variants}</div>
   <div class="meta">
     <b>${esc(it.id ?? path.basename(it.path))}</b> <code>${esc(it.path)}</code>
@@ -131,7 +134,8 @@ try { state = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch {}
 const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
 for (const el of document.querySelectorAll('.item')) {
   const p = el.dataset.path;
-  const s = state[p] || {};
+  // This browser's unsent marks first, then what was already applied to asset-manifest.json.
+  const s = state[p] || { status: el.dataset.status || undefined, note: el.dataset.note || '' };
   for (const r of el.querySelectorAll('input[type=radio]')) { r.checked = r.value === s.status; r.onchange = () => { state[p] = { ...state[p], status: r.value }; persist(); }; }
   const ta = el.querySelector('textarea');
   ta.value = s.note || '';
@@ -152,6 +156,9 @@ document.getElementById('save').onclick = () => {
 `;
 }
 
+/** Notes come from a textarea: keep each on one checklist line. */
+const oneLine = (s) => String(s ?? '').replace(/\s*[\r\n]+\s*/g, ' ').trim();
+
 function apply(root, file) {
   const src = path.resolve(file);
   if (!exists(src)) throw new GkError(`Không có ${file}`);
@@ -166,7 +173,7 @@ function apply(root, file) {
   for (const a of man?.assets ?? []) {
     const r = data.items[a.path];
     if (!r || !['ok', 'fix'].includes(r.status)) continue;
-    a.review = { status: r.status, note: r.note?.trim() || null, at };
+    a.review = { status: r.status, note: oneLine(r.note) || null, at };
     inManifest++;
   }
   if (man) {
@@ -178,7 +185,7 @@ function apply(root, file) {
   const oks = Object.entries(data.items).filter(([, v]) => v.status === 'ok').length;
   const notes = path.join(root, 'notes', 'review.md');
   fs.mkdirSync(path.dirname(notes), { recursive: true });
-  const section = [`## Duyệt asset ${at.slice(0, 10)}`, '', `${oks} OK, ${fixes.length} cần sửa.`, '', ...fixes.map(([p, v]) => `- [ ] \`${p}\`${v.note?.trim() ? ` — ${v.note.trim()}` : ''}`), ''].join('\n');
+  const section = [`## Duyệt asset ${at.slice(0, 10)}`, '', `${oks} OK, ${fixes.length} cần sửa.`, '', ...fixes.map(([p, v]) => `- [ ] \`${oneLine(p).replace(/`/g, "'")}\`${oneLine(v.note) ? ` — ${oneLine(v.note)}` : ''}`), ''].join('\n');
   fs.writeFileSync(notes, (exists(notes) ? fs.readFileSync(notes, 'utf8') + '\n' : '# Ghi chú duyệt asset\n\n') + section);
   log.ok(`${oks} OK, ${fixes.length} cần sửa — asset-manifest.json (${inManifest} mục), notes/review.md`);
   return 0;

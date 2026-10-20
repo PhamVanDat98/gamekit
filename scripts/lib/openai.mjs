@@ -10,29 +10,48 @@ function key() {
   return k;
 }
 
+const TIMEOUT_MS = 5 * 60 * 1000; // a high-quality image can take minutes
+
 async function post(path, body, { tries = 3 } = {}) {
   for (let attempt = 1; ; attempt++) {
-    const res = await fetch(`${base()}${path}`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${key()}`, 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    let res;
+    try {
+      res = await fetch(`${base()}${path}`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${key()}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch (e) {
+      if (e instanceof GkError) throw e;
+      // Network down, DNS, proxy, timeout: worth another try, then a clear message.
+      if (attempt < tries) {
+        await sleep(1000 * 2 ** attempt);
+        continue;
+      }
+      throw new GkError(`OpenAI ${path}: không kết nối được (${e.cause?.code ?? e.name}: ${e.cause?.message ?? e.message}) — kiểm tra mạng/proxy, OPENAI_BASE_URL`);
+    }
     if (res.ok) return res;
     const text = await res.text().catch(() => '');
-    // Rate limits and server errors are worth another try; a bad request or a refused prompt is not.
-    if ((res.status === 429 || res.status >= 500) && attempt < tries) {
-      await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
-      continue;
-    }
-    let msg = text;
+    let err = {};
     try {
-      msg = JSON.parse(text).error?.message ?? text;
+      err = JSON.parse(text).error ?? {};
     } catch {
       /* not JSON */
     }
-    throw new GkError(`OpenAI ${path}: HTTP ${res.status} — ${msg.slice(0, 300)}`);
+    // Rate limits and server errors are worth another try; out of quota, a bad request or a refused prompt is not.
+    const retry = (res.status === 429 && err.code !== 'insufficient_quota') || res.status >= 500;
+    if (retry && attempt < tries) {
+      const after = Number(res.headers.get('retry-after'));
+      await sleep(Number.isFinite(after) && after > 0 ? Math.min(after, 60) * 1000 : 1000 * 2 ** attempt);
+      continue;
+    }
+    const msg = err.message ?? text;
+    throw new GkError(`OpenAI ${path}: HTTP ${res.status}${err.code ? ` (${err.code})` : ''} — ${String(msg).slice(0, 300)}`);
   }
 }
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Closest size the image models accept for a target aspect ratio. */
 export function imageSizeFor(w, h) {
