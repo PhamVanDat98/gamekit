@@ -2,7 +2,7 @@
   "$schema": "../.gamekit/schemas/motion.schema.json",
   "name": "hit",
   "role": "reaction",
-  "brief": "Bị đánh từ bên phải: văng về sau và nghiêng ngay khung đầu (không chuẩn bị), bị ép ngang (stretch 1.2), mắt nhắm sập (hold). Trôi thêm 6 khung, hồi về lâu (18 khung) vượt qua chỗ cũ một chút rồi settle. Râu quất ngược rồi dao động tắt dần. Renderer thêm nháy trắng 2–3 khung.",
+  "brief": "Bị đánh từ bên phải: ngay khung 1–2 văng về sau, ngả người, bị ép ngang (stretch 1.2), mắt nhắm sập và há miệng (hold) — không chuẩn bị. Đầu, tay, tai, đuôi bị quăng về trước (drag) rồi dao động tắt dần. Trôi thêm 6 khung, hồi 18 khung vượt chỗ cũ một chút rồi settle. Renderer thêm nháy trắng 2–3 khung.",
   "tracks": {
     "body.x": [
       { "f": 0, "v": 0 },
@@ -25,18 +25,59 @@
       { "f": 14, "v": 1.03, "ease": "inOut" },
       { "f": 20, "v": 1, "ease": "inOut" }
     ],
+    "head.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 3, "v": -18, "ease": "out" },
+      { "f": 10, "v": -20, "ease": "out" },
+      { "f": 24, "v": 4, "ease": "inOut" },
+      { "f": 32, "v": 0, "ease": "inOut" }
+    ],
+    "armL.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 3, "v": -60, "ease": "out" },
+      { "f": 12, "v": -30, "ease": "inOut" },
+      { "f": 22, "v": 8, "ease": "inOut" },
+      { "f": 30, "v": 0, "ease": "inOut" }
+    ],
+    "armR.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 4, "v": -75, "ease": "out" },
+      { "f": 13, "v": -35, "ease": "inOut" },
+      { "f": 23, "v": 8, "ease": "inOut" },
+      { "f": 31, "v": 0, "ease": "inOut" }
+    ],
+    "earR.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 3, "v": 35, "ease": "out" },
+      { "f": 12, "v": -12, "ease": "inOut" },
+      { "f": 20, "v": 6, "ease": "inOut" },
+      { "f": 28, "v": 0, "ease": "inOut" }
+    ],
+    "earL.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 4, "v": 30, "ease": "out" },
+      { "f": 13, "v": -10, "ease": "inOut" },
+      { "f": 21, "v": 5, "ease": "inOut" },
+      { "f": 29, "v": 0, "ease": "inOut" }
+    ],
+    "tail.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 4, "v": 22, "ease": "out" },
+      { "f": 12, "v": -10, "ease": "inOut" },
+      { "f": 20, "v": 5, "ease": "inOut" },
+      { "f": 28, "v": 0, "ease": "inOut" }
+    ],
     "eyes.sy": [
       { "f": 0, "v": 1 },
       { "f": 1, "v": 0.15, "ease": "hold" },
       { "f": 14, "v": 0.15 },
       { "f": 20, "v": 1, "ease": "out" }
     ],
-    "antenna.rot": [
-      { "f": 0, "v": 0 },
-      { "f": 4, "v": 22, "ease": "out" },
-      { "f": 12, "v": -10, "ease": "inOut" },
-      { "f": 20, "v": 5, "ease": "inOut" },
-      { "f": 28, "v": 0, "ease": "inOut" }
+    "mouth.sy": [
+      { "f": 0, "v": 1 },
+      { "f": 1, "v": 2.4, "ease": "hold" },
+      { "f": 14, "v": 2.4 },
+      { "f": 20, "v": 1, "ease": "out" }
     ]
   }
 }

@@ -1,0 +1,88 @@
+{
+  "$schema": "../.gamekit/schemas/motion.schema.json",
+  "name": "surprise",
+  "role": "action",
+  "brief": "Giật mình kiểu cartoon (take): co rúm 6 khung (nén 0.84, cúi đầu, nheo mắt) rồi bung ra trong 3 khung — giãn 1.32, nhảy khỏi đất, mắt to 1.4×, há miệng to, hai tay bung ra, đuôi dựng, tai vểnh. Giữ pose cực 17 khung (moving hold: vẫn xẹp dần) để mắt kịp đọc, rồi thả về trong 12–14 khung.",
+  "tracks": {
+    "body.stretch": [
+      { "f": 0, "v": 1 },
+      { "f": 6, "v": 0.84, "ease": "inOut", "beat": "anticipation" },
+      { "f": 9, "v": 1.32, "ease": "out", "beat": "action" },
+      { "f": 26, "v": 1.25, "ease": "inOut" },
+      { "f": 36, "v": 0.95, "ease": "inOut" },
+      { "f": 44, "v": 1, "ease": "inOut" }
+    ],
+    "body.y": [
+      { "f": 0, "v": 0 },
+      { "f": 6, "v": 0 },
+      { "f": 9, "v": -18, "ease": "out" },
+      { "f": 26, "v": -14, "ease": "inOut" },
+      { "f": 34, "v": 0, "ease": "in" }
+    ],
+    "eyes.sx": [
+      { "f": 0, "v": 1 },
+      { "f": 6, "v": 1, "ease": "inOut" },
+      { "f": 8, "v": 1.4, "ease": "out" },
+      { "f": 26, "v": 1.35, "ease": "inOut" },
+      { "f": 38, "v": 1, "ease": "inOut" }
+    ],
+    "eyes.sy": [
+      { "f": 0, "v": 1 },
+      { "f": 6, "v": 0.8, "ease": "inOut" },
+      { "f": 8, "v": 1.4, "ease": "out" },
+      { "f": 26, "v": 1.35, "ease": "inOut" },
+      { "f": 38, "v": 1, "ease": "inOut" }
+    ],
+    "head.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 6, "v": 8, "ease": "inOut" },
+      { "f": 9, "v": -14, "ease": "out" },
+      { "f": 26, "v": -10, "ease": "inOut" },
+      { "f": 40, "v": 0, "ease": "inOut" }
+    ],
+    "earR.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 6, "v": 10, "ease": "inOut" },
+      { "f": 9, "v": -18, "ease": "out" },
+      { "f": 26, "v": -15, "ease": "inOut" },
+      { "f": 33, "v": 5, "ease": "inOut" },
+      { "f": 40, "v": 0, "ease": "inOut" }
+    ],
+    "earL.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 7, "v": -10, "ease": "inOut" },
+      { "f": 10, "v": 16, "ease": "out" },
+      { "f": 27, "v": 13, "ease": "inOut" },
+      { "f": 34, "v": -4, "ease": "inOut" },
+      { "f": 41, "v": 0, "ease": "inOut" }
+    ],
+    "armL.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 6, "v": -20, "ease": "inOut" },
+      { "f": 9, "v": 100, "ease": "out" },
+      { "f": 26, "v": 95, "ease": "inOut" },
+      { "f": 38, "v": 0, "ease": "inOut" }
+    ],
+    "armR.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 7, "v": 25, "ease": "inOut" },
+      { "f": 10, "v": -110, "ease": "out" },
+      { "f": 27, "v": -100, "ease": "inOut" },
+      { "f": 39, "v": 0, "ease": "inOut" }
+    ],
+    "mouth.sy": [
+      { "f": 0, "v": 1 },
+      { "f": 8, "v": 1 },
+      { "f": 10, "v": 3, "ease": "out" },
+      { "f": 26, "v": 2.8, "ease": "inOut" },
+      { "f": 36, "v": 1, "ease": "inOut" }
+    ],
+    "tail.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 6, "v": -10, "ease": "inOut" },
+      { "f": 9, "v": 35, "ease": "out" },
+      { "f": 26, "v": 30, "ease": "inOut" },
+      { "f": 38, "v": 0, "ease": "inOut" }
+    ]
+  }
+}

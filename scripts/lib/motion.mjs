@@ -55,6 +55,7 @@ const POSITION = new Set(['x', 'y']);
 const DEFORM = new Set(['sx', 'sy', 'stretch']);
 // Below these a change is noise, not movement.
 const EPS = { x: 0.5, y: 0.5, rot: 0.5, sx: 0.005, sy: 0.005, stretch: 0.005, alpha: 0.005 };
+const REST = { x: 0, y: 0, rot: 0, sx: 1, sy: 1, stretch: 1, alpha: 1 };
 // Which kind of change counts as "the main action" when no key says beat: action.
 const PRIORITY = { x: 3, y: 3, rot: 2, sx: 1, sy: 1, stretch: 1, alpha: 0 };
 
@@ -199,6 +200,16 @@ export function analyzeMotion(m) {
       const overshoots =
         after.some((k) => dir * (k.v - vEnd) > EPS[main.prop]) || segs.some((s) => s.track === main.track && s.from >= main.from && OVERSHOOT_EASES.has(s.ease));
       if (!overshoots) warn('follow-through', `ui: ${main.track} không vượt quá đích rồi về — thêm overshoot (outBack hoặc một key quá đà)`);
+    }
+  }
+
+  // Back to rest: a one-shot that ends off its rest pose snaps when the idle loop takes over.
+  if (oneShot && role !== 'fx') {
+    for (const [track, keys] of Object.entries(m.tracks)) {
+      const { part, prop } = splitTrack(track);
+      const v = keys[keys.length - 1].v;
+      if (Math.abs(v - REST[prop]) > EPS[prop] * 2 && !vanishes(part))
+        warn('rest', `${track} kết thúc ở ${fmt(v)}, không phải pose nghỉ (${REST[prop]}) — về idle sẽ giật; đưa về ${REST[prop]}, hoặc để core/ dời vị trí thật`);
     }
   }
 

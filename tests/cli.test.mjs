@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
+import { gk, newGame, token, sh, write, read, editJson, editYaml, solidPng, CLI } from './helpers.mjs';
+import { spawnSync } from 'node:child_process';
 import { parseGate } from '../scripts/gate.mjs';
 import { checkModulePlan } from '../scripts/validate.mjs';
 import { ownershipProblems, topo } from '../scripts/parallel.mjs';
@@ -723,7 +724,7 @@ test('motion command: template motions pass with a chart; a linear tween fails; 
   const dir = newGame('mo1');
   let r = gk(dir, 'motion');
   assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /4 chuyển động đạt/);
+  assert.match(r.out, /8 chuyển động đạt/);
   assert.match(r.out, /hop · action · 58 khung/);
   assert.match(gk(dir, 'motion', 'motion/hit.json', '--quiet').out, /1 chuyển động đạt/);
   write(dir, 'motion/slide.json', JSON.stringify({ name: 'slide', role: 'action', tracks: { 'body.x': [{ f: 0, v: 0 }, { f: 20, v: 100, ease: 'linear' }] } }));
@@ -751,4 +752,75 @@ test('motion: gate P3 runs {auto: motion}; a game without motion/ passes it', ()
   r = gk(dir, 'gate');
   assert.match(r.out, /✔ Chuyển động trong `motion\/\*\.json`/);
   assert.equal(gk(dir, 'motion').code, 0);
+});
+
+// ---------- frames: frame-by-frame art via Codex ----------
+function bakedFrames(dir, name = 'hop', count = 3) {
+  const frames = Array.from({ length: count }, (_, i) => ({ file: `pose-0${i}.png`, at: i * 12 }));
+  write(dir, `art/frames/${name}/meta.json`, JSON.stringify({ name, fps: 12, loop: false, width: 8, height: 6, anchor: [4, 6], frames, motion: `motion/${name}.json` }));
+  for (const f of frames) fs.writeFileSync(path.join(dir, `art/frames/${name}`, f.file), solidPng(8, 6));
+  return frames;
+}
+
+test('frames: prompts per frame carry the pose rules and the beat; nothing baked is a clear error', () => {
+  const dir = newGame('fr1');
+  let r = gk(dir, 'frames', 'hop');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /Xuất frame/);
+  bakedFrames(dir);
+  r = gk(dir, 'frames', 'hop', '--style', 'flat pastel');
+  assert.equal(r.code, 0, r.out);
+  const prompts = read(dir, 'art/frames/hop/prompts.md');
+  assert.match(prompts, /## Khung 1\/3/);
+  assert.match(prompts, /save it as a PNG file at: art\/frames\/hop\/drawn\/00\.png/);
+  assert.match(prompts, /exactly 8×6 px, transparent background/);
+  assert.match(prompts, /ground point under the feet is at x=4, y=6/);
+  assert.match(prompts, /style of the reference: flat pastel/);
+  // hop.json: f0 is the wind-up, f12 is the jump (action), f24 follows through.
+  assert.match(prompts, /Khung 1\/3[\s\S]*?Beat of this frame: anticipation/);
+  assert.match(prompts, /Khung 2\/3[\s\S]*?Beat of this frame: action[^\n]*smear/);
+  assert.match(prompts, /Khung 3\/3[\s\S]*?Beat of this frame: follow-through/);
+});
+
+test('frames --codex: runs codex exec per missing frame with the reference and pose attached, then --check and --install', (t) => {
+  if (process.platform === 'win32') return t.skip('fake codex is a shell script');
+  const dir = newGame('fr2');
+  bakedFrames(dir);
+  let r = gk(dir, 'frames', 'hop', '--codex');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /art\/character\.png/);
+  fs.writeFileSync(path.join(dir, 'art/character.png'), solidPng(8, 6));
+  // A stand-in for Codex: records its arguments and writes the PNG the prompt asks for (frame 2 at the wrong size).
+  const bin = path.join(dir, '.gamekit/local/fake-codex.mjs');
+  write(dir, '.gamekit/local/fake-codex.mjs', `#!/usr/bin/env node
+import fs from 'node:fs';
+const args = process.argv.slice(2);
+fs.appendFileSync('.gamekit/local/codex-calls.txt', JSON.stringify(args.slice(0, 7)) + '\\n');
+const out = args.at(-1).match(/PNG file at: (\\S+)/)[1];
+const big = out.endsWith('01.png');
+fs.copyFileSync(big ? 'art/character-big.png' : 'art/character.png', out);
+`);
+  fs.chmodSync(bin, 0o755);
+  fs.writeFileSync(path.join(dir, 'art/character-big.png'), solidPng(16, 12));
+  const env = { GK_CODEX: bin };
+  const run = (...a) => {
+    const res = spawnSync(process.execPath, [CLI, ...a], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', ...env } });
+    return { code: res.status, out: `${res.stdout}${res.stderr}` };
+  };
+  r = run('frames', 'hop', '--codex');
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /drawn\/01\.png: 16×12, cần 8×6/);
+  const calls = read(dir, '.gamekit/local/codex-calls.txt').trim().split('\n').map((l) => JSON.parse(l));
+  assert.equal(calls.length, 3);
+  assert.deepEqual(calls[0], ['exec', '--sandbox', 'workspace-write', '--image', 'art/character.png', '--image', 'art/frames/hop/pose-00.png']);
+  // Redo only the bad frame: delete it, fix the stand-in, run again.
+  fs.rmSync(path.join(dir, 'art/frames/hop/drawn/01.png'));
+  fs.copyFileSync(path.join(dir, 'art/character.png'), path.join(dir, 'art/character-big.png'));
+  r = run('frames', 'hop', '--codex', '--install');
+  assert.equal(r.code, 0, r.out);
+  assert.equal(read(dir, '.gamekit/local/codex-calls.txt').trim().split('\n').length, 4);
+  const meta = JSON.parse(read(dir, 'assets/img/anim/hop/meta.json'));
+  assert.deepEqual(meta.frames.map((f) => f.file), ['00.png', '01.png', '02.png']);
+  assert.match(read(dir, 'provenance.json'), /assets\/img\/anim\/hop\/01\.png[\s\S]*generated/);
+  assert.equal(gk(dir, 'validate').code, 0);
 });

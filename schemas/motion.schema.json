@@ -44,7 +44,7 @@
     },
     "skip": {
       "type": "object",
-      "propertyNames": { "enum": ["slow-in-out", "anticipation", "follow-through", "squash-stretch", "overlap", "arcs", "timing"] },
+      "propertyNames": { "enum": ["slow-in-out", "anticipation", "follow-through", "squash-stretch", "overlap", "arcs", "timing", "rest"] },
       "additionalProperties": { "type": "string", "minLength": 3 },
       "description": "Bỏ một kiểm tra nguyên lý cho chuyển động này, kèm lý do"
     }

@@ -1,6 +1,6 @@
 ---
 name: animate
-description: Dùng khi làm chuyển động cho nhân vật, kẻ địch, UI hoặc hiệu ứng (nhất là kiểu cartoon) — ở P3 khi reskin cần asset chuyển động mới, hoặc khi game của người dùng thiếu animation. Áp 12 nguyên lý hoạt hình bằng key pose theo khung trong motion/*.json, rig cắt rời cho asset do AI tạo, spring cho follow-through; chấm bằng `gamekit motion` (biểu đồ nhịp) và xem onion skin ở /lab.html.
+description: Dùng khi làm chuyển động cho nhân vật, kẻ địch, UI hoặc hiệu ứng (nhất là kiểu cartoon) — ở P3 khi reskin cần asset chuyển động mới, hoặc khi game của người dùng thiếu animation, kể cả khi muốn ảnh từng khung (frame-by-frame) vẽ bằng Codex thay cho Spine. Áp 12 nguyên lý hoạt hình bằng key pose theo khung trong motion/*.json, rig cắt rời, spring cho follow-through; chấm bằng `gamekit motion`, xem ở /lab.html, xuất pose và cho Codex vẽ lại từng khung bằng `gamekit frames`.
 ---
 
 # Làm chuyển động theo nguyên lý hoạt hình
@@ -16,10 +16,10 @@ Chuyển động "AI làm" thường hỏng vì cùng vài lý do, không phải
 | Mọi phần bắt đầu và dừng cùng khung | Overlapping action | `motion`: cảnh báo `overlap` |
 | x và y cùng ease → đi đường thẳng | Arcs | `motion`: cảnh báo `arcs`; đường đi trong lab |
 | Mọi đoạn 0.3 s | Timing (tương phản) | `motion`: cảnh báo `timing` |
-| Xin AI vẽ sprite sheet 8 khung → nhân vật "nhảy hình" mỗi khung | Solid drawing | Dùng rig cắt rời ([assets.md](references/assets.md)) |
+| Xin AI vẽ sprite sheet 8 khung → nhân vật "nhảy hình" mỗi khung | Solid drawing | Xuất pose từ motion rồi Codex vẽ lại từng khung theo pose ([frames.md](references/frames.md)), hoặc rig cắt rời ([assets.md](references/assets.md)) |
 | Không xem kết quả | — | Biểu đồ nhịp + screenshot onion skin ở `/lab.html` |
 
-Nguyên lý đầy đủ, kèm số: [principles.md](references/principles.md). Công thức từng hành động (nhảy, đáp, đi, bị đánh, telegraph, nút, popup, nhặt xu…): [recipes.md](references/recipes.md). Làm asset để chuyển động được: [assets.md](references/assets.md).
+Nguyên lý đầy đủ, kèm số: [principles.md](references/principles.md). Công thức từng hành động (nhảy, đáp, đi, bị đánh, telegraph, nút, popup, nhặt xu…): [recipes.md](references/recipes.md). Làm asset để chuyển động được: [assets.md](references/assets.md). Ảnh từng khung bằng Codex (không Spine): [frames.md](references/frames.md).
 
 ## Khi nào dùng
 - `third-party` (P3 reskin): mọi chuyển động của asset mới.
@@ -29,10 +29,10 @@ Nguyên lý đầy đủ, kèm số: [principles.md](references/principles.md). 
 ## Chọn kỹ thuật
 | Cần | Dùng |
 | --- | --- |
-| Nhân vật, kẻ địch, vật có hình cố định | **Rig cắt rời** (`src/view/anim/rig.ts`) + `motion/*.json` — mặc định cho asset AI tạo |
+| Nhân vật cần nét vẽ tay, game chỉ phát ảnh (không rig, không Spine) | **Ảnh từng khung**: `motion/*.json` → lab "Xuất frame" → `gamekit frames <tên> --codex` (Codex vẽ lại từng khung theo pose) → `FrameAnim` ([frames.md](references/frames.md)) |
+| Nhiều hành động × nhiều skin, cần nhẹ và rẻ | **Rig cắt rời** (`src/view/anim/rig.ts`, tự viết, không phải Spine) + `motion/*.json` phát trực tiếp |
 | Phản hồi liên tục theo gameplay (nghiêng theo tốc độ, tóc/đuôi đung đưa, bám con trỏ) | **Procedural**: `Spring`, `stretchFromSpeed` |
 | Biến hình (lửa, khói, nước, nổ) | Particle/procedural trước; ảnh từng khung chỉ khi bắt buộc (ít khung, `step: 12`) |
-| Team đã có Spine/DragonBones | Dùng runtime đó trong `view/`; vẫn áp nguyên lý, chấm bằng mắt (lab, quay chậm) |
 | UI bằng DOM | Cùng số khung/ease trong recipes, viết bằng CSS/Web Animations; UI trên canvas dùng `motion/*.json` |
 
 ## Quy trình (pose-to-pose)
@@ -48,8 +48,9 @@ Nguyên lý đầy đủ, kèm số: [principles.md](references/principles.md). 
 6. **Overlap + secondary** — phần phụ (râu, tai, tóc, đuôi, mũ) trễ 2–4 khung so với thân rồi vượt quá và dao động tắt dần; chớp mắt, nheo mắt khi chạm, bụi khi đáp. Phần dài hoặc chạy theo gameplay: dùng `Spring` (frequency 2–5, damping 0.3–0.6).
 7. **Squash & stretch** — dùng `<phần>.stretch` (giữ khối: sy = s, sx = 1/s), pivot đặt ở điểm tiếp xúc (chân khi đáp). Vật cứng co giãn ít (≤ 5%) hoặc chỉ phần mềm.
 8. **Chấm** — `npm run gk -- motion`: đọc biểu đồ nhịp (dưới đây), sửa đến khi hết lỗi; cảnh báo nào cố ý thì ghi `"skip": { "<kiểm tra>": "lý do" }`.
-9. **Xem** — `npm run dev` → `/lab.html?m=<tên>&onion=1&f=<khung>`: chụp màn hình vài khung (pose chuẩn bị, đỉnh action, chạm, settle) và tự xem: arc có cong, khoảng cách ghost có dày ở hai đầu (ease), khớp có lộ hở khi xoay, squash có giữ khối. Đổi `PLACEHOLDER_RIG` trong `src/view/anim/lab.ts` thành rig thật. Rồi chạy trong game ở 1× và 0.25×.
-10. **Người dùng duyệt** — cảm giác là quyết định của người dùng (mục `(bạn)` ở cổng P3). Gửi screenshot onion skin + biểu đồ nhịp; không tự tick.
+9. **Xem** — `npm run dev` → `/lab.html?m=<tên>&onion=1&f=<khung>`: chụp màn hình vài khung (pose chuẩn bị, đỉnh action, chạm, settle) và tự xem: arc có cong, khoảng cách ghost có dày ở hai đầu (ease), khớp có lộ hở khi xoay, squash có giữ khối. `/lab.html?play=1`: điều khiển nhân vật (đi, nhảy, đánh, bị đánh…) để thử chuyển tiếp idle ↔ walk ↔ one-shot cùng nháy sáng, rung, bụi. Rig mẫu là `SAMPLE_RIG` (`src/view/anim/sample-rig.ts`); đổi `RIG` trong `lab.ts` thành rig thật.
+10. **Ảnh từng khung** (nếu game phát ảnh) — "Xuất frame" trong lab, rồi `gamekit frames <tên> --codex`, `--check`, xem `/lab.html?frames=<tên>`, `--install` ([frames.md](references/frames.md)).
+11. **Người dùng duyệt** — cảm giác là quyết định của người dùng (mục `(bạn)` ở cổng P3). Gửi screenshot onion skin + biểu đồ nhịp; không tự tick.
 
 ## Đọc biểu đồ nhịp (`gamekit motion`)
 ```

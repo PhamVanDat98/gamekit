@@ -2,6 +2,7 @@ import type { Motion } from './motion';
 
 export * from './animator';
 export * from './ease';
+export * from './frames';
 export * from './motion';
 export * from './rig';
 export * from './spring';

@@ -1,0 +1,101 @@
+{
+  "$schema": "../.gamekit/schemas/motion.schema.json",
+  "name": "attack",
+  "role": "telegraph",
+  "brief": "Đòn lao húc của kẻ địch (telegraph). Lấy đà 24 khung: lùi người, ngả ra sau, giãn cao, hai tay vung ra sau, chân trước chống, mắt nheo quyết tâm; rướn thêm 10 khung (moving hold) — người chơi có ~0.57 s để đọc. Lao tới trong 4 khung: người đổ về trước, giãn ngang theo hướng lao (stretch 0.8), tay quăng tới, chân đạp ra sau, mắt mở to, hét. Trôi thêm rồi lùi về chỗ cũ trong 26 khung; tai, đuôi quất theo. Renderer: nháy đỏ f0–24 (tín hiệu hình).",
+  "tracks": {
+    "body.x": [
+      { "f": 0, "v": 0 },
+      { "f": 24, "v": -14, "ease": "inOut", "beat": "anticipation" },
+      { "f": 34, "v": -18, "ease": "out", "beat": "hold" },
+      { "f": 38, "v": 36, "ease": "out", "beat": "action" },
+      { "f": 46, "v": 30, "ease": "inOut" },
+      { "f": 64, "v": 0, "ease": "inOut", "beat": "settle" }
+    ],
+    "body.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 24, "v": -18, "ease": "inOut" },
+      { "f": 34, "v": -22, "ease": "out" },
+      { "f": 38, "v": 22, "ease": "out" },
+      { "f": 48, "v": -4, "ease": "inOut" },
+      { "f": 60, "v": 0, "ease": "inOut" }
+    ],
+    "body.stretch": [
+      { "f": 0, "v": 1 },
+      { "f": 24, "v": 1.12, "ease": "inOut" },
+      { "f": 34, "v": 1.14, "ease": "out" },
+      { "f": 38, "v": 0.8, "ease": "out" },
+      { "f": 46, "v": 1.06, "ease": "out" },
+      { "f": 56, "v": 1, "ease": "inOut" }
+    ],
+    "armR.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 24, "v": 70, "ease": "inOut" },
+      { "f": 34, "v": 80, "ease": "inOut" },
+      { "f": 38, "v": -80, "ease": "out" },
+      { "f": 48, "v": -40, "ease": "inOut" },
+      { "f": 62, "v": 0, "ease": "inOut" }
+    ],
+    "armL.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 25, "v": 60, "ease": "inOut" },
+      { "f": 35, "v": 70, "ease": "inOut" },
+      { "f": 39, "v": -60, "ease": "out" },
+      { "f": 49, "v": -30, "ease": "inOut" },
+      { "f": 63, "v": 0, "ease": "inOut" }
+    ],
+    "legR.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 24, "v": -15, "ease": "inOut" },
+      { "f": 38, "v": 30, "ease": "out" },
+      { "f": 50, "v": 0, "ease": "inOut" }
+    ],
+    "legL.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 24, "v": 10, "ease": "inOut" },
+      { "f": 38, "v": 35, "ease": "out" },
+      { "f": 52, "v": 0, "ease": "inOut" }
+    ],
+    "head.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 26, "v": -8, "ease": "inOut" },
+      { "f": 36, "v": -10, "ease": "inOut" },
+      { "f": 40, "v": 14, "ease": "out" },
+      { "f": 52, "v": 0, "ease": "inOut" }
+    ],
+    "eyes.sy": [
+      { "f": 0, "v": 1 },
+      { "f": 8, "v": 0.55, "ease": "inOut" },
+      { "f": 36, "v": 0.55 },
+      { "f": 38, "v": 1.2, "ease": "out" },
+      { "f": 48, "v": 1, "ease": "inOut" }
+    ],
+    "mouth.sy": [
+      { "f": 0, "v": 1 },
+      { "f": 36, "v": 1 },
+      { "f": 38, "v": 2.6, "ease": "out" },
+      { "f": 50, "v": 1, "ease": "inOut" }
+    ],
+    "earR.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 26, "v": -15, "ease": "inOut" },
+      { "f": 38, "v": 25, "ease": "out" },
+      { "f": 46, "v": -8, "ease": "inOut" },
+      { "f": 54, "v": 0, "ease": "inOut" }
+    ],
+    "earL.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 27, "v": -18, "ease": "inOut" },
+      { "f": 39, "v": 20, "ease": "out" },
+      { "f": 47, "v": -6, "ease": "inOut" },
+      { "f": 55, "v": 0, "ease": "inOut" }
+    ],
+    "tail.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 24, "v": 15, "ease": "inOut" },
+      { "f": 38, "v": -25, "ease": "out" },
+      { "f": 46, "v": 10, "ease": "inOut" },
+      { "f": 56, "v": 0, "ease": "inOut" }
+    ]
+  }
+}

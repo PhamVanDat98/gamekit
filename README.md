@@ -57,6 +57,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | `pack [--portal] [--all] [--version V] [--compress] [--zip]` | `builds/<YYMMDDNN>/<portal>/{index.html, preview.html, version.txt, <v>/…}` + `builds/<v>/manifest.json` (+ zip) |
 | `release-check [--version V] [--portal p]` | Mặc định bản mới nhất. Kiểm bố cục az-v1, footer bản quyền, chặn asset reference/placeholder, tên game gốc, link ngoài, đường dẫn tuyệt đối, vượt ngân sách tải |
 | `motion [file…] [--quiet] [--json]` | Chấm `motion/*.json` theo nguyên lý hoạt hình (slow in/out, anticipation theo vai trò, follow-through, squash giữ khối, overlap, arc, timing) và in biểu đồ nhịp; lỗi chặn cổng P3 `{auto: motion}`, bỏ một kiểm tra cần `skip` có lý do |
+| `frames <motion> [--codex] [--check] [--install]` | Ảnh từng khung không cần Spine: pose xuất từ lab (`art/frames/<motion>/`) → prompt từng khung (giữ pose, anchor, nhịp) → `codex exec` vẽ lại từng khung → kiểm kích thước/nền trong suốt → cài vào `assets/img/anim/` với nhãn `generated` |
 | `fanout --wave N` | Mỗi module một worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>` + `BRIEF.md` |
 | `check-ownership` | Module chỉ sửa trong thư mục được giao, không đụng vùng shared |
 | `integrate --wave N [--cleanup]` | Merge theo phụ thuộc, test sau mỗi merge, đỏ thì hoàn tác |
@@ -80,7 +81,7 @@ tests/            node --test
 
 - `src/core/` logic thuần: `Rng` có seed, fixed timestep, input ghi/phát lại. ESLint chặn DOM, `Math.random`, `Date.now`, thư viện render và số lạ.
 - `src/platform/`: `Platform` (game gọi) và `PortalAdapter` (mỗi portal một file mỏng). `createPlatform()` lo pause + tắt tiếng khi ad, gameplay start/stop cân bằng, không chồng ad, lọc tên event, save fallback. Build chỉ bundle adapter của portal đang đóng gói (`virtual:gk-adapter`).
-- `src/view/anim/` + `motion/*.json`: chuyển động theo key pose (ease, `stretch` giữ khối, vòng lặp, `step` giữ pose kiểu vẽ tay), `Animator` (idle + một lần), `Spring` cho follow-through, rig cắt rời cho asset tách phần, onion skin. `npm run dev` → `/lab.html?m=hop&onion=1&f=20` để xem/chụp từng khung (chỉ khi dev, không vào build). Skill **animate**.
+- `src/view/anim/` + `motion/*.json`: chuyển động theo key pose (ease, `stretch` giữ khối, vòng lặp, `step` giữ pose kiểu vẽ tay), `Animator` (idle + một lần), `Spring` cho follow-through, rig cắt rời cho asset tách phần, onion skin. `npm run dev` → `/lab.html?m=hop&onion=1&f=20` để xem/chụp từng khung, `?play=1` để điều khiển nhân vật mẫu Mochi (8 chuyển động), "Xuất frame" ra PNG từng khung cho `gamekit frames`, `?frames=hop` để xem ảnh từng khung (chỉ khi dev, không vào build). `FrameAnim` phát ảnh từng khung trong game. Skill **animate**.
 - Game demo (né vật rơi) để pipeline chạy được từ đầu đến cuối; thay bằng game thật ở P2.
 
 ## Nâng cấp game cũ

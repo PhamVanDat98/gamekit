@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
@@ -20,6 +20,42 @@ function portalAdapter(): Plugin {
   };
 }
 
+/**
+ * Dev only: /lab.html → "Xuất frame" posts the baked frames here and they land in art/frames/<name>/
+ * (pose-NN.png + meta.json), the input of `gamekit frames`. Never part of a build.
+ */
+function bakeFrames(): Plugin {
+  return {
+    name: 'gamekit-bake-frames',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/__gk/bake', (req, res) => {
+        if (req.method !== 'POST') return void ((res.statusCode = 405), res.end());
+        let body = '';
+        req.on('data', (c: Buffer) => (body += c));
+        req.on('end', () => {
+          try {
+            const { meta, images } = JSON.parse(body) as { meta: { name: string; frames: { file: string }[] }; images: string[] };
+            if (!/^[a-z0-9][a-z0-9-]*$/.test(meta.name) || images.length !== meta.frames.length) throw new Error('dữ liệu bake không hợp lệ');
+            const dir = resolve('art/frames', meta.name);
+            for (const f of meta.frames) if (!/^pose-\d+\.png$/.test(f.file)) throw new Error(`tên file lạ: ${f.file}`);
+            mkdirSync(dir, { recursive: true });
+            // Re-baking replaces the poses (the count may change); redrawn frames in drawn/ are kept.
+            for (const f of readdirSync(dir)) if (/^pose-\d+\.png$/.test(f)) rmSync(resolve(dir, f));
+            meta.frames.forEach((f, i) => writeFileSync(resolve(dir, f.file), Buffer.from(images[i]!.replace(/^data:image\/png;base64,/, ''), 'base64')));
+            writeFileSync(resolve(dir, 'meta.json'), JSON.stringify(meta, null, 2) + '\n');
+            res.setHeader('content-type', 'application/json');
+            res.end(JSON.stringify({ dir: `art/frames/${meta.name}`, count: images.length }));
+          } catch (e) {
+            res.statusCode = 400;
+            res.end((e as Error).message);
+          }
+        });
+      });
+    },
+  };
+}
+
 const ASSET_KINDS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\.(png|jpe?g|webp|gif|svg|avif)$/i, 'img'],
   [/\.(mp3|ogg|m4a|aac|wav)$/i, 'audio'],
@@ -31,7 +67,7 @@ const ASSET_KINDS: ReadonlyArray<readonly [RegExp, string]> = [
 // plugin. public/Icons and public/StreamingAssets are copied as-is.
 export default defineConfig({
   base: './',
-  plugins: [portalAdapter()],
+  plugins: [portalAdapter(), bakeFrames()],
   publicDir: 'public',
   define: {
     __GK_PORTAL__: JSON.stringify(process.env.GK_PORTAL ?? 'dev-mock'),

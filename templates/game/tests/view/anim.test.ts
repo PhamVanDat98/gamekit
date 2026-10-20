@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Animator, EASES, MOTIONS, Spring, poseAt, sampleKeys, worldMatrices, type Motion, type RigPart } from '../../src/view/anim';
+import { Animator, EASES, MOTIONS, Spring, frameIndex, poseAt, sampleKeys, worldMatrices, type FrameMeta, type Motion, type RigPart } from '../../src/view/anim';
+import { SAMPLE_RIG } from '../../src/view/anim/sample-rig';
 
 describe('anim: eases', () => {
   it('start at 0 and end at 1', () => {
@@ -51,7 +52,7 @@ describe('anim: motions', () => {
     expect(poseAt(loop, 4 / 60).a!.x).toBe(0);
   });
   it('template motions load by name', () => {
-    expect(Object.keys(MOTIONS).sort()).toEqual(['hit', 'hop', 'idle', 'pop-in']);
+    expect(Object.keys(MOTIONS).sort()).toEqual(['attack', 'celebrate', 'hit', 'hop', 'idle', 'pop-in', 'surprise', 'walk']);
   });
 });
 
@@ -98,5 +99,24 @@ describe('anim: rig', () => {
     const arm = m.arm!;
     expect(arm[4]).toBeCloseTo(20, 6);
     expect(arm[5]).toBeCloseTo(0, 6);
+  });
+});
+
+describe('anim: frame-by-frame', () => {
+  const meta: FrameMeta = { name: 'f', fps: 12, loop: false, width: 10, height: 10, anchor: [5, 10], frames: [{ file: 'a.png' }, { file: 'b.png', hold: 3 }, { file: 'c.png' }] };
+  it('holds frames for their ticks and stops on the last one', () => {
+    const at = (tick: number) => frameIndex(meta, tick / 12);
+    expect([0, 1, 2, 3, 4, 5, 99].map(at)).toEqual([0, 1, 1, 1, 2, 2, 2]);
+  });
+  it('loops wrap', () => {
+    expect(frameIndex({ ...meta, loop: true }, 5 / 12)).toBe(0);
+  });
+});
+
+describe('anim: sample rig', () => {
+  it('every part a motion keys exists in the rig, parents first', () => {
+    const parts = new Set(SAMPLE_RIG.map((p) => p.name));
+    for (const m of Object.values(MOTIONS)) for (const track of Object.keys(m.tracks)) expect(parts, `${m.name}: ${track}`).toContain(track.split('.')[0]);
+    expect(() => worldMatrices(SAMPLE_RIG, {})).not.toThrow();
   });
 });

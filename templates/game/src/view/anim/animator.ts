@@ -25,6 +25,11 @@ export class Animator {
     return this.shot?.m.name ?? null;
   }
 
+  /** Frame (in the motion's fps) the one-shot is at, for timing effects to it (flash, shake, dust). */
+  get frame(): number {
+    return this.shot ? this.shot.t * (this.shot.m.fps ?? 60) : 0;
+  }
+
   /** Advance by real seconds (0 while paused). */
   update(dt: number): void {
     if (this.base) this.base.t += dt;

@@ -87,7 +87,7 @@ test('motion: straight paths, lockstep parts, uniform timing and lost volume war
 });
 
 test('motion: skip waives a check only with a reason; structure errors stop the analysis', () => {
-  const m = { name: 'w', role: 'action', skip: { anticipation: 'bị đẩy, không tự chuẩn bị' }, tracks: { 'b.y': keys([0, 0], [20, -100, 'out'], [30, -95]), 'b.stretch': keys([0, 1], [20, 1.1], [30, 1]) } };
+  const m = { name: 'w', role: 'action', skip: { anticipation: 'bị đẩy, không tự chuẩn bị' }, tracks: { 'b.y': keys([0, 0], [20, -100, 'out'], [34, 0]), 'b.stretch': keys([0, 1], [20, 1.1], [30, 1]) } };
   assert.deepEqual(checks(m), { errors: [], warnings: [], waived: ['anticipation'] });
   assert.ok(check('motion', { ...m, skip: { anticipation: '' } }).length);
   assert.ok(check('motion', { ...m, skip: { magic: 'lý do' } }).length);
@@ -109,4 +109,10 @@ test('motion: the chart shows spans, keys and one sparkline per track (y drawn u
   const idle = chartMotion(JSON.parse(fs.readFileSync(path.join(ROOT, 'templates/game/motion/idle.json'), 'utf8')));
   assert.match(idle, /1 cột = 2 khung/);
   assert.match(idle, /eyes\.sy .*0\.10…1$/m);
+});
+
+test('motion: a one-shot that ends off its rest pose warns (it would snap back to idle)', () => {
+  const r = checks({ name: 'r', role: 'action', tracks: { 'b.x': keys([0, 0], [12, -6], [20, 44, 'out', 'action'], [30, 40]), 'b.stretch': keys([0, 1], [12, 0.9], [20, 1.1, 'out'], [30, 1]) } });
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.warnings, ['rest']);
 });

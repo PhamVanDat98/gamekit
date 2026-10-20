@@ -23,6 +23,9 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
   release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)
   motion [file…] [--quiet] [--json]          Chấm motion/*.json theo nguyên lý hoạt hình, in biểu đồ nhịp (timing chart)
+  frames <motion> [--codex] [--check] [--install] [--ref ảnh] [--style "…"]
+                                            Ảnh từng khung từ pose đã xuất (art/frames/<motion>/): prompt từng khung,
+                                            Codex vẽ lại từng khung, kiểm kích thước/nền, cài vào assets/img/anim/
   fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
   check-ownership [--module id]             Module chỉ sửa trong thư mục được giao
   integrate --wave N [--test "cmd"] [--cleanup]   Merge theo phụ thuộc, test sau mỗi lần
@@ -30,7 +33,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'codex', 'check', 'install']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -60,6 +63,7 @@ const COMMANDS = {
   pack: () => import('./pack.mjs').then((m) => m.run),
   'release-check': () => import('./release-check.mjs').then((m) => m.run),
   motion: () => import('./motion.mjs').then((m) => m.run),
+  frames: () => import('./frames.mjs').then((m) => m.run),
   fanout: () => import('./parallel.mjs').then((m) => m.fanout),
   'check-ownership': () => import('./parallel.mjs').then((m) => m.checkOwnership),
   integrate: () => import('./parallel.mjs').then((m) => m.integrate),

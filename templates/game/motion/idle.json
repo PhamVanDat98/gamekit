@@ -3,17 +3,47 @@
   "name": "idle",
   "role": "idle",
   "loop": true,
-  "brief": "Đứng thở: thân phồng nhẹ 3% trong 1 s rồi xẹp (giữ khối), râu lắc chậm hơn thân 10 khung (overlap), chớp mắt một lần mỗi vòng (secondary action). Không bao giờ đứng im hẳn — moving hold.",
+  "brief": "Đứng thở 2 s: thân phồng 3% rồi xẹp (giữ khối), đầu và tay lệch pha thân 4–8 khung (overlap), đuôi đung đưa chậm, tai giật một cái (tai sau trễ 2 khung), chớp mắt một lần. Không bao giờ đứng im hẳn — moving hold.",
   "tracks": {
     "body.stretch": [
       { "f": 0, "v": 1 },
       { "f": 60, "v": 1.03, "ease": "inOut" },
       { "f": 120, "v": 1, "ease": "inOut" }
     ],
-    "antenna.rot": [
+    "head.rot": [
+      { "f": 0, "v": 1 },
+      { "f": 68, "v": -2, "ease": "inOut" },
+      { "f": 120, "v": 1, "ease": "inOut" }
+    ],
+    "armL.rot": [
       { "f": 0, "v": 2 },
-      { "f": 70, "v": -3, "ease": "inOut" },
+      { "f": 66, "v": -2, "ease": "inOut" },
       { "f": 120, "v": 2, "ease": "inOut" }
+    ],
+    "armR.rot": [
+      { "f": 0, "v": -2 },
+      { "f": 64, "v": 3, "ease": "inOut" },
+      { "f": 120, "v": -2, "ease": "inOut" }
+    ],
+    "tail.rot": [
+      { "f": 0, "v": 4 },
+      { "f": 50, "v": -10, "ease": "inOut" },
+      { "f": 100, "v": 10, "ease": "inOut" },
+      { "f": 120, "v": 4, "ease": "inOut" }
+    ],
+    "earR.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 78, "v": 0 },
+      { "f": 81, "v": 12, "ease": "out" },
+      { "f": 90, "v": 0, "ease": "inOut" },
+      { "f": 120, "v": 0 }
+    ],
+    "earL.rot": [
+      { "f": 0, "v": 0 },
+      { "f": 80, "v": 0 },
+      { "f": 83, "v": -10, "ease": "out" },
+      { "f": 92, "v": 0, "ease": "inOut" },
+      { "f": 120, "v": 0 }
     ],
     "eyes.sy": [
       { "f": 0, "v": 1 },

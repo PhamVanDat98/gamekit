@@ -19,7 +19,7 @@ Model tạo ảnh giỏi **một ảnh đẹp**, dở **nhiều ảnh giống h�
    - Cắt từ ảnh toàn thân bằng công cụ tách lớp/xoá nền, rồi vẽ bù phần bị che ở khớp.
    - Vẽ bằng code (SVG/canvas path) khi hình đơn giản: AI viết vector cho hình cartoon đơn giản rất ổn, đổi hình bằng tham số (độ cong miệng, độ mở mắt), sắc nét ở mọi kích thước. Hợp cho UI, vật phẩm, nhân vật dạng khối.
 3. **Pivot = khớp**: đo toạ độ khớp trên từng ảnh (vai trên ảnh tay, cổ trên ảnh đầu, chân trên ảnh thân) → `pivot` của part; vị trí khớp trên ảnh cha → `at`.
-4. **Ghép rig** trong `src/view/anim/lab.ts` (thay `PLACEHOLDER_RIG`): thứ tự phần = cha trước con; `z` cho tay xa (âm) / tay gần (dương).
+4. **Ghép rig** theo mẫu `src/view/anim/sample-rig.ts`, rồi trỏ `RIG` trong `src/view/anim/lab.ts` vào nó: thứ tự phần = cha trước con; `z` cho tay xa (âm) / tay gần (dương).
 5. **Thử khớp**: ở lab, tạm đặt `rot` ±30° cho từng phần và `stretch` 0.7 / 1.3 cho thân, chụp màn hình: khớp có hở? phần có bị cắt? Hở thì vẽ dư thêm hoặc dời pivot.
 
 ## Spec trong `asset-manifest.json`
@@ -35,7 +35,7 @@ Mỗi phần một entry `kind: "anim"`:
 - Provenance: ảnh AI tạo → `generated`; phần tạm → `placeholder` (P5 chặn); người dùng cung cấp → `own`/`licensed`.
 
 ## Khi buộc phải vẽ từng khung
-Biến hình (lửa, khói, nước bắn, nổ, hoá phép) không làm bằng rig được:
+Nhân vật vẽ tay từng khung: xuất pose từ motion rồi để Codex vẽ lại từng khung theo pose — [frames.md](frames.md). Biến hình (lửa, khói, nước bắn, nổ, hoá phép) không có pose để xuất:
 1. Thử procedural trước: particle (vị trí `out`, kích thước co, alpha `in` lúc chết), hình vector biến dạng theo tham số.
 2. Cần ảnh: ít khung (4–8), giữ pose bằng `step` 12 (on twos) — ít khung mà vẫn "vẽ tay". Tạo các khung cùng lúc trong **một ảnh** (một lần sinh, chia lưới) thay vì từng ảnh riêng, rồi cắt; kiểm bằng contact sheet (ghép các khung cạnh nhau và xem chúng có cùng tâm, cùng cỡ).
 3. Ghép sprite sheet theo `frames: { count, width, height, fps }` trong manifest; `validate` kiểm kích thước.
