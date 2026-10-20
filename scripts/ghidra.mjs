@@ -11,7 +11,7 @@ import { requireGameRoot, loadGame, updateGame, nowIso } from './lib/game.mjs';
 import { listZip, readZipEntry } from './lib/unzip.mjs';
 
 const SCRIPTS = path.join(path.dirname(fileURLToPath(import.meta.url)), 'ghidra');
-const ARCHIVE = /\.(apk|xapk|aab|ipa|zip)$/i;
+const ARCHIVE = /\.(apk|xapk|apks|aab|ipa|zip)$/i;
 
 export function launcher(home, platform = process.platform) {
   const f = path.join(home, 'support', platform === 'win32' ? 'analyzeHeadless.bat' : 'analyzeHeadless');
@@ -43,16 +43,28 @@ export async function run(args) {
 
   if (ARCHIVE.test(binary)) {
     // Native code inside an APK/IPA: copy the one entry out (lib/<abi>/libil2cpp.so, Frameworks/UnityFramework…).
+    // XAPK/APKS: native code sits in split APKs inside — "config.arm64_v8a.apk!/lib/arm64-v8a/libil2cpp.so".
+    const native = (list, prefix) => list.filter((e) => /(^|\/)lib\/[^/]+\/[^/]+\.so$|\.framework\/[^/.]+$|GameAssembly\.dll$/.test(e.name)).map((e) => prefix + e.name);
+    const outer = listZip(binary);
+    const inner = (name) => {
+      const e = outer.find((x) => x.name === name);
+      const f = path.join(local, 'bin', 'apk', path.basename(name));
+      fs.mkdirSync(path.dirname(f), { recursive: true });
+      fs.writeFileSync(f, readZipEntry(binary, e, { limit: 2 * 1024 ** 3 }));
+      return f;
+    };
     if (!args.entry) {
-      const natives = listZip(binary).filter((e) => /(^|\/)lib\/[^/]+\/[^/]+\.so$|\.framework\/[^/.]+$|GameAssembly\.dll$/.test(e.name));
-      throw new GkError(`${given} là file nén — chọn file trong đó bằng --entry:\n${natives.map((e) => `  ${e.name}`).join('\n') || '  (không thấy thư viện native)'}`);
+      const natives = [...native(outer, ''), ...outer.filter((e) => /\.apk$/i.test(e.name)).flatMap((e) => native(listZip(inner(e.name)), `${e.name}!/`))];
+      throw new GkError(`${given} là file nén — chọn file trong đó bằng --entry:\n${natives.map((n) => `  ${n}`).join('\n') || '  (không thấy thư viện native)'}`);
     }
-    const entry = listZip(binary).find((e) => e.name === args.entry);
+    const [apk, rest] = String(args.entry).includes('!/') ? String(args.entry).split('!/') : [null, String(args.entry)];
+    const archive = apk ? inner(apk) : binary;
+    const entry = listZip(archive).find((e) => e.name === rest);
     if (!entry) throw new GkError(`${given} không có ${args.entry}`);
     const to = path.join(local, 'bin', path.basename(entry.name));
     if (!args['dry-run']) {
       fs.mkdirSync(path.dirname(to), { recursive: true });
-      fs.writeFileSync(to, readZipEntry(binary, entry, { limit: 2 * 1024 ** 3 }));
+      fs.writeFileSync(to, readZipEntry(archive, entry, { limit: 2 * 1024 ** 3 }));
     }
     binary = to;
   }

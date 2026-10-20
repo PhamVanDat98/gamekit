@@ -8,7 +8,7 @@ export const PHASE_INFO = {
   P2: { name: 'Dựng lại', skills: ['runtime-select', 'module-plan', 'rebuild-game', 'integrate', 'parity-check'] },
   P3: {
     name: 'Chuyển sang web',
-    skills: ['web-relayout'],
+    skills: ['web-relayout', 'asset-spec'],
     human: 'Bạn duyệt bố cục và điều khiển trên web.',
     thirdParty: { name: 'Reskin', skills: ['web-relayout', 'style-direction', 'style-preview', 'asset-spec', 'apply-style', 'replace-graphics', 'replace-audio', 'rename-and-text'], human: 'Bạn chọn style.' },
   },
@@ -16,17 +16,12 @@ export const PHASE_INFO = {
   P5: { name: 'Phát hành', skills: ['package-web-build', 'perf-budget', 'qa-smoke', 'store-assets', 'release-check'], human: 'Bạn playtest bản cuối.' },
 };
 
-// Skills that ship in this version of the plugin. Others are planned (later sub-projects).
+// Skills that ship with the plugin (one folder each in skills/). engine-<engine> resolves per game.
+export const ENGINE_SKILLS = ['unity', 'cocos', 'godot', 'unreal', 'flash', 'construct', 'laya', 'html5', 'other'].map((e) => `engine-${e}`);
 export const AVAILABLE_SKILLS = new Set([
   'using-gamekit',
-  're-notes',
-  'rebuild-game',
-  'parity-check',
-  'module-plan',
-  'integrate',
-  'platform-sdk',
-  'package-web-build',
-  'release-check',
+  ...Object.values(PHASE_INFO).flatMap((p) => [...p.skills, ...(p.thirdParty?.skills ?? [])]).filter((s) => !s.includes('<')),
+  ...ENGINE_SKILLS,
 ]);
 
 /** Phase name, skills and the user's decision for this game's ownership. */

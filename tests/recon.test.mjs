@@ -79,3 +79,22 @@ test('recon: Unity Mono desktop build, Unity project, Cocos web build, Godot pck
   write(dir, 'nothing/readme.txt', '');
   assert.equal(recon(path.join(dir, 'nothing')).engine, 'unknown');
 });
+
+test('recon: Flutter points at libapp.so, Construct/Defold projects, hashed Cocos web build', () => {
+  const dir = tmpDir();
+  write(dir, 'fl/lib/arm64-v8a/libflutter.so', 'x');
+  write(dir, 'fl/lib/arm64-v8a/libapp.so', 'x');
+  write(dir, 'fl/classes.dex', 'x');
+  let r = recon(path.join(dir, 'fl'));
+  assert.equal(r.name, 'Flutter (Flame?)');
+  assert.deepEqual(r.logic, ['lib/arm64-v8a/libapp.so']);
+  write(dir, 'c3/game.c3p', 'x');
+  r = recon(path.join(dir, 'c3'));
+  assert.deepEqual([r.engine, r.source], ['construct', true]);
+  write(dir, 'df/game.project', '[project]');
+  assert.equal(recon(path.join(dir, 'df')).name, 'Defold (project)');
+  write(dir, 'cw/index.html', '');
+  write(dir, 'cw/cocos2d-js-min.1a2b3c.js', 'Cocos Creator v2.4.8');
+  r = recon(path.join(dir, 'cw'));
+  assert.deepEqual([r.engine, r.version], ['cocos', '2.4.8']);
+});

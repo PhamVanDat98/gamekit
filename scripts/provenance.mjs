@@ -25,7 +25,7 @@ export async function run(args) {
       if (!exists(abs)) throw new GkError(`Không có ${p}`);
       const rel = toPosix(path.relative(root, abs));
       const list = walk(abs);
-      if (list.length) files.push(...list.map((f) => `${rel}/${f}`));
+      if (list.length) files.push(...list.filter((f) => path.basename(f) !== '.gitkeep').map((f) => `${rel}/${f}`));
       else files.push(rel);
     }
     labelFiles(root, files, { label: args.label, source: args.source ?? null, license: args.license ?? null, note: args.note ?? null });

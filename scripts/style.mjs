@@ -32,7 +32,8 @@ function choose(root, id) {
   if (!id) throw new GkError('Dùng: gamekit style choose <id>');
   const opt = loadStyleOptions(root).find((o) => o.data?.id === id);
   if (!opt) throw new GkError(`Không có style/options/${id}.json`);
-  const { errors, warnings } = styleProblems(root, opt.data, opt.file);
+  // Checked as the chosen style: theme.ts imports the font files, so a missing one breaks the build.
+  const { errors, warnings } = styleProblems(root, opt.data, 'style/style.json');
   for (const w of warnings) log.warn(w);
   if (errors.length) throw new GkError(errors.join('\n'));
   const { $schema: _, ...data } = opt.data;

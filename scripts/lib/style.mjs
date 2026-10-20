@@ -102,6 +102,6 @@ export function themeSource(style) {
     .replace(/export const THEME = \{[\s\S]*?\} as const;/, theme)
     .replace(/const FONT_FILES: [^\n]*= \[\];/, fontFiles);
   if (replaced === tpl) throw new GkError('templates/game/src/view/theme.ts không còn đúng dạng để sinh theme');
-  const header = `// Sinh từ style/style.json (${style.id}) bằng \`gamekit style choose\` — sửa style ở đó rồi chạy lại.\n`;
+  const header = `// Sinh bằng \`gamekit style choose ${style.id}\` — sửa style/options/${style.id}.json rồi chạy lại lệnh đó.\n`;
   return header + (imports.length ? `${imports.join('\n')}\n\n` : '') + replaced;
 }

@@ -20,7 +20,8 @@ const IMAGE_MODEL = () => process.env.GAMEKIT_IMAGE_MODEL ?? 'gpt-image-1.5';
 // gpt-image-2 only makes opaque images; sprites and UI with alpha need 1.5 (or gpt-image-1).
 const NO_ALPHA_MODEL = /^gpt-image-2/;
 const SPEECH_MODEL = () => process.env.GAMEKIT_SPEECH_MODEL ?? 'gpt-4o-mini-tts';
-const SPEECH_FORMAT = { mp3: 'mp3', ogg: 'opus', opus: 'opus', aac: 'aac', m4a: 'aac', flac: 'flac', wav: 'wav' };
+// File extension → API response_format. Only formats the web build ships (vite.config.ts audio kinds).
+const SPEECH_FORMAT = { mp3: 'mp3', ogg: 'opus', aac: 'aac', wav: 'wav' };
 const ASK_ABOVE = 5; // more API calls than this need --yes
 
 const KIND_TEXT = {
@@ -156,7 +157,7 @@ async function voice(ctx, args) {
   for (const a of list) {
     if (!a.voice) throw new GkError(`${a.id}: không phải lời thoại (cần voice: true, kind audio, textKey)`);
     const ext = path.extname(a.path).slice(1).toLowerCase();
-    if (!SPEECH_FORMAT[ext]) throw new GkError(`${a.id}: đuôi .${ext} không hỗ trợ — dùng .mp3, .ogg, .aac, .flac hoặc .wav`);
+    if (!SPEECH_FORMAT[ext]) throw new GkError(`${a.id}: đuôi .${ext} không hỗ trợ — dùng .mp3, .ogg, .aac hoặc .wav`);
     for (const t of targets(ctx, a, only)) if (force || !exists(path.join(ctx.root, t.path))) jobs.push({ a, t, format: SPEECH_FORMAT[ext] });
   }
   if (!jobs.length) {

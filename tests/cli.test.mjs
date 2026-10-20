@@ -711,6 +711,14 @@ mkdir -p "$last4/c" && printf 'address\tname\n001\tPlayer$$Update\n' > "$last4/f
   r = gk(dir, 'ghidra', '../g.apk', '--entry', 'lib/arm64-v8a/libil2cpp.so', '--il2cpp', '../script.json', '--functions', 'Player', '--ghidra-home', home);
   assert.equal(r.code, 0, r.out);
   assert.match(r.out, /1 hàm/);
+  // XAPK: the library is inside a split APK.
+  fs.mkdirSync(path.join(parent, 'x'));
+  fs.copyFileSync(path.join(parent, 'g.apk'), path.join(parent, 'x', 'config.arm64_v8a.apk'));
+  zipDir(path.join(parent, 'x'), path.join(parent, 'g.xapk'));
+  r = gk(dir, 'ghidra', '../g.xapk');
+  assert.match(r.out, /config\.arm64_v8a\.apk!\/lib\/arm64-v8a\/libil2cpp\.so/);
+  r = gk(dir, 'ghidra', '../g.xapk', '--entry', 'config.arm64_v8a.apk!/lib/arm64-v8a/libil2cpp.so', '--dry-run');
+  assert.match(r.out, /-process libil2cpp\.so -noanalysis/);
   r = gk(dir, 'ghidra', '.gamekit/ghidra/bin/libil2cpp.so', '--ghidra-home', home);
   assert.equal(r.code, 0, r.out);
   const calls = read(parent, 'calls.txt').trim().split('\n');

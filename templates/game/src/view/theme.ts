@@ -1,6 +1,6 @@
 /**
  * Style tokens for view/: colours, fonts, shapes. `gamekit style choose <id>` rewrites this file from
- * style/style.json — change the style there. CSS reads the tokens as --gk-* variables.
+ * style/options/<id>.json — change the style there. CSS reads the tokens as --gk-* variables.
  */
 export const THEME = {
   palette: { bg: '#14161a', surface: '#1c1f25', primary: '#4fb3ff', secondary: '#ff6b5a', text: '#f2f2f2', muted: '#9aa0a6', onPrimary: '#0d0f12' },

@@ -230,6 +230,9 @@ function validateLanguages(root, game, pr) {
       else if (placeholders(v) !== placeholders(en[k])) pr.error(where, `${k}: tham số {…} khác en.json`);
     }
     if (c === 'en') continue;
+    // Intl.PluralRules can always answer "other": without it, translate() falls back to the key.
+    for (const base of new Set(Object.keys(dict).map(pluralBase).filter((b) => b && pluralParams.has(b))))
+      if (!Object.hasOwn(dict, `${base}.other`)) pr.error(where, `${base}: có dạng số nhiều nhưng thiếu ${base}.other (pack sẽ lấy bản en)`);
     const hasBase = new Set(Object.keys(dict).map(pluralBase).filter(Boolean));
     const miss = Object.keys(en).filter((k) => k !== '_meta' && !Object.hasOwn(dict, k) && !(pluralParams.has(pluralBase(k)) && hasBase.has(pluralBase(k))));
     if (miss.length) pr.warn(where, `thiếu ${miss.length} key, pack sẽ lấy từ en: ${miss.slice(0, 20).join(', ')}${miss.length > 20 ? '…' : ''}`);
@@ -455,7 +458,7 @@ function validateStyles(root, pr) {
   for (const w of warnings) pr.warn('style', w);
   const theme = path.join(root, 'src', 'view', 'theme.ts');
   if (!errors.length && exists(theme) && fs.readFileSync(theme, 'utf8') !== themeSource(chosen))
-    pr.warn('src/view/theme.ts', `khác style/style.json — chạy gamekit style choose ${chosen.id} (hoặc sửa style.json cho khớp)`);
+    pr.warn('src/view/theme.ts', `khác style/style.json — sửa style/options/${chosen.id}.json rồi chạy gamekit style choose ${chosen.id}`);
 }
 
 export async function run(args) {

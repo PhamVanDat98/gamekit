@@ -13,7 +13,7 @@ checklist:
 settings:
   gameCode:
     label: Mã game
-    description: Mã game do bên vận hành portal cấp. Dùng làm key localStorage `azgames.<gameCode>` (tiến trình, ngôn ngữ đã chọn).
+    description: Mã game do bên vận hành portal cấp. Dùng trong key localStorage `azgames.<gameCode>.lang` (ngôn ngữ người chơi đã chọn).
     example: g205
     required: true
     pattern: "^[a-z0-9]+$"

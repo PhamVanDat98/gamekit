@@ -62,9 +62,9 @@ export function scan(root, from) {
         if (size.alpha !== null) e.alpha = size.alpha;
       }
     }
-    e.brief = maybeText(rel)
-      ? 'TODO: mô tả. Tên file gợi ý có chữ trong ảnh — có thì text: true, textKey, path trong assets/i18n/en/'
-      : 'TODO: mô tả';
+    // Remakes need a brief for every new asset; own assets are the originals, only a possible text image needs a look.
+    if (maybeText(rel)) e.brief = 'TODO: tên file gợi ý có chữ trong ảnh — có thì text: true, textKey, path trong assets/i18n/en/ (mỗi ngôn ngữ một bản)';
+    else if (from === 'reference') e.brief = 'TODO: mô tả';
     return e;
   });
 }
@@ -91,7 +91,7 @@ export async function run(args) {
   const byKind = {};
   for (const e of fresh) byKind[e.kind] = (byKind[e.kind] ?? 0) + 1;
   log.info(`${from}/: ${fresh.length} asset chưa có trong asset-manifest.json${fresh.length ? ` (${Object.entries(byKind).map(([k, v]) => `${k} ${v}`).join(', ')})` : ''}`);
-  const texty = fresh.filter((e) => e.brief.includes('có chữ'));
+  const texty = fresh.filter((e) => e.brief?.includes('có chữ'));
   if (texty.length) log.warn(`${texty.length} file có tên gợi ý chữ trong ảnh — mở xem: ${texty.slice(0, 10).map((e) => e.ref ?? e.path).join(', ')}${texty.length > 10 ? '…' : ''}`);
   if (!args.write) {
     for (const e of fresh.slice(0, 30)) log.info(`  ${e.kind.padEnd(10)} ${e.width ? `${e.width}×${e.height}`.padEnd(10) : ''.padEnd(10)} ${e.ref ?? e.path}`);

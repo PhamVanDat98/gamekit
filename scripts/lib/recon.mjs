@@ -11,17 +11,20 @@ const RULES = [
   { engine: 'unreal', name: 'Unreal (project)', source: true, any: [/\.uproject$/] },
   { engine: 'unreal', name: 'Unreal', any: [/(^|\/)lib\/[^/]+\/lib(UE4|Unreal)\.so$/, /(^|\/)Content\/Paks\/[^/]+\.(pak|utoc)$/] },
   { engine: 'cocos', name: 'Cocos Creator (project)', source: true, all: [/(^|\/)assets\//, /(^|\/)(project\.json|settings\/project\.json|creator\.d\.ts)$/] },
-  { engine: 'cocos', name: 'Cocos Creator / cocos2d-x JS', any: [/(^|\/)lib\/[^/]+\/libcocos2djs\.so$/, /(^|\/)lib\/[^/]+\/libcocos\.so$/, /(^|\/)cocos2d-js(-min)?\.js$/, /(^|\/)cocos-js\/cc\.js$/, /(^|\/)src\/settings(\.[0-9a-f]+)?\.js$/, /\.jsc$/] },
+  { engine: 'cocos', name: 'Cocos Creator / cocos2d-x JS', any: [/(^|\/)lib\/[^/]+\/libcocos2djs\.so$/, /(^|\/)lib\/[^/]+\/libcocos\.so$/, /(^|\/)cocos2d-js(-min)?(\.[0-9a-f]+)?\.js$/, /(^|\/)cocos-js\/cc\.js$/, /(^|\/)src\/settings(\.[0-9a-f]+)?\.(js|json)$/, /\.jsc$/] },
   { engine: 'cocos', name: 'cocos2d-x Lua', any: [/(^|\/)lib\/[^/]+\/libcocos2dlua\.so$/] },
   { engine: 'cocos', name: 'cocos2d-x C++', any: [/(^|\/)lib\/[^/]+\/libcocos2dcpp\.so$/, /(^|\/)lib\/[^/]+\/libMyGame\.so$/] },
   { engine: 'flash', name: 'Adobe AIR', any: [/(^|\/)META-INF\/AIR\//, /(^|\/)lib\/[^/]+\/libCore\.so$/] },
   { engine: 'flash', name: 'Flash', any: [/\.swf$/] },
+  { engine: 'construct', name: 'Construct (project)', source: true, any: [/\.(c3p|capx)$/] },
   { engine: 'construct', name: 'Construct 3', any: [/(^|\/)c3runtime\.js$/, /(^|\/)scripts\/c3main\.js$/] },
   { engine: 'construct', name: 'Construct 2', any: [/(^|\/)c2runtime\.js$/] },
   { engine: 'laya', name: 'LayaAir', any: [/(^|\/)laya\.core\.js$/, /(^|\/)libs\/laya\.[^/]+\.js$/, /(^|\/)lib\/[^/]+\/liblaya\.so$/] },
   { engine: 'other', name: 'GameMaker', any: [/(^|\/)data\.win$/, /(^|\/)game\.(unx|ios|droid)$/, /(^|\/)lib\/[^/]+\/libyoyo\.so$/] },
+  { engine: 'other', name: 'Defold (project)', source: true, any: [/(^|\/)game\.project$/] },
   { engine: 'other', name: 'Defold', any: [/(^|\/)game\.(arcd|projectc)$/, /(^|\/)lib\/[^/]+\/libdmengine\.so$/] },
   { engine: 'other', name: 'Flutter (Flame?)', any: [/(^|\/)lib\/[^/]+\/libflutter\.so$/] },
+  { engine: 'other', name: 'libGDX', any: [/(^|\/)lib\/[^/]+\/libgdx\.so$/] },
   { engine: 'html5', name: 'RPG Maker MV/MZ', any: [/(^|\/)js\/(rpg|rmmz)_core\.js$/] },
   { engine: 'html5', name: 'HTML5', any: [/(^|\/)(assets\/www\/|www\/)?index\.html$/] },
 ];
@@ -40,7 +43,7 @@ export const kindOf = (p) => KIND.find(([, re]) => re.test(p))?.[0] ?? 'other';
 const VERSION_PROBES = [
   // Unity serialized files / UnityFS bundles carry the editor version in their header.
   { engine: 'unity', files: [/(^|\/)ProjectSettings\/ProjectVersion\.txt$/, /globalgamemanagers$/, /data\.unity3d$/, /(^|\/)(mainData|level0|unity default resources)$/, /\.(data|data\.unityweb)$/], re: /m_EditorVersion:\s*(\S+)|\b((?:20\d\d|6000|5|4)\.\d+\.\d+[abfp]\d+)\b/ },
-  { engine: 'cocos', files: [/cocos2d-js(-min)?\.js$/, /cocos-js\/cc\.js$/, /(^|\/)main\.js$/], re: /(?:Cocos ?Creator|cocos2d-x|CocosCreator)[ -]v?(\d+\.\d+(?:\.\d+)?)/i },
+  { engine: 'cocos', files: [/cocos2d-js(-min)?(\.[0-9a-f]+)?\.js$/, /cocos-js\/cc\.js$/, /(^|\/)main\.js$/], re: /(?:Cocos ?Creator|cocos2d-x|CocosCreator)[ -]v?(\d+\.\d+(?:\.\d+)?)/i },
   { engine: 'godot', files: [/(^|\/)project\.godot$/], re: /config\/features=PackedStringArray\("(\d+\.\d+)/ },
   { engine: 'unreal', files: [/\.uproject$/], re: /"EngineAssociation"\s*:\s*"([^"]+)"/ },
   { engine: 'laya', files: [/laya\.core\.js$/], re: /\bversion\s*[=:]\s*["'](\d+\.\d+\.\d+)/ },
@@ -133,7 +136,7 @@ function explain(r, paths) {
       r.tools = ['Unity Editor (mở project, đọc thẳng C#)'];
       return;
     }
-    const il2cpp = find(/(libil2cpp\.so|GameAssembly\.(dll|dylib)|global-metadata\.dat)$/);
+    const il2cpp = find(/(libil2cpp\.so|GameAssembly\.(dll|dylib)|UnityFramework\.framework\/UnityFramework|global-metadata\.dat)$/);
     const mono = find(/(^|\/)Managed\/Assembly-CSharp\.dll$/);
     const wasm = find(/\.wasm(\.gz|\.br|\.unityweb)?$/);
     r.backend = il2cpp.length ? 'IL2CPP' : mono.length ? 'Mono' : wasm.length ? 'IL2CPP (WebGL)' : null;
@@ -149,7 +152,7 @@ function explain(r, paths) {
     r.logic = find(/(\.jsc|\.luac?|(^|\/)(main|project|index)(\.[0-9a-f]+)?\.js|lib\/[^/]+\/libcocos2d(cpp|lua|js)\.so|libMyGame\.so)$/);
     r.data = find(/(^|\/)(res|assets)\/.*\.(json|plist|atlas|png)$/);
     r.tools = paths.some((p) => /\.(jsc|luac)$/.test(p))
-      ? ['Script đã mã hoá (.jsc/.luac, thường XXTEA): tìm key trong lib*.so (strings/Ghidra), giải mã rồi đọc JS/Lua', 'Ghidra cho lib*.so']
+      ? ['Script đã mã hoá (.jsc/.luac, thường XXTEA). Game của bạn: lấy key từ project gốc, hoặc tìm trong lib*.so (strings, gamekit ghidra) rồi giải mã. Làm lại game người khác: không phá mã hoá — đo hành vi, đọc dữ liệu không mã hoá']
       : ['Đọc bundle JS (beautify, tách module theo uuid/require)', 'Source map nếu có'];
     return;
   }
@@ -182,7 +185,18 @@ function explain(r, paths) {
     r.tools = ['UndertaleModTool (data.win: code GML, sprite, âm thanh)'];
     return;
   }
-  if (r.name === 'Defold') {
+  if (r.name.startsWith('Flutter')) {
+    r.logic = find(/(^|\/)lib\/[^/]+\/libapp\.so$/);
+    r.data = find(/flutter_assets\//);
+    r.tools = ['libapp.so là Dart AOT: Blutter / reFlutter (khó; cân nhắc đo từ video)', 'flutter_assets/ chứa asset, JSON'];
+    return;
+  }
+  if (r.name === 'libGDX') {
+    r.logic = find(/classes\d*\.dex$/);
+    r.tools = ['jadx (Java/Kotlin, gói com.badlogic.gdx là engine)'];
+    return;
+  }
+  if (r.name.startsWith('Defold')) {
     r.logic = find(/game\.(arcd|projectc)$/);
     r.tools = ['Giải game.arcd (archive Defold), script Lua bên trong'];
     return;
