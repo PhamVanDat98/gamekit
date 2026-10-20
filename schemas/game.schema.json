@@ -252,7 +252,7 @@
         "null"
       ],
       "additionalProperties": true,
-      "description": "Đường dẫn project Ghidra và trạng thái phân tích (dự án con 4)"
+      "description": "Project Ghidra và các file đã phân tích (gamekit ghidra ghi)"
     },
     "release": {
       "type": "object",

@@ -8,6 +8,9 @@
     { "label": "Dev server", "type": "shell", "command": "npm run dev", "isBackground": true, "problemMatcher": [] },
     { "label": "GameKit: pack (mọi portal)", "type": "shell", "command": "npm run --silent gk -- pack --all", "problemMatcher": [], "group": { "kind": "build", "isDefault": true } },
     { "label": "GameKit: release-check", "type": "shell", "command": "npm run --silent gk -- release-check", "problemMatcher": [] },
+    { "label": "GameKit: smoke test bản build", "type": "shell", "command": "npm run --silent gk -- smoke", "problemMatcher": [] },
+    { "label": "GameKit: trang duyệt asset", "type": "shell", "command": "npm run --silent gk -- review", "problemMatcher": [] },
+    { "label": "GameKit: so sánh style", "type": "shell", "command": "npm run --silent gk -- style preview", "problemMatcher": [] },
     { "label": "GameKit: integrate (hỏi đợt)", "type": "shell", "command": "npm run --silent gk -- integrate --wave ${input:wave}", "problemMatcher": [] }
   ],
   "inputs": [{ "id": "wave", "type": "promptString", "description": "Đợt số", "default": "1" }]

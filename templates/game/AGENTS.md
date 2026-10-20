@@ -33,9 +33,12 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 | Parity với game gốc | `npm run gk -- parity` (nghĩa vụ trong `spec/obligations.yaml`, test gắn thẻ `[id:case]`) |
 | Kiểm tra cổng, sang pha sau | `npm run gk -- gate` · `npm run gk -- gate --advance` |
 | Dựng song song | `npm run gk -- fanout --wave N` → subagent làm theo `.gamekit/local/BRIEF.md` → `npm run gk -- integrate --wave N` |
+| Engine game gốc, kiểm kê | `npm run gk -- recon <đường dẫn> --write` · native: `npm run gk -- ghidra <file> [--il2cpp script.json]` |
+| Asset: spec, style, sinh, duyệt | `npm run gk -- assets scan --write` · `style preview` / `style choose <id>` · `gen image` (`--dry-run`) · `review` |
 | Thông tin portal còn thiếu | `npm run gk -- config --portal <id>` |
 | Đóng gói, kiểm tra phát hành | `npm run gk -- pack --all` → `builds/<v>/<portal>/` (`--zip`, `--compress`, `--version`) · `npm run gk -- release-check` |
 | Chơi thử bản build | `npm run preview` → `http://localhost:4173/<v>/dev-mock/<v>/index.html` |
+| Smoke test, trang store | `npm run gk -- smoke` (cần Playwright) · `npm run gk -- store` |
 
 ## Nếu bạn là subagent trong một worktree
 Đọc `.gamekit/local/BRIEF.md`. Chỉ sửa trong thư mục được giao; cần đổi contract/params/package.json thì dừng và báo lại. Trước khi xong: test xanh, `npm run gk -- check-ownership` đạt, commit trên nhánh của module.

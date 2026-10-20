@@ -8,9 +8,10 @@ GameKit là plugin cho Claude Code giúp **chuyển game di động (Unity, Coco
 
 | Đã chạy | Chưa có |
 | --- | --- |
-| Tạo project game web, theo dõi 6 pha, chấm cổng | Hướng dẫn riêng cho AI ở P0 (nhận diện, đánh giá), P1 (phân tích game gốc), P3 (chuyển sang web) — AI tự làm theo checklist, chất lượng chưa đều |
-| Hướng dẫn cho AI ở P2 (dựng lại, test đối chiếu với game gốc), P4 (SDK portal), P5 (đóng gói) | Quảng cáo, leaderboard thật trên azgames |
-| Đóng gói cho azgames và bản chạy thử ở máy (`dev-mock`), kiểm tra trước khi phát hành | Game 3D: chưa thử với game thật |
+| Tạo project game web, theo dõi 6 pha, chấm cổng; hướng dẫn cho AI ở mọi bước P0–P5 | Quảng cáo, leaderboard thật trên azgames; SDK các portal khác (chờ tài liệu) |
+| Nhận diện engine từ thư mục hoặc APK/IPA, Ghidra headless cho code native | Hướng dẫn engine mới viết, chưa thử với game thật của từng engine |
+| Style, trang so sánh style, trang duyệt asset, sinh ảnh/lời thoại qua OpenAI (cần `OPENAI_API_KEY`) | Hiệu ứng âm thanh, nhạc: chưa có model sinh — dùng nguồn có giấy phép |
+| Đóng gói cho azgames và `dev-mock`, smoke test bằng Chromium, ảnh store | Kích thước ảnh store của azgames: chưa có yêu cầu chính thức, đang dùng bộ chung · Game 3D: chưa thử với game thật |
 
 ## Cần có
 
@@ -69,7 +70,12 @@ Lúc nào cũng có thể gõ `/gamekit:status` (đang ở đâu, còn gì) ho�
 npm run dev                          # chơi thử trong trình duyệt, có portal giả
 npm run gk -- pack --all --zip       # đóng gói vào builds/<số phiên bản>/
 npm run gk -- release-check          # kiểm tra trước khi phát hành
+npm run gk -- smoke                  # chạy gói trong Chromium: vào game, FPS, lỗi, mọi ngôn ngữ
+npm run gk -- store                  # ảnh và mô tả trang game cho từng portal
 ```
+
+`smoke` cần Playwright, cài một lần trong thư mục game: `npm i -D playwright && npx playwright install chromium`.
+Sinh ảnh bằng `gen` cần biến môi trường `OPENAI_API_KEY` (tính phí theo OpenAI). Không có key: `npm run gk -- gen prompt` in prompt để dùng ở công cụ khác, rồi `gen import` đưa ảnh vào.
 
 Gói `azgames` có khóa tên miền, chỉ chạy trên azgames.io. Muốn chạy thử gói ở máy, mở gói `dev-mock` nằm cùng thư mục: `npm run preview` rồi vào địa chỉ nó in ra. Không có mã game và token azgames thì vẫn thử được hết, chỉ không đóng gói được cho azgames.
 

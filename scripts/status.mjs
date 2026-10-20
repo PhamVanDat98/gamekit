@@ -31,7 +31,9 @@ export function summarize(root) {
   }
   const gateFile = path.join(root, 'gates', `${phase}.md`);
   const pending = exists(gateFile) ? gateItemsFor(game, fs.readFileSync(gateFile, 'utf8')).filter((i) => !i.auto && !i.checked) : [];
-  const skills = info.skills.map((s) => s.replace('<engine>', game.source?.engine ?? 'unknown'));
+  // engine-<engine>: the engine skill once recon knows the engine; until then, recon again.
+  const engine = game.source?.engine ?? 'unknown';
+  const skills = [...new Set(info.skills.map((s) => (s === 'engine-<engine>' ? (engine === 'unknown' ? 'game-recon' : `engine-${engine}`) : s)))];
   const missing = [];
   for (const p of game.portals ?? []) {
     try {

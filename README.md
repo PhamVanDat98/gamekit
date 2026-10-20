@@ -2,7 +2,7 @@
 
 Plugin skill + script cho dây chuyền **port game từ engine bất kỳ sang web game JS/TS, reskin và phát hành lên portal**. Dùng được trên Claude Code (plugin) và Codex (skill + AGENTS.md).
 
-Bản này là **dự án con 1 — khung plugin**: trạng thái `game.yaml`, pipeline 6 pha có cổng, template game, interface platform + `dev-mock`, script validate / provenance / pack / release-check, dựng song song bằng worktree (fanout / integrate / check-ownership), tích hợp IDE.
+Gồm: trạng thái `game.yaml`, pipeline 6 pha có cổng và skill cho từng bước, template game, interface platform + `dev-mock`, nhận diện engine và Ghidra headless, pipeline style + trang so sánh/duyệt, sinh ảnh và lời thoại qua OpenAI, đóng gói portal, smoke test bằng Chromium, ảnh và mô tả store, dựng song song bằng worktree, tích hợp IDE.
 
 **Game của ai.** Mặc định GameKit coi game là **của bạn** (`source.ownership: own`): giữ nguyên hình, âm thanh, tên; asset gốc gắn nhãn `own` và được phát hành; P3 là chuyển sang web (điều khiển, bố cục, nén asset). Làm lại game của người khác thì `init … --third-party`: asset gốc chỉ là tư liệu, bắt buộc reskin, chặn tên gốc. Mục cổng chỉ áp cho một loại game ghi `{only: own}` / `{only: third-party}`.
 
@@ -50,11 +50,19 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | `init <tên>` | Tạo game từ `templates/game`, git init, cài hook, cài dependency. Hỏi thông tin (TTY) hoặc `--set k=v`; `--questions --json` in câu hỏi cho agent; `--third-party` khi làm lại game người khác |
 | `config [--portal p] [--set k=v]` | Điền thông tin portal còn thiếu hoặc thêm portal (chép checklist vào `gates/P4.md`) |
 | `status` / `next` | Pha, thời gian ở pha (cảnh báo vượt dự kiến), việc còn mở, skill tiếp theo |
+| `recon [đường dẫn] [--write]` | Nhận diện engine, version, backend (Mono/IL2CPP…) từ thư mục hoặc apk/xapk/ipa/zip; logic và dữ liệu nằm ở đâu, công cụ nên dùng, kiểm kê. `--write`: `notes/recon.md` + `source.*` trong game.yaml |
+| `ghidra <file> [--entry …] [--il2cpp script.json] [--functions regex]` | Ghidra headless (`GHIDRA_HOME`): phân tích một lần, xuất danh sách hàm, chuỗi, decompile C vào `decompiled/ghidra/` (gitignored); đặt tên hàm IL2CPP từ Il2CppDumper |
+| `assets scan [--from reference\|assets] [--write]` | Nháp `asset-manifest.json` từ file có sẵn: kích thước, alpha, loại, gợi ý ảnh có chữ |
+| `style list\|choose <id>\|preview` | Style cho reskin: `style/options/<id>.json` → `style/style.json` + `src/view/theme.ts`; trang so sánh UI kit với chữ thật mọi ngôn ngữ |
+| `review [--apply review.json]` | Trang duyệt asset: spec, bản gốc, nhãn, mọi ngôn ngữ; kết quả vào `asset-manifest.json` và `notes/review.md` |
+| `gen image\|voice\|prompt\|import` | Sinh ảnh (OpenAI `gpt-image-1.5`) và lời thoại theo spec; ảnh có chữ mỗi ngôn ngữ một bản; `prompt` cho Codex/công cụ khác, `import` đưa file vào và khớp spec |
 | `gate [--advance]` | Chấm `gates/<pha>.md`: mục `{auto: …}` chạy script, mục `(bạn)` chỉ người dùng tick |
 | `validate [--stage Px]` | Schema `game.yaml`, `params/*.json` (mọi giá trị có `source`; `confidence` = observed/derived/inferred, inferred cần `tolerance` từ P2), `spec/obligations.yaml`, `spec/oracles/*.json`, provenance, `module-plan.yaml`, `asset-manifest.json` |
 | `parity [--report file.json]` | Chạy vitest, đóng từng nghĩa vụ trong `spec/obligations.yaml` bằng test gắn thẻ `[id:case]`. Test đỏ, skip/todo, thiếu case hay thẻ lạ đều tính là chưa đạt |
 | `provenance add <file…> --label …` | Nhãn `reference / generated / own / licensed / placeholder` |
 | `pack [--portal] [--all] [--version V] [--compress] [--zip]` | `builds/<YYMMDDNN>/<portal>/{index.html, preview.html, version.txt, <v>/…}` + `builds/<v>/manifest.json` (+ zip) |
+| `smoke [--version V] [--portal p] [--quick]` | Chạy gói build trong Chromium (Playwright): thời gian vào game, FPS máy tính và điện thoại chậm, lỗi console, màn trắng, Settings, mọi ngôn ngữ; so với `budget` |
+| `store [--portal p]` | Ảnh trang game cho từng portal (từ `store/source/` hoặc ảnh smoke) + kiểm `store/listing.yaml` |
 | `release-check [--version V] [--portal p]` | Mặc định bản mới nhất. Kiểm bố cục az-v1, footer bản quyền, chặn asset reference/placeholder, tên game gốc, link ngoài, đường dẫn tuyệt đối, vượt ngân sách tải |
 | `fanout --wave N` | Mỗi module một worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>` + `BRIEF.md` |
 | `check-ownership` | Module chỉ sửa trong thư mục được giao, không đụng vùng shared |
@@ -67,10 +75,10 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 .claude-plugin/   plugin.json, marketplace.json
 hooks/            SessionStart → using-gamekit + gamekit status
 commands/         /gamekit:status, /gamekit:next
-skills/           using-gamekit, rebuild-game, module-plan, integrate, platform-sdk, package-web-build, release-check
+skills/           một skill cho mỗi bước của pipeline (P0 game-recon … P5 store-assets), engine-<engine> cho từng engine
 portals/          vỏ portal dùng chung: azgames, dev-mock (portal.yaml, kit.mjs, shell.html, loader.entry.js, Icons/), shared/
-scripts/          CLI gamekit.mjs + lệnh; lib/
-schemas/          game, params, provenance, module-plan, asset-manifest (JSON Schema)
+scripts/          CLI gamekit.mjs + lệnh; lib/ (PNG, zip, recon, style, store, OpenAI…); ghidra/GameKitExport.java
+schemas/          game, params, provenance, module-plan, asset-manifest, style, store-listing (JSON Schema)
 templates/game/   Vite + TS: core/ (deterministic), view/, platform/ (interface, PauseBus, dev-mock), contracts/, tests, gates, .vscode, AGENTS.md
 tests/            node --test
 ```
@@ -89,11 +97,13 @@ Game tạo từ template trước bố cục az-v1 build ra `index.html` + `Buil
 2. `package.json`: thêm `esbuild`, `javascript-obfuscator` vào `devDependencies`; script `"preview": "vite preview --outDir builds"`. Rồi `npm install`.
 3. `src/main.ts`.
 4. `src/platform/`: `index.ts`, `types.ts`, `create-platform.ts`, `gm-globals.d.ts`, `dev-loader.ts`, `adapters/azgames.ts`, `web-guard.ts`.
-5. `src/view/`: `i18n.ts`, `settings.ts`, `style.css`, `renderer.ts`, `input-dom.ts` (popup Settings phải giữ footer `gk-settings-footer`).
+5. `src/view/`: `i18n.ts`, `settings.ts`, `style.css`, `renderer.ts`, `input-dom.ts`, `theme.ts` (popup Settings phải giữ footer `gk-settings-footer`). `main.ts` gọi `applyTheme()`.
 6. `Language/en.json` (chuỗi của game đưa vào đây, gọi bằng `t()`). Ảnh có chữ: `assets/i18n/<mã>/`, gọi bằng `tAsset()` (trong `i18n.ts`). Chép thêm `eslint.config.js` để lint chặn chữ viết cứng trong `src/view/`.
 7. `public/Icons/web.png`, `public/Icons/loading.webp`, và hai mục tương ứng trong `provenance.json` (thay bằng icon thật ở P3).
 8. `.gitignore`: `builds/` thay cho `dist/` (cũng sửa `ignores` trong `eslint.config.js`, `search.exclude` trong `.vscode/settings.json`). `index.html` gốc: favicon `./Icons/web.png`.
 9. Xoá `public/TemplateData/`; dữ liệu tĩnh để trong `public/StreamingAssets/`.
+
+10. `gates/P3.md`, `gates/P5.md` (mục style, duyệt asset, `{auto: smoke}`, `{auto: store}`), `.vscode/` (schema style, store, task mới).
 
 Sau đó: `npm run gk -- config` (điền thông tin portal: gameCode, signed…), `npm run gk -- validate`, `npm test`, `npm run typecheck`, rồi `npm run gk -- pack --all`.
 
@@ -101,14 +111,14 @@ Sau đó: `npm run gk -- config` (điền thông tin portal: gameCode, signed…
 
 ## Lộ trình
 
-1. ✅ Khung plugin (bản này)
-2. Adapter SDK thật: gmsdkv2, H5 Games Ads, CrazyGames, GameDistribution, Weegoo — chờ dữ liệu và tiêu chuẩn
-3. Pipeline UI và style, template preview, asset-spec, giao diện review
-4. Adapter engine Unity + script Ghidra headless
-5. Tạo đồ hoạ và âm thanh qua Codex/OpenAI
-6. Engine còn lại
-7. QA, perf, store assets
+1. ✅ Khung plugin
+2. Adapter SDK thật: gmsdkv2, H5 Games Ads, CrazyGames, GameDistribution, Weegoo — **chờ tài liệu SDK và tiêu chuẩn đóng gói của từng portal** (skill platform-sdk không đoán API)
+3. ✅ Pipeline UI và style (`style`, theme.ts), trang so sánh style, asset-spec (`assets scan`), trang duyệt (`review`)
+4. ✅ Nhận diện engine (`recon`), Unity (skill engine-unity) + Ghidra headless (`ghidra`, tên IL2CPP)
+5. ✅ Sinh đồ hoạ và lời thoại qua OpenAI (`gen`), prompt cho Codex/công cụ khác (`gen prompt`, `gen import`). Hiệu ứng âm thanh và nhạc: chưa có model OpenAI — dùng nguồn licensed
+6. ✅ Engine còn lại: skill engine-cocos, -godot, -unreal, -flash, -construct, -laya, -html5, -other
+7. ✅ QA, hiệu năng (`smoke`), ảnh và mô tả store (`store`)
 
 ## Phát triển plugin
 
-`npm test` chạy bộ test của CLI (tạo game tạm, chạy git thật). Kiểm tra template đầy đủ: `init` một game, rồi `npm test`, `npm run typecheck`, `npm run lint`, `npm run gk -- pack --all`, `npm run gk -- release-check`.
+`npm test` chạy bộ test của CLI (tạo game tạm, chạy git thật; test smoke tự bỏ qua khi máy không có Playwright). Kiểm tra template đầy đủ: `init` một game, rồi `npm test`, `npm run typecheck`, `npm run lint`, `npm run gk -- pack --all`, `npm run gk -- release-check`.

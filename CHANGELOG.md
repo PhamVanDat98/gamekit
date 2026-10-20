@@ -1,6 +1,17 @@
 # Changelog
 
 ## Chưa phát hành
+Hoàn thành các mục 3–7 của lộ trình:
+- **Mọi bước có skill**: P0 game-recon, triage · P1 engine-unity/-cocos/-godot/-unreal/-flash/-construct/-laya/-html5/-other, gameplay-spec, asset-inventory, ui-extract · P2 runtime-select · P3 web-relayout, style-direction, style-preview, apply-style, asset-spec, replace-graphics, replace-audio, rename-and-text · P4 add-analytics, add-leaderboard, add-save, add-i18n · P5 perf-budget, qa-smoke, store-assets. `status` gợi ý engine-<engine> theo `source.engine` (chưa rõ engine → game-recon).
+- `recon`: nhận diện engine, version, backend từ thư mục hoặc apk/xapk/ipa/zip (đọc trong file nén, không giải nén), logic và dữ liệu nằm ở đâu, công cụ nên dùng, kiểm kê; `--write` ghi `notes/recon.md` và `source.*`.
+- `ghidra`: Ghidra headless với `GameKitExport.java` — danh sách hàm, chuỗi, decompile C theo regex vào `decompiled/ghidra/`; tên hàm/chuỗi/metadata IL2CPP từ `script.json` của Il2CppDumper; `--entry` lấy `.so` trong APK; lần sau chỉ xuất lại.
+- Style cho reskin: `style/options/<id>.json` (schema `style`), `style choose` sinh `style/style.json` + `src/view/theme.ts` (template đọc THEME: biến CSS `--gk-*`, renderer, font đi kèm game), `style preview` so sánh bằng UI kit + popup Settings thật với chữ thật mọi ngôn ngữ; validate kiểm tương phản, file font, theme.ts lệch style.
+- `assets scan`: nháp `asset-manifest.json` (kích thước PNG/JPEG/WebP/GIF, alpha, loại, gợi ý ảnh có chữ). `review`: trang duyệt asset, `--apply` ghi `review` vào manifest và `notes/review.md`. Manifest có thêm `textKey`, `voice`, `ref`, `prompt`, `gen`, `review`; âm thanh không cần width/height.
+- `gen`: sinh ảnh (`gpt-image-1.5`, nền trong suốt; chặn `gpt-image-2` cho asset cần alpha) và lời thoại qua OpenAI; ảnh có chữ mỗi ngôn ngữ một bản đúng chữ trong `Language/`; khớp đúng kích thước spec, nhãn `generated`; `gen prompt`/`--dry-run` cho Codex hay công cụ khác, `gen import` đưa file vào; game làm lại: chặn prompt có `release.forbiddenTerms`.
+- `smoke`: gói build trong Chromium (Playwright) — thời gian vào game, FPS máy tính và điện thoại chậm 4× mạng 4G, lỗi console, màn trắng, Settings và footer, mọi ngôn ngữ và RTL; so với `budget`. `store`: ảnh theo kích thước từng portal + `store/listing.yaml`. Cổng P5: `{auto: smoke}`, `{auto: store}`.
+- Template: `src/view/theme.ts`; renderer thu nhỏ chữ cho vừa khi bản dịch dài.
+- Mục 2 (SDK các portal khác) còn chờ tài liệu SDK và tiêu chuẩn đóng gói.
+
 - Đa ngôn ngữ cho ảnh có chữ (logo, nút, banner): `assets/i18n/<mã>/<đường dẫn>`, bản gốc ở `assets/i18n/en/`, lấy URL bằng `tAsset('ui/title.png')`; ngôn ngữ thiếu ảnh dùng bản en. Mỗi ảnh là một file riêng trong gói (không nhúng vào `framework.js`), người chơi chỉ tải ảnh của ngôn ngữ mình. `validate` báo file không có bản en, thư mục ngôn ngữ ngoài `languages`, `tAsset()` trỏ tới file không có; thiếu bản dịch chỉ cảnh báo. Game cũ: chép `src/view/i18n.ts` từ template.
 - Mọi chữ người chơi thấy phải đổi theo ngôn ngữ, kể cả ảnh UI sinh ra có chữ: `asset-manifest.json` có trường `text: true` — ảnh đó phải nằm trong `assets/i18n/en/` (và ảnh trong `assets/i18n/` phải có `text: true`). Lint của template chặn chữ viết cứng trong `src/view/`, `src/main.ts` (`fillText`, `textContent`, `setAttribute('aria-label', …)`, Pixi `Text`, Phaser `add.text`…). Cổng P3 có mục kiểm chữ đa ngôn ngữ; bỏ yêu cầu "chữ không in vào ảnh" cho game `third-party` (được in, miễn là có bản cho mỗi ngôn ngữ).
 
