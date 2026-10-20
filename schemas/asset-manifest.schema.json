@@ -41,6 +41,7 @@
           "collider": { "type": "string", "description": "Đường dẫn param collider, vd player.hitbox" },
           "minDisplayPx": { "type": "integer", "description": "Kích thước nhỏ nhất thật sự hiển thị (icon)" },
           "noText": { "type": "boolean", "description": "Không in chữ vào ảnh" },
+          "text": { "type": "boolean", "description": "Ảnh có chữ (logo, nút, banner…): path phải ở assets/i18n/en/, mỗi ngôn ngữ một bản cùng đường dẫn trong assets/i18n/<mã>/" },
           "brief": { "type": "string" }
         }
       }

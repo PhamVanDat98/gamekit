@@ -90,7 +90,7 @@ Game tạo từ template trước bố cục az-v1 build ra `index.html` + `Buil
 3. `src/main.ts`.
 4. `src/platform/`: `index.ts`, `types.ts`, `create-platform.ts`, `gm-globals.d.ts`, `dev-loader.ts`, `adapters/azgames.ts`, `web-guard.ts`.
 5. `src/view/`: `i18n.ts`, `settings.ts`, `style.css`, `renderer.ts`, `input-dom.ts` (popup Settings phải giữ footer `gk-settings-footer`).
-6. `Language/en.json` (chuỗi của game đưa vào đây, gọi bằng `t()`). Ảnh có chữ: `assets/i18n/<mã>/`, gọi bằng `tAsset()` (trong `i18n.ts`).
+6. `Language/en.json` (chuỗi của game đưa vào đây, gọi bằng `t()`). Ảnh có chữ: `assets/i18n/<mã>/`, gọi bằng `tAsset()` (trong `i18n.ts`). Chép thêm `eslint.config.js` để lint chặn chữ viết cứng trong `src/view/`.
 7. `public/Icons/web.png`, `public/Icons/loading.webp`, và hai mục tương ứng trong `provenance.json` (thay bằng icon thật ở P3).
 8. `.gitignore`: `builds/` thay cho `dist/` (cũng sửa `ignores` trong `eslint.config.js`, `search.exclude` trong `.vscode/settings.json`). `index.html` gốc: favicon `./Icons/web.png`.
 9. Xoá `public/TemplateData/`; dữ liệu tĩnh để trong `public/StreamingAssets/`.

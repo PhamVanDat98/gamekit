@@ -2,6 +2,7 @@
 
 ## Chưa phát hành
 - Đa ngôn ngữ cho ảnh có chữ (logo, nút, banner): `assets/i18n/<mã>/<đường dẫn>`, bản gốc ở `assets/i18n/en/`, lấy URL bằng `tAsset('ui/title.png')`; ngôn ngữ thiếu ảnh dùng bản en. Mỗi ảnh là một file riêng trong gói (không nhúng vào `framework.js`), người chơi chỉ tải ảnh của ngôn ngữ mình. `validate` báo file không có bản en, thư mục ngôn ngữ ngoài `languages`, `tAsset()` trỏ tới file không có; thiếu bản dịch chỉ cảnh báo. Game cũ: chép `src/view/i18n.ts` từ template.
+- Mọi chữ người chơi thấy phải đổi theo ngôn ngữ, kể cả ảnh UI sinh ra có chữ: `asset-manifest.json` có trường `text: true` — ảnh đó phải nằm trong `assets/i18n/en/` (và ảnh trong `assets/i18n/` phải có `text: true`). Lint của template chặn chữ viết cứng trong `src/view/`, `src/main.ts` (`fillText`, `textContent`, `setAttribute('aria-label', …)`, Pixi `Text`, Phaser `add.text`…). Cổng P3 có mục kiểm chữ đa ngôn ngữ; bỏ yêu cầu "chữ không in vào ảnh" cho game `third-party` (được in, miễn là có bản cho mỗi ngôn ngữ).
 
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):

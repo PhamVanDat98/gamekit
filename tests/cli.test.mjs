@@ -642,6 +642,25 @@ test('validate: assets/i18n — en is the source, extra files fail, missing ones
   assert.match(r.out, /tAsset\('ui\/nope\.png'\)/);
 });
 
+test('validate: asset-manifest — an image with words (text: true) lives in assets/i18n/en/', () => {
+  const dir = newGame('vmantext');
+  const man = (assets) => write(dir, 'asset-manifest.json', JSON.stringify({ assets }));
+  const ui = { kind: 'ui', width: 8, height: 8 };
+  man([{ id: 'title', path: 'assets/i18n/en/ui/title.png', text: true, ...ui }, { id: 'bg', path: 'assets/img/bg.png', noText: true, ...ui }]);
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 0, r.out);
+  man([
+    { id: 'play', path: 'assets/img/play.png', text: true, ...ui },
+    { id: 'logo', path: 'assets/i18n/en/logo.png', ...ui },
+    { id: 'both', path: 'assets/i18n/en/both.png', text: true, noText: true, ...ui },
+  ]);
+  r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /play: ảnh có chữ phải nằm trong assets\/i18n\/en\//);
+  assert.match(r.out, /logo: [^\n]*phải có text: true/);
+  assert.match(r.out, /both: text và noText/);
+});
+
 test('validate: Icons/web.png must be PNG, loading.webp must be WebP; builds/ must be gitignored', () => {
   const dir = newGame('vicon');
   assert.equal(gk(dir, 'validate').code, 0);

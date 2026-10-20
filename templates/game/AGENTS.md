@@ -11,7 +11,10 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 3. **Asset.** `own`: asset gốc xuất sang định dạng web, đưa vào `assets/`/`public/` với nhãn `own`. `third-party`: asset gốc chỉ là tư liệu trong `reference/` (gitignored). Mọi file trong `assets/` và `public/` phải có nhãn trong `provenance.json` (`gamekit provenance add … --label …`).
 4. **Không tự đánh dấu việc "(bạn)"** trong `gates/*.md` — đó là quyết định của người dùng.
 5. **Popup Settings phải giữ footer bản quyền** (`platform.info.copyright`) — portal yêu cầu, không bỏ khi đổi giao diện.
-6. **Mọi text hiển thị đi qua `t()`** và `Language/en.json` (+ các ngôn ngữ khác), không viết cứng trong `src/`. **Ảnh có chữ** (logo, nút, banner…) đặt ở `assets/i18n/<mã>/` cùng đường dẫn với bản gốc `assets/i18n/en/`, lấy URL bằng `tAsset('ui/title.png')`; ngôn ngữ thiếu ảnh thì dùng bản en. Ảnh không có chữ để ngoài `assets/i18n/`.
+6. **Mọi chữ người chơi thấy phải đổi theo ngôn ngữ.**
+   - Text: qua `t()` và `Language/en.json` (+ các ngôn ngữ khác), không viết cứng trong `src/` (lint chặn chữ viết cứng trong `src/view/`, `src/main.ts`).
+   - Ảnh có chữ (logo, nút, banner, ảnh tutorial…), **cả ảnh gốc lẫn ảnh sinh ra**: đặt ở `assets/i18n/<mã>/` cùng đường dẫn với bản gốc `assets/i18n/en/`, lấy URL bằng `tAsset('ui/title.png')`; ngôn ngữ thiếu ảnh thì dùng bản en. Trong `asset-manifest.json` ghi `text: true`. Ảnh không có chữ để ngoài `assets/i18n/`. Làm được thì ưu tiên ảnh nền không chữ + chữ vẽ bằng `t()`.
+   - Dữ liệu (`public/StreamingAssets/`, `params/`, level…) chỉ giữ key, không giữ câu chữ hiển thị.
 
 ## Cấu trúc
 - `src/core/` logic thuần, deterministic: không DOM, không thư viện render, thời gian từ fixed step, ngẫu nhiên từ `Rng` có seed. **Viết test trước** (TDD).

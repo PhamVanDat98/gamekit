@@ -44,6 +44,7 @@ Cổng tự bỏ các mục `{only: …}` không áp cho game này.
 3. **Asset gốc.** `own`: xuất sang định dạng web, đưa vào `assets/`/`public/`, nhãn `own`. `third-party`: chỉ là tư liệu, nằm trong `reference/` (gitignored). Mọi file trong `assets/`, `public/` phải có nhãn provenance: `reference | generated | own | licensed | placeholder`. Bản phát hành không được còn `reference` hay `placeholder`.
 4. **Phân tích.** `own`: được chạy, debug, đo game gốc. `third-party`: chỉ phân tích file tĩnh, không can thiệp vào game đang chạy.
 5. **Art brief** (`third-party`) mô tả thiết kế mới, không viết "vẽ lại nhân vật X của game gốc".
+6. **Mọi chữ người chơi thấy đổi theo ngôn ngữ.** Text qua `t()` + `Language/*.json` (lint chặn chữ viết cứng trong `src/view/`). Ảnh có chữ — ảnh gốc hay ảnh sinh ra — nằm trong `assets/i18n/<mã>/` (bản gốc `assets/i18n/en/`), lấy bằng `tAsset()`, `text: true` trong `asset-manifest.json`. Dữ liệu game chỉ giữ key.
 
 ## Cấu trúc một game
 `src/core/` logic thuần, deterministic (không DOM, không render, `Rng` có seed, fixed timestep) · `src/view/` render + input, chỉ đọc state · `src/platform/` interface chung cho mọi portal · `src/contracts/` type dùng chung · `params/` số liệu có nguồn · `spec/` (gameplay spec, `obligations.yaml` nghĩa vụ parity, `oracles/` bảng từ game gốc) · `notes/` (ghi chú RE, `QUESTIONS.md`) · `gates/` · `DECISIONS.md` · `provenance.json` · `module-plan.yaml` (khi dựng song song).

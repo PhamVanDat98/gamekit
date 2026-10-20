@@ -390,6 +390,11 @@ function validateAssetManifest(root, pr) {
   }
   for (const e of check('asset-manifest', man)) pr.error(where, e);
   for (const a of man.assets ?? []) {
+    // Words in an image are text too: they need one version per language, like Language/*.json.
+    const localized = a.path.startsWith('assets/i18n/');
+    if (a.text && a.noText) pr.error(where, `${a.id}: text và noText không thể cùng true`);
+    if (a.text && !a.path.startsWith('assets/i18n/en/')) pr.error(where, `${a.id}: ảnh có chữ phải nằm trong assets/i18n/en/ (bản gốc), mỗi ngôn ngữ một bản trong assets/i18n/<mã>/ — hiện là ${a.path}`);
+    if (localized && !a.text) pr.error(where, `${a.id}: ${a.path} nằm trong assets/i18n/ nên phải có text: true`);
     const file = path.join(root, a.path);
     if (!exists(file)) continue; // not generated yet
     if (!a.path.toLowerCase().endsWith('.png')) continue;

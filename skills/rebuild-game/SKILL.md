@@ -31,7 +31,7 @@ Với mỗi cơ chế trong spec:
 Thêm replay test cho luồng chơi chính (`tests/replay/`). Thay `src/core/world.ts` demo bằng logic game thật; giữ `worldHash` cho replay.
 
 ## 5. View
-`src/view/` vẽ từ state, map input thiết bị → `Action` (`src/contracts/input.ts`). Không sửa state. Text hiển thị qua `t()` + `Language/*.json`; ảnh có chữ (logo, nút, banner) xuất mỗi ngôn ngữ một bản vào `assets/i18n/<mã>/` (cùng đường dẫn với `assets/i18n/en/`) và lấy bằng `tAsset()`. Không unit test; kiểm tra bằng chạy thử `npm run dev` và screenshot.
+`src/view/` vẽ từ state, map input thiết bị → `Action` (`src/contracts/input.ts`). Không sửa state. Text hiển thị qua `t()` + `Language/*.json`; ảnh có chữ (logo, nút, banner — cả ảnh gốc lẫn ảnh sinh ra) xuất mỗi ngôn ngữ một bản vào `assets/i18n/<mã>/` (cùng đường dẫn với `assets/i18n/en/`) và lấy bằng `tAsset()`; dữ liệu level/hội thoại chỉ giữ key. Không unit test; kiểm tra bằng chạy thử `npm run dev` và screenshot.
 
 ## 6. Game lớn → chia module
 Nếu game có nhiều cơ chế độc lập, dùng skill **module-plan** trước khi viết core, rồi **integrate**. Game nhỏ thì làm tuần tự, ghi lý do không chia vào DECISIONS.md.
