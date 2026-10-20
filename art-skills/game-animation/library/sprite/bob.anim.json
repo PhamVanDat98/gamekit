@@ -1,0 +1,22 @@
+{
+ "note": "nhún lên xuống nhẹ (đứng yên)",
+ "skeleton": "sprite.skeleton.json",
+ "frames": 8,
+ "fps": 8,
+ "loop": true,
+ "pivot": "bottom",
+ "keys": {
+  "body": {
+   "y": [
+    [
+     0,
+     0
+    ],
+    [
+     0.5,
+     -0.04
+    ]
+   ]
+  }
+ }
+}

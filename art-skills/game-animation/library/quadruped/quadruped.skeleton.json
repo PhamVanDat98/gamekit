@@ -1,0 +1,114 @@
+{
+ "note": "Thú bốn chân nhìn ngang, quay sang phải. Cột sống từ hông ra vai. Chân dài 1.6.",
+ "root": [
+  -1.1,
+  -1.552
+ ],
+ "bones": {
+  "spine": {
+   "length": 2.2,
+   "angle": -90,
+   "width": 0.5,
+   "side": "mid"
+  },
+  "neck": {
+   "parent": "spine",
+   "at": 1.0,
+   "length": 0.75,
+   "angle": -150,
+   "width": 0.3,
+   "side": "mid"
+  },
+  "head": {
+   "parent": "neck",
+   "at": 1.0,
+   "length": 0.8,
+   "angle": -120,
+   "shape": "circle",
+   "face": true,
+   "side": "mid"
+  },
+  "tail1": {
+   "parent": "spine",
+   "at": 0.0,
+   "length": 0.4,
+   "angle": 125,
+   "width": 0.14,
+   "side": "mid"
+  },
+  "tail2": {
+   "parent": "tail1",
+   "length": 0.35,
+   "angle": 115,
+   "width": 0.11,
+   "side": "mid"
+  },
+  "tail3": {
+   "parent": "tail2",
+   "length": 0.3,
+   "angle": 105,
+   "width": 0.09,
+   "side": "mid"
+  },
+  "hind_upper_back": {
+   "parent": "spine",
+   "at": 0.06,
+   "length": 0.8,
+   "angle": 0,
+   "width": 0.2,
+   "side": "back"
+  },
+  "hind_lower_back": {
+   "parent": "hind_upper_back",
+   "length": 0.8,
+   "angle": 0,
+   "width": 0.15,
+   "side": "back"
+  },
+  "fore_upper_back": {
+   "parent": "spine",
+   "at": 0.94,
+   "length": 0.8,
+   "angle": 0,
+   "width": 0.18,
+   "side": "back"
+  },
+  "fore_lower_back": {
+   "parent": "fore_upper_back",
+   "length": 0.8,
+   "angle": 0,
+   "width": 0.14,
+   "side": "back"
+  },
+  "hind_upper_front": {
+   "parent": "spine",
+   "at": 0.06,
+   "length": 0.8,
+   "angle": 0,
+   "width": 0.2,
+   "side": "front"
+  },
+  "hind_lower_front": {
+   "parent": "hind_upper_front",
+   "length": 0.8,
+   "angle": 0,
+   "width": 0.15,
+   "side": "front"
+  },
+  "fore_upper_front": {
+   "parent": "spine",
+   "at": 0.94,
+   "length": 0.8,
+   "angle": 0,
+   "width": 0.18,
+   "side": "front"
+  },
+  "fore_lower_front": {
+   "parent": "fore_upper_front",
+   "length": 0.8,
+   "angle": 0,
+   "width": 0.14,
+   "side": "front"
+  }
+ }
+}

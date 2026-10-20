@@ -1,0 +1,4 @@
+interface:
+  display_name: "Game Animation"
+  short_description: "Animation 2D bằng dữ liệu: khung xương + keyframe + sóng + IK cho mọi loại nhân vật"
+  default_prompt: "Xem thư viện mẫu, chép animation gần nhất về dự án, chỉnh cho nhân vật của tôi và cho tôi xem GIF người que."

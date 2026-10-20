@@ -56,10 +56,10 @@ Asset chưa có trong frame (kẻ địch mới): giữ Image 1 làm style, mô 
 ## 5. Animation Codex vẽ từng frame (canvas + pose)
 Chuẩn bị (cùng `--frames` và `--cell` để các ô khớp nhau):
 ```bash
-GA pose   --anim walk --frames 6 --cell 128x128 --out art/raw/walk-pose.png --gif .gamekit/local/walk-pose.gif
+AN pose   art/anim/hero/walk.anim.json --frames 6 --cell 128x128 --out art/raw/walk-pose.png   # skill game-animation
 GA canvas --seed assets/gfx/hero.png --frames 6 --cell 128x128 --out art/raw/walk-canvas.png
 ```
-`--anim`: `idle`, `walk`, `run`, `jump`, `attack`, `hit` (chân hai khúc bám đất, gót chạm rồi mũi đẩy, khuỷu tay, người nhún đúng nhịp tiếp đất/đổi chân). Xem GIF của dải tư thế trước: chuyển động sai thì sửa ở đây, đừng mong model tự sửa. Nhân vật đầu to: `--proportions chibi`.
+Animation lấy từ `art/anim/` của dự án (skill `game-animation`: chép mẫu `AN new humanoid/walk --out art/anim/hero/` rồi sửa; `AN preview … --out x.gif` để xem trước). Sai chuyển động thì sửa file animation, đừng mong model tự sửa.
 ```
 Input images: Image 1: edit target — a strip of 6 equal slots; slot 1 already holds the approved character; Image 2: pose guide — one stick figure per slot (orange/red = FRONT arm and leg, blue = BACK arm and leg; the gray dot shows the facing side); Image 3: approved style frame (style only)
 Primary request: fill slots 2–6 of Image 1 with the SAME character from slot 1, each slot copying the pose of the matching stick figure in Image 2; keep slot 1 unchanged
@@ -113,4 +113,4 @@ Primary request: the character from Image 1, side view facing right, separated i
 Invariants: identical design, colors, outline and scale to Image 1; each part complete with the hidden area painted in; every joint end (shoulder, elbow, hip, knee) rounded so parts rotate cleanly; every limb piece straight and hanging down
 + [KEY-BLOCK]
 ```
-`GA split parts-raw.png --out-dir parts --index .gamekit/local/parts-index.png --names head,body,leg_front,shin_front,leg_back,shin_back,arm_front,forearm_front,arm_back,forearm_back` (theo thứ tự trong ảnh index), rồi viết `rig.json` (SKILL.md §3b) và `GA rig rig.json --anim idle --gif …`. Muốn tay sau/chân sau tối hơn một chút (cho có chiều sâu): thêm "back arm and back leg slightly darker" vào prompt.
+`GA split parts-raw.png --out-dir parts --index .gamekit/local/parts-index.png --names head,torso,thigh_front,shin_front,thigh_back,shin_back,arm_front,forearm_front,arm_back,forearm_back` (theo thứ tự trong ảnh index), rồi viết `rig.json` và chạy `AN rig rig.json --anim art/anim/hero/idle.anim.json --size 96x96 --out … --gif …` (skill `game-animation`; tên phần trùng tên xương: `torso, head, thigh_front, shin_front, …`). Muốn tay sau/chân sau tối hơn một chút (cho có chiều sâu): thêm "back arm and back leg slightly darker" vào prompt.

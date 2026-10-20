@@ -1,0 +1,22 @@
+{
+ "note": "lắc lư qua lại quanh chân",
+ "skeleton": "sprite.skeleton.json",
+ "frames": 8,
+ "fps": 8,
+ "loop": true,
+ "pivot": "bottom",
+ "keys": {
+  "body": {
+   "rot": [
+    [
+     0,
+     -5
+    ],
+    [
+     0.5,
+     5
+    ]
+   ]
+  }
+ }
+}

@@ -1,0 +1,42 @@
+{
+ "note": "đập nhịp to nhỏ (tim, nút)",
+ "skeleton": "sprite.skeleton.json",
+ "frames": 6,
+ "fps": 10,
+ "loop": true,
+ "pivot": "center",
+ "keys": {
+  "body": {
+   "sx": [
+    [
+     0,
+     1
+    ],
+    [
+     0.3,
+     1.1,
+     "out"
+    ],
+    [
+     1.0,
+     1
+    ]
+   ],
+   "sy": [
+    [
+     0,
+     1
+    ],
+    [
+     0.3,
+     1.1,
+     "out"
+    ],
+    [
+     1.0,
+     1
+    ]
+   ]
+  }
+ }
+}

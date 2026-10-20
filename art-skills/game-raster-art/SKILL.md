@@ -1,6 +1,6 @@
 ---
 name: game-raster-art
-description: Tạo asset game raster (nhân vật, kẻ địch, vật phẩm, icon, UI, tile, nền/parallax, hiệu ứng, animation) bằng image_gen của Codex — không cần API key — rồi hậu xử lý thành file dùng được trong game: tách nền trong suốt, đúng cỡ, cùng tỉ lệ và điểm neo, animation frame-by-frame không trôi nét (tween/rig từ ảnh đã duyệt), tile liền mạch. Asset được rút ra từ một khung hình concept đã duyệt để ghép vào game vẫn giống concept. Dùng khi làm art game theo style ảnh (cartoon, sticker, anime, vẽ tay, 3D render, phẳng, neon — pixel art và voxel thì dùng skill vẽ bằng code), hoặc khi người dùng đưa ảnh mẫu style và muốn asset giống như vậy.
+description: Tạo asset game raster (nhân vật, kẻ địch, vật phẩm, icon, UI, tile, nền/parallax, hiệu ứng, animation) bằng image_gen của Codex — không cần API key — rồi hậu xử lý thành file dùng được trong game: tách nền trong suốt, đúng cỡ, cùng tỉ lệ và điểm neo, ảnh cho animation (sprite, bộ phận để rig, frame Codex vẽ theo dải tư thế — chuyển động do skill game-animation), tile liền mạch. Asset được rút ra từ một khung hình concept đã duyệt để ghép vào game vẫn giống concept. Dùng khi làm art game theo style ảnh (cartoon, sticker, anime, vẽ tay, 3D render, phẳng, neon — pixel art và voxel thì dùng skill vẽ bằng code), hoặc khi người dùng đưa ảnh mẫu style và muốn asset giống như vậy.
 ---
 
 # Art game raster bằng Codex
@@ -46,29 +46,18 @@ Mọi lần tạo đều đính kèm `art/style/frame.png` là **Image 1** (Code
 
 `key` đoán màu nền từ viền ảnh; viền còn ám màu → tăng `--soft`; vật bị khoét → giảm `--tol` hoặc tạo lại với màu nền khác.
 
-## 3b. Animation: frame-by-frame từ ảnh đã duyệt
-`image_gen` là model ảnh tĩnh: mỗi frame nó **vẽ lại** nhân vật, nên dải nhiều frame bị trôi mặt, trôi cỡ, trôi trang phục. Các showcase mượt trên GitHub dùng model **video** (agent-sprite-forge: ảnh → video → cắt frame) hoặc ô nhỏ + khung bố cục + bỏ frame hỏng (hatch-pet). Ở đây chọn theo loại chuyển động (đi/chạy: thử `rig` trước — rẻ, chắc chắn đúng; cần nét vẽ tay từng frame thì canvas + pose):
+## 3b. Animation
+`image_gen` là model ảnh tĩnh: mỗi frame nó **vẽ lại** nhân vật, nên dải nhiều frame bị trôi mặt, trôi cỡ, trôi trang phục. Chuyển động thiết kế bằng skill **`game-animation`** (khung xương + keyframe theo từng dự án, `AN` = `python3 <game-animation>/scripts/animate.py`); skill này lo phần ảnh:
 
-| Chuyển động | Cách | Lệnh |
+| Cách | Ảnh từ `image_gen` | Chuyển động |
 | --- | --- | --- |
-| Nhún, thở, lắc lư, nảy, nhấp nháy, xoay đồng xu, đập nhịp | **tween** — cả sprite đã duyệt di chuyển/co giãn; frame nào cũng đúng từng pixel của bản duyệt | `GA tween hero.png --anim bob\|breathe\|sway\|wobble\|hop\|spin\|pulse --frames 8 --size 96x96 --out idle.png --gif …` |
-| Đi, chạy, nhảy, đánh, trúng đòn của nhân vật có tay chân | **rig cắt rời** — `image_gen` vẽ nhân vật thành từng bộ phận một lần (mẫu §9 trong prompts.md), `GA split` tách ra, `rig.json` khai báo khớp; script quay bộ phận quanh khớp | `GA rig rig.json --anim idle\|walk\|run\|jump\|attack\|hit --frames 8 --size 96x96 --out walk.png --gif …` |
-| **Codex vẽ từng frame** (đi, chạy, đánh, biến hình… mà muốn nét vẽ tay từng frame, không xoay bộ phận) | **canvas + pose**: Codex *sửa* một ảnh có sẵn frame đã duyệt ở ô 1 (`canvas`), nhìn dải hình que đúng chu kỳ (`pose`) để biết tư thế từng ô; cắt theo ô, khoá frame 1 về ảnh gốc, `inspect` chỉ frame trôi → sửa lại đúng frame đó **từ sprite đã duyệt** | `GA pose --anim walk --frames 6 --cell 128x128 --out pose.png` · `GA canvas --seed hero.png --frames 6 --cell 128x128 --out canvas.png` → `image_gen` (mẫu §5 prompts.md) → `GA anim raw.png --frames 6 --slots --anchor slot --lock-first hero.png --size 64x64 --out walk.png` → `GA inspect walk.png --frames 6 --ref hero.png` |
-| Chuyển động mượt cần model video (tuỳ chọn, **trả phí**) | agent-sprite-forge `video2dsprite` qua **Grok CLI** đăng nhập tài khoản grok.com có gói trả phí (SuperGrok hoặc X Premium+; video miễn phí đã bị bỏ từ 3/2026), không API key; chưa kiểm được trong GameKit. Codex không có video — mặc định dùng tween/rig | `route_media.py video … --route grok-acp` |
+| **tween** — vật thể, quái một khối, vật phẩm | một sprite đã duyệt | `AN tween sprite.png --anim <anim.json> --size … --out …` |
+| **rig** — nhân vật có tay chân, cánh, đuôi | bộ phận cắt rời vẽ một lần (mẫu §9 prompts.md) → `GA split` | `AN rig rig.json --anim <anim.json> --size … --out …` |
+| **Codex vẽ từng frame** — cần nét vẽ tay khác nhau mỗi frame | Codex *sửa* `GA canvas` (frame đã duyệt sẵn ở ô 1) nhìn dải tư thế `AN pose` (mẫu §5 prompts.md) → `GA anim --slots --anchor slot --lock-first` → `GA inspect` → `GA replace` frame hỏng | `AN pose <anim.json> --cell 128x128 --out pose.png` |
+| Video (tuỳ chọn, **trả phí**) | agent-sprite-forge `video2dsprite` qua Grok CLI đăng nhập tài khoản có gói trả phí (SuperGrok hoặc X Premium+; video miễn phí đã bị bỏ từ 3/2026), không API key; chưa kiểm được trong GameKit | — |
 | Pixel art, voxel | vẽ bằng code: pxl `anim(...)`, voxel-art `FRAMES` | — |
 
-`rig.json` (tọa độ là pixel trong ảnh từng bộ phận; bỏ trống thì lấy mặc định theo tên — đầu xoay quanh cổ, tay/chân quanh đầu trên, gắn vào `body`):
-```json
-{"parts": {
-  "body": {"file": "parts/body.png"},
-  "head": {"file": "parts/head.png", "pivot": [40, 70], "at": [30, 6]},
-  "arm_front": {"file": "parts/arm_front.png"}, "arm_back": {"file": "parts/arm_back.png"},
-  "leg_front": {"file": "parts/leg_front.png"}, "shin_front": {"file": "parts/shin_front.png"},
-  "leg_back": {"file": "parts/leg_back.png"}, "shin_back": {"file": "parts/shin_back.png"},
-  "forearm_front": {"file": "parts/forearm_front.png"}, "forearm_back": {"file": "parts/forearm_back.png"},
-  "weapon": {"file": "parts/sword.png", "parent": "arm_front", "pivot": [6, 60], "at": [10, 44]}}}
-```
-Tên chuẩn: `body` (gốc), `head`, `arm_front`/`arm_back` (cánh tay trên), `forearm_front`/`forearm_back` (cẳng tay, gắn vào đầu dưới cánh tay), `leg_front`/`leg_back` (đùi), `shin_front`/`shin_back` (cẳng chân + bàn chân, gắn vào đầu gối), `tail`, `weapon`. Có `shin_*`/`forearm_*` thì `walk`/`run`/`jump`/`attack`/`hit`/`idle` tính chân hai khúc bằng IK (bàn chân bám đất, gối và khuỷu gập đúng) — **nên có**, chân tay một khúc trông cứng. Xem `--gif` để chỉnh khớp (`pivot`/`at`) và độ mạnh (`--amp 0.6`). Chuyển động riêng: `--anim keys.json` với `{"keys": {"arm_front": {"rot": [0, 30, 60, 30]}, "body": {"y": [0, -3]}}}` (giá trị ít hơn số frame được nội suy vòng).
+`canvas` và `pose` phải cùng `--frames`/`--cell` để các ô khớp nhau (cùng hình học: ô ~1536 px, đường đất ở 92 % chiều cao).
 
 ## 4. Ghép thử và so với concept (bắt buộc trước khi giao)
 1. Viết `art/style/layout.json`: vị trí và cỡ từng asset như trong game (số px của game):

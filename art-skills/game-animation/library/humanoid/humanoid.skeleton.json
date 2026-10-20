@@ -1,0 +1,98 @@
+{
+ "note": "Người nhìn ngang, quay sang phải. Đơn vị: chân dài 2 (đùi 1 + cẳng 1). Gốc là thân, bắt đầu ở hông.",
+ "root": [
+  0,
+  -1.97
+ ],
+ "bones": {
+  "torso": {
+   "length": 1.45,
+   "angle": 180,
+   "width": 0.3,
+   "side": "mid"
+  },
+  "head": {
+   "parent": "torso",
+   "at": 1.0,
+   "length": 1.0,
+   "angle": 180,
+   "shape": "circle",
+   "face": true,
+   "side": "mid"
+  },
+  "thigh_back": {
+   "parent": "torso",
+   "at": 0.0,
+   "length": 1.0,
+   "angle": 0,
+   "width": 0.17,
+   "side": "back"
+  },
+  "shin_back": {
+   "parent": "thigh_back",
+   "length": 1.0,
+   "angle": 0,
+   "width": 0.16,
+   "side": "back"
+  },
+  "foot_back": {
+   "parent": "shin_back",
+   "length": 0.36,
+   "angle": -90,
+   "width": 0.13,
+   "side": "back"
+  },
+  "arm_back": {
+   "parent": "torso",
+   "at": 0.9,
+   "length": 0.8,
+   "angle": 0,
+   "width": 0.14,
+   "side": "back"
+  },
+  "forearm_back": {
+   "parent": "arm_back",
+   "length": 0.75,
+   "angle": 0,
+   "width": 0.13,
+   "side": "back"
+  },
+  "thigh_front": {
+   "parent": "torso",
+   "at": 0.0,
+   "length": 1.0,
+   "angle": 0,
+   "width": 0.17,
+   "side": "front"
+  },
+  "shin_front": {
+   "parent": "thigh_front",
+   "length": 1.0,
+   "angle": 0,
+   "width": 0.16,
+   "side": "front"
+  },
+  "foot_front": {
+   "parent": "shin_front",
+   "length": 0.36,
+   "angle": -90,
+   "width": 0.13,
+   "side": "front"
+  },
+  "arm_front": {
+   "parent": "torso",
+   "at": 0.9,
+   "length": 0.8,
+   "angle": 0,
+   "width": 0.14,
+   "side": "front"
+  },
+  "forearm_front": {
+   "parent": "arm_front",
+   "length": 0.75,
+   "angle": 0,
+   "width": 0.13,
+   "side": "front"
+  }
+ }
+}

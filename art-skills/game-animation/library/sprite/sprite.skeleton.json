@@ -1,0 +1,15 @@
+{
+ "note": "Một sprite nguyên khối: gốc ở đáy giữa ảnh, chiều cao = 1.",
+ "root": [
+  0,
+  0
+ ],
+ "bones": {
+  "body": {
+   "length": 1.0,
+   "angle": 180,
+   "width": 0.6,
+   "side": "mid"
+  }
+ }
+}

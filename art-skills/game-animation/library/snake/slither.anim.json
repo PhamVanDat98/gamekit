@@ -1,0 +1,38 @@
+{
+ "note": "trườn: sóng đều dọc thân, đầu giữ gần như yên",
+ "skeleton": "snake.skeleton.json",
+ "frames": 8,
+ "fps": 10,
+ "loop": true,
+ "keys": {
+  "head": {
+   "rot": [
+    [
+     0,
+     -3
+    ],
+    [
+     0.5,
+     3
+    ]
+   ]
+  }
+ },
+ "waves": [
+  {
+   "bones": [
+    "seg1",
+    "seg2",
+    "seg3",
+    "seg4",
+    "seg5",
+    "seg6",
+    "seg7"
+   ],
+   "amp": 13,
+   "cycles": 1,
+   "phase_step": 0.17,
+   "decay": 1.0
+  }
+ ]
+}

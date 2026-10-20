@@ -1,0 +1,59 @@
+{
+ "root": [
+  1.2,
+  -1.4
+ ],
+ "bones": {
+  "head": {
+   "length": 0.7,
+   "angle": 90,
+   "width": 0.55,
+   "side": "mid",
+   "shape": "circle",
+   "face": true
+  },
+  "seg1": {
+   "parent": "head",
+   "length": 0.42,
+   "angle": 90,
+   "width": 0.471,
+   "side": "mid"
+  },
+  "seg2": {
+   "parent": "seg1",
+   "length": 0.42,
+   "angle": 90,
+   "width": 0.393,
+   "side": "mid"
+  },
+  "seg3": {
+   "parent": "seg2",
+   "length": 0.42,
+   "angle": 90,
+   "width": 0.314,
+   "side": "mid"
+  },
+  "seg4": {
+   "parent": "seg3",
+   "length": 0.42,
+   "angle": 90,
+   "width": 0.236,
+   "side": "mid"
+  },
+  "seg5": {
+   "parent": "seg4",
+   "length": 0.42,
+   "angle": 90,
+   "width": 0.157,
+   "side": "mid"
+  },
+  "fin": {
+   "parent": "seg5",
+   "length": 0.5,
+   "angle": 70,
+   "width": 0.3,
+   "side": "mid"
+  }
+ },
+ "note": "Cá nhìn ngang, đầu bên phải, thân là chuỗi đốt."
+}

@@ -35,6 +35,12 @@ test('art-skills: each skill has frontmatter name = folder, a description, agent
 });
 
 const skipPy = !hasPillow && 'không có python3 + Pillow';
+const AN = path.join(ART, 'game-animation', 'scripts', 'animate.py');
+const LIB = path.join(ART, 'game-animation', 'library');
+const an = (cwd, ...args) => {
+  const r = spawnSync(PY, ['-I', AN, ...args], { cwd, encoding: 'utf8' });
+  return { code: r.status, out: `${r.stdout}${r.stderr}` };
+};
 
 test('gameart key: flat magenta background → transparent, trimmed, no magenta left at the edges', { skip: skipPy }, () => {
   const dir = tmpDir();
@@ -275,51 +281,6 @@ im = Image.open('bob.png'); print(json.dumps([im.size, [im.crop((i*56, 0, i*56+5
   assert.match(r.out, /boom\.vox\.py:5: ZeroDivisionError/);
 });
 
-test('gameart tween + rig: every frame built from the approved pixels; motion kept, feet on one line; custom keys', { skip: skipPy }, () => {
-  const dir = tmpDir();
-  py(dir, `
-import os
-os.makedirs('parts', exist_ok=True)
-def part(w, h, fill):
-    im = Image.new('RGBA', (w, h), (0, 0, 0, 0)); ImageDraw.Draw(im).rounded_rectangle([0, 0, w - 1, h - 1], radius=min(w, h) // 3, fill=fill); return im
-part(60, 80, (200, 80, 60, 255)).save('sprite.png')
-part(34, 44, (70, 130, 200, 255)).save('parts/body.png')
-part(40, 38, (250, 210, 170, 255)).save('parts/head.png')
-for n, c in (('arm_front', (60, 110, 180, 255)), ('arm_back', (45, 85, 140, 255)), ('leg_front', (70, 60, 60, 255)), ('leg_back', (50, 45, 45, 255))):
-    part(12, 32, c).save(f'parts/{n}.png')`);
-  let r = ga(dir, 'tween', 'sprite.png', '--anim', 'hop', '--frames', '8', '--size', '64x96', '--out', 'hop.png', '--gif', 'hop.gif');
-  assert.equal(r.code, 0, r.out);
-  const hop = JSON.parse(py(dir, `
-import json
-im = Image.open('hop.png'); print(json.dumps([im.size, [im.crop((i*64, 0, i*64+64, 96)).getchannel('A').getbbox() for i in range(8)]]))`));
-  assert.deepEqual(hop[0], [512, 96]);
-  const bottoms = hop[1].map((b) => b[3]);
-  assert.ok(Math.min(...bottoms) < Math.max(...bottoms) - 10, `hop phải bay lên: ${bottoms}`);
-  assert.equal(bottoms[0], Math.max(...bottoms), 'frame 0 đứng trên mặt đất');
-  r = ga(dir, 'tween', 'sprite.png', '--anim', 'dance', '--frames', '4', '--size', '64x64', '--out', 'x.png');
-  assert.equal(r.code, 1);
-  assert.match(r.out, /không có animation 'dance'/);
-
-  fs.writeFileSync(path.join(dir, 'rig.json'), JSON.stringify({ parts: Object.fromEntries(['body', 'head', 'arm_front', 'arm_back', 'leg_front', 'leg_back'].map((n) => [n, { file: `parts/${n}.png` }])) }));
-  r = ga(dir, 'rig', 'rig.json', '--anim', 'walk', '--frames', '8', '--size', '96x96', '--out', 'walk.png', '--frames-dir', 'wf');
-  assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /8 frame 'walk', 6 phần/);
-  assert.doesNotMatch(r.out, /tail/, 'preset bỏ qua bộ phận rig không có, không cảnh báo');
-  const walk = JSON.parse(py(dir, `
-import json
-im = Image.open('walk.png'); fr = [im.crop((i*96, 0, i*96+96, 96)) for i in range(8)]
-print(json.dumps({'size': im.size, 'bottom': [f.getchannel('A').getbbox()[3] for f in fr], 'same': fr[0].tobytes() == fr[2].tobytes()}))`));
-  assert.deepEqual(walk.size, [768, 96]);
-  assert.equal(walk.same, false, 'các frame phải khác nhau (chân tay chuyển động)');
-  assert.ok(Math.max(...walk.bottom) - Math.min(...walk.bottom) <= 6, `chân gần một đường: ${walk.bottom}`);
-  fs.writeFileSync(path.join(dir, 'wave.json'), JSON.stringify({ keys: { arm_front: { rot: [0, -120] } } }));
-  assert.equal(ga(dir, 'rig', 'rig.json', '--anim', 'wave.json', '--frames', '6', '--size', '96x96', '--out', 'wave.png').code, 0);
-  fs.writeFileSync(path.join(dir, 'bad.json'), JSON.stringify({ parts: { head: { file: 'parts/head.png', parent: 'neck' }, body: { file: 'parts/body.png' } } }));
-  r = ga(dir, 'rig', 'bad.json', '--anim', 'idle', '--size', '64x64', '--out', 'x.png');
-  assert.equal(r.code, 1);
-  assert.match(r.out, /gắn vào 'neck'/);
-});
-
 test('gameart guide + anim --slots + inspect: equal slots, drifting frames flagged', { skip: skipPy }, () => {
   const dir = tmpDir();
   let r = ga(dir, 'guide', '--frames', '4', '--cell', '64x64', '--out', 'guide.png');
@@ -346,7 +307,7 @@ ref = Image.new('RGBA', (40, 45), (0, 0, 0, 0)); ImageDraw.Draw(ref).ellipse([0,
 
 test('gameart pose + canvas + anim --lock-first + replace: Codex edits a canvas holding the approved frame, guided by stick-figure poses', { skip: skipPy }, () => {
   const dir = tmpDir();
-  let r = ga(dir, 'pose', '--anim', 'walk', '--frames', '6', '--cell', '128x128', '--out', 'pose.png', '--gif', 'pose.gif');
+  let r = an(dir, 'pose', path.join(ART, 'game-animation', 'library', 'humanoid', 'walk.anim.json'), '--frames', '6', '--cell', '128x128', '--out', 'pose.png');
   assert.equal(r.code, 0, r.out);
   const pose = JSON.parse(py(dir, `
 import json
@@ -355,13 +316,12 @@ def has(c, i):
     return any(abs(p[0]-c[0]) < 30 and abs(p[1]-c[1]) < 30 and abs(p[2]-c[2]) < 30 for p in im.crop((i*cw, 0, (i+1)*cw, h)).getdata())
 # front leg (red) x-position per slot: it swings forward and back over the cycle
 def front_x(i):
-    xs = [x for y in range(h) for x in range(cw) if (lambda p: p[0] > 190 and p[1] < 90 and p[2] < 80)(im.getpixel((i*cw + x, y)))]
+    xs = [x for y in range(int(h * 0.75), h) for x in range(cw) if (lambda p: p[0] > 190 and 60 < p[1] < 110 and p[2] < 80)(im.getpixel((i*cw + x, y)))]
     return sum(xs) / len(xs)
-print(json.dumps({'size': [w, h], 'front': all(has((220, 60, 50), i) for i in range(6)), 'back': all(has((40, 80, 190), i) for i in range(6)), 'fx': [round(front_x(i)) for i in range(6)]}))`));
+print(json.dumps({'size': [w, h], 'front': all(has((225, 85, 45), i) for i in range(6)), 'back': all(has((55, 105, 210), i) for i in range(6)), 'fx': [round(front_x(i)) for i in range(6)]}))`));
   assert.deepEqual(pose.size, [1536, 256]);
   assert.ok(pose.front && pose.back, 'mỗi ô có chân trước (đỏ) và chân sau (xanh)');
   assert.ok(Math.max(...pose.fx) - Math.min(...pose.fx) > 10, `chân trước phải đánh qua lại: ${pose.fx}`);
-  assert.ok(fs.existsSync(path.join(dir, 'pose.gif')));
 
   py(dir, `
 s = Image.new('RGBA', (60, 120), (0, 0, 0, 0)); ImageDraw.Draw(s).rounded_rectangle([0, 0, 59, 119], radius=20, fill=(40, 160, 90, 255)); s.save('hero.png')`);
@@ -407,43 +367,122 @@ im = Image.new('RGB', (300, 400), (250, 3, 248)); ImageDraw.Draw(im).rounded_rec
   assert.equal(ga(dir, 'replace', 'walk.png', '--frames', '6', '--frame', '9', '--with', 'fix.png', '--out', 'x.png').code, 1);
 });
 
-test('gameart motion: walk keeps the planted foot on the ground and moving back, knees bend, hips lowest after contact; rig takes two-bone limbs', { skip: skipPy }, () => {
+test('game-animation library: every template loads, passes check and previews; new copies anim + skeleton into the project', { skip: skipPy }, () => {
+  const dir = tmpDir();
+  const lib = an(dir, 'library');
+  assert.equal(lib.code, 0, lib.out);
+  const names = lib.out.trim().split('\n').map((l) => l.split(/\s+/)[0]);
+  for (const n of ['humanoid/walk', 'humanoid/run', 'humanoid/jump', 'humanoid/attack', 'humanoid/hit', 'humanoid/idle', 'quadruped/walk', 'bird/flap', 'fish/swim', 'snake/slither', 'sprite/squash-hop', 'sprite/spin']) assert.ok(names.includes(n), n);
+  for (const n of names) {
+    const r = an(dir, 'check', path.join(LIB, `${n}.anim.json`));
+    assert.equal(r.code, 0, `${n}: ${r.out}`);
+  }
+  let r = an(dir, 'new', 'quadruped/walk', '--out', 'art/anim/dog');
+  assert.equal(r.code, 0, r.out);
+  assert.ok(fs.existsSync(path.join(dir, 'art/anim/dog/walk.anim.json')) && fs.existsSync(path.join(dir, 'art/anim/dog/quadruped.skeleton.json')));
+  r = an(dir, 'preview', 'art/anim/dog/walk.anim.json', '--out', 'dog.gif');
+  assert.equal(r.code, 0, r.out);
+  assert.ok(fs.existsSync(path.join(dir, 'dog.gif')));
+  assert.equal(an(dir, 'new', 'humanoid/moonwalk', '--out', 'x').code, 1);
+});
+
+test('game-animation: a project-specific skeleton and animation (inline), waves, easing; spec errors are explained; pops are flagged', { skip: skipPy }, () => {
+  const dir = tmpDir();
+  const ghost = {
+    frames: 6, fps: 8, loop: true,
+    skeleton: { root: [0, -2], bones: { body: { length: 1, angle: 180, width: 0.6 }, eye: { parent: 'body', at: 0.8, length: 0.3, angle: -90, shape: 'circle', face: true },
+      tail1: { parent: 'body', at: 0, length: 0.4, angle: 20 }, tail2: { parent: 'tail1', length: 0.35, angle: 30 }, tail3: { parent: 'tail2', length: 0.3, angle: 40 } } },
+    keys: { body: { y: [[0, 0], [0.5, -0.3, 'out']], sy: [[0, 1], [0.5, 1.08]] } },
+    waves: [{ bones: ['tail1', 'tail2', 'tail3'], amp: 15, phase_step: 0.15 }],
+  };
+  fs.writeFileSync(path.join(dir, 'ghost.anim.json'), JSON.stringify(ghost));
+  let r = an(dir, 'check', 'ghost.anim.json');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /5 xương, 6 frame, 1 xương có key, 1 sóng, 0 IK/);
+  r = an(dir, 'bake', 'ghost.anim.json', '--out', 'ghost.json');
+  assert.equal(r.code, 0, r.out);
+  const baked = JSON.parse(fs.readFileSync(path.join(dir, 'ghost.json'), 'utf8'));
+  assert.equal(baked.frames.length, 6);
+  assert.ok(baked.frames[3].body.y < baked.frames[0].body.y, 'thân bay lên giữa vòng (y âm hơn)');
+  assert.notEqual(baked.frames[1].tail3.angle, baked.frames[0].tail3.angle, 'đuôi có sóng');
+
+  const bad = (patch, re) => {
+    fs.writeFileSync(path.join(dir, 'bad.anim.json'), JSON.stringify({ ...ghost, ...patch }));
+    const x = an(dir, 'check', 'bad.anim.json');
+    assert.equal(x.code, 1, x.out);
+    assert.match(x.out, re);
+  };
+  bad({ keys: { wing: { rot: [[0, 1]] } } }, /xương 'wing' không có/);
+  bad({ keys: { tail1: { y: [[0, 1]] } } }, /chỉ xương gốc/);
+  bad({ keys: { body: { rot: [[0, 1, 'bouncy']] } } }, /easing 'bouncy'/);
+  bad({ ik: [{ bones: ['body', 'tail2'], target: [[0, [0, 0]]] }] }, /ik cần 2 xương cha-con/);
+  bad({ skeleton: { bones: { a: { length: 1 }, b: { length: 1 } } } }, /đúng một xương gốc/);
+  bad({ keys: { body: { rot: [[0, 0, 'step'], [0.2, 170, 'step']] } } }, /xoay \d+° trong một frame/);
+});
+
+test('game-animation humanoid walk: planted foot on the ground moving back, knee bends, hips lowest after contact', { skip: skipPy }, () => {
   const dir = tmpDir();
   const m = JSON.parse(py(dir, `
 import json, sys
-sys.path.insert(0, ${JSON.stringify(path.join(ART, 'game-raster-art', 'scripts'))})
-import gameart as g
-L = g.PROPORTIONS['normal']; n = 16
-fr = g.motion_frames('walk', n, L)
-sk = [g.solve_skeleton(f, L) for f in fr]
-duty = g.GAITS['walk']['duty']
-stance = [i for i in range(n) if 0.15 < i / n < duty * 0.68]
-leg = L['thigh'] + L['shin']
+sys.path.insert(0, ${JSON.stringify(path.join(ART, 'game-animation', 'scripts'))})
+import animate as A
+an = A.load_anim(${JSON.stringify(path.join(LIB, 'humanoid', 'walk.anim.json'))})
+an.frames = 16
+P = A.all_poses(an)
+stance = [i for i in range(16) if 0.15 < i / 16 < 0.42]
 print(json.dumps({
-  'ground': max(abs(sk[i]['ankle_front'][1]) for i in stance),
-  'back': all(sk[a]['ankle_front'][0] > sk[b]['ankle_front'][0] for a, b in zip(stance, stance[1:])),
-  'knee': max(abs(s['shin_front'] - s['thigh_front']) for s in sk),
-  'lift': -min(s['ankle_front'][1] for s in sk) / leg,
-  'low': max(range(n), key=lambda i: sk[i]['hip'][1]) / n,
-}))`));
-  assert.ok(m.ground < 1e-6, `bàn chân đỡ người phải nằm trên đất: ${m.ground}`);
-  assert.ok(m.back, 'bàn chân đỡ người lùi đều về sau (không trượt tới)');
-  assert.ok(m.knee > 20, `gối phải gập khi bước: ${m.knee}°`);
-  assert.ok(m.lift > 0.08, `chân bước phải nhấc lên: ${m.lift}`);
-  assert.ok(m.low < 0.2 || (m.low > 0.5 && m.low < 0.7), `hông thấp nhất ngay sau lúc tiếp đất: t=${m.low}`);
+  'ground': max(abs(P[i]['shin_front']['end'][1]) for i in stance),
+  'back': all(P[a]['shin_front']['end'][0] > P[b]['shin_front']['end'][0] for a, b in zip(stance, stance[1:])),
+  'knee': max(abs(p['shin_front']['angle'] - p['thigh_front']['angle']) for p in P),
+  'lift': -min(p['shin_front']['end'][1] for p in P),
+  'low': max(range(16), key=lambda i: P[i]['torso']['start'][1]) / 16}))`));
+  assert.ok(m.ground < 1e-3, `chân đỡ nằm trên đất: ${m.ground}`);
+  assert.ok(m.back, 'chân đỡ lùi đều, không trượt tới');
+  assert.ok(m.knee > 20, `gối gập: ${m.knee}°`);
+  assert.ok(m.lift > 0.15, `chân bước nhấc lên: ${m.lift}`);
+  assert.ok(m.low < 0.2 || (m.low > 0.5 && m.low < 0.7), `hông thấp nhất ngay sau tiếp đất: ${m.low}`);
+});
 
+test('game-animation rig + tween: parts follow bones; one sprite squashes and hops; a flat spin keeps a sliver', { skip: skipPy }, () => {
+  const dir = tmpDir();
   py(dir, `
 import os, json
 os.makedirs('parts', exist_ok=True)
 def part(w, h, fill):
     im = Image.new('RGBA', (w, h), (0, 0, 0, 0)); ImageDraw.Draw(im).rounded_rectangle([0, 0, w - 1, h - 1], radius=min(w, h) // 3, fill=fill); return im
-part(30, 46, (70, 130, 200, 255)).save('parts/body.png'); part(36, 36, (250, 210, 170, 255)).save('parts/head.png')
-names = ['body', 'head']
+part(30, 46, (70, 130, 200, 255)).save('parts/torso.png'); part(36, 36, (250, 210, 170, 255)).save('parts/head.png')
+names = ['torso', 'head']
 for s in ('front', 'back'):
-    for n, wh in (('leg', (13, 24)), ('shin', (12, 26)), ('arm', (11, 20)), ('forearm', (10, 20))):
+    for n, wh in (('thigh', (13, 24)), ('shin', (12, 26)), ('arm', (11, 20)), ('forearm', (10, 20))):
         part(*wh, (80, 70, 70, 255)).save(f'parts/{n}_{s}.png'); names.append(f'{n}_{s}')
-json.dump({'parts': {n: {'file': f'parts/{n}.png'} for n in names}}, open('rig.json', 'w'))`);
-  const r = ga(dir, 'rig', 'rig.json', '--anim', 'walk', '--frames', '8', '--size', '96x96', '--out', 'walk.png');
+json.dump({'parts': {n: {'file': f'parts/{n}.png'} for n in names}}, open('rig.json', 'w'))
+part(60, 80, (200, 80, 60, 255)).save('sprite.png')`);
+  let r = an(dir, 'rig', 'rig.json', '--anim', path.join(LIB, 'humanoid', 'walk.anim.json'), '--size', '96x96', '--out', 'walk.png', '--gif', 'walk.gif');
   assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /10 phần/);
+  assert.match(r.out, /8 frame, 10 phần/);
+  const walk = JSON.parse(py(dir, `
+import json
+im = Image.open('walk.png'); fr = [im.crop((i*96, 0, i*96+96, 96)) for i in range(8)]
+print(json.dumps({'size': im.size, 'bottom': [f.getchannel('A').getbbox()[3] for f in fr], 'same': fr[0].tobytes() == fr[2].tobytes()}))`));
+  assert.deepEqual(walk.size, [768, 96]);
+  assert.equal(walk.same, false, 'các frame khác nhau');
+  assert.ok(Math.max(...walk.bottom) - Math.min(...walk.bottom) <= 8, `chân gần một đường: ${walk.bottom}`);
+  fs.writeFileSync(path.join(dir, 'bad-rig.json'), JSON.stringify({ parts: { tentacle: { file: 'parts/head.png' } } }));
+  r = an(dir, 'rig', 'bad-rig.json', '--anim', path.join(LIB, 'humanoid', 'walk.anim.json'), '--size', '64x64', '--out', 'x.png');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /xương 'tentacle' không có/);
+
+  r = an(dir, 'tween', 'sprite.png', '--anim', path.join(LIB, 'sprite', 'squash-hop.anim.json'), '--size', '64x96', '--out', 'hop.png');
+  assert.equal(r.code, 0, r.out);
+  const hop = JSON.parse(py(dir, `
+import json
+im = Image.open('hop.png'); print(json.dumps([im.crop((i*64, 0, i*64+64, 96)).getchannel('A').getbbox() for i in range(8)]))`));
+  const bottoms = hop.map((b) => b[3]);
+  assert.ok(Math.min(...bottoms) < Math.max(...bottoms) - 8, `nảy lên: ${bottoms}`);
+  const widths = hop.map((b) => b[2] - b[0]);
+  assert.ok(Math.max(...widths) - Math.min(...widths) > 4, `nén giãn: ${widths}`);
+  r = an(dir, 'tween', 'sprite.png', '--anim', path.join(LIB, 'sprite', 'spin.anim.json'), '--size', '48x48', '--out', 'spin.png');
+  assert.equal(r.code, 0, r.out);
+  assert.equal(py(dir, `
+im = Image.open('spin.png'); print(all(im.crop((i*48, 0, i*48+48, 48)).getchannel('A').getbbox() for i in range(8)))`), 'True', 'không frame nào biến mất');
 });

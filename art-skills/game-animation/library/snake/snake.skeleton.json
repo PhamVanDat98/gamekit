@@ -1,0 +1,66 @@
+{
+ "root": [
+  1.5,
+  -0.25
+ ],
+ "bones": {
+  "head": {
+   "length": 0.5,
+   "angle": 90,
+   "width": 0.32,
+   "side": "mid",
+   "shape": "circle",
+   "face": true
+  },
+  "seg1": {
+   "parent": "head",
+   "length": 0.42,
+   "angle": 90,
+   "width": 0.284,
+   "side": "mid"
+  },
+  "seg2": {
+   "parent": "seg1",
+   "length": 0.42,
+   "angle": 90,
+   "width": 0.249,
+   "side": "mid"
+  },
+  "seg3": {
+   "parent": "seg2",
+   "length": 0.42,
+   "angle": 90,
+   "width": 0.213,
+   "side": "mid"
+  },
+  "seg4": {
+   "parent": "seg3",
+   "length": 0.42,
+   "angle": 90,
+   "width": 0.178,
+   "side": "mid"
+  },
+  "seg5": {
+   "parent": "seg4",
+   "length": 0.42,
+   "angle": 90,
+   "width": 0.142,
+   "side": "mid"
+  },
+  "seg6": {
+   "parent": "seg5",
+   "length": 0.42,
+   "angle": 90,
+   "width": 0.107,
+   "side": "mid"
+  },
+  "seg7": {
+   "parent": "seg6",
+   "length": 0.42,
+   "angle": 90,
+   "width": 0.071,
+   "side": "mid"
+  }
+ },
+ "note": "Rắn/sâu nhìn ngang, đầu bên phải, bò sát đất."
+}
