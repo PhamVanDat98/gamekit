@@ -60,7 +60,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | `provenance add <file…> --label …` | Nhãn `reference / generated / own / licensed / placeholder` |
 | `pack [--portal] [--all] [--version V] [--compress] [--zip]` | `builds/<YYMMDDNN>/<portal>/{index.html, preview.html, version.txt, <v>/…}` + `builds/<v>/manifest.json` (+ zip) |
 | `release-check [--version V] [--portal p]` | Mặc định bản mới nhất. Kiểm bố cục az-v1, footer bản quyền, chặn asset reference/placeholder, tên game gốc, link ngoài, đường dẫn tuyệt đối, vượt ngân sách tải |
-| `smoke [--quick] [--only …] [--no-perf] [--version [V]] [--json]` | Mở game trong Chromium headless: desktop, mobile dọc/ngang, ad giả fail/skip/slow/none, máy yếu (CPU 4×, 1.6 Mbps). Chụp ảnh vào `.gamekit/smoke/`, bắt lỗi console/tải, cuộn trang, canvas tràn, màn trống, hình đứng yên, Settings + đổi ngôn ngữ, đo thời gian vào game và FPS theo `budget`. Cổng `{auto: smoke}`, `{auto: perf}` |
+| `smoke [--quick \| --scenarios basic\|full] [--only …] [--no-perf] [--version [V]] [--json]` | Mở game trong Chromium headless: desktop, mobile dọc/ngang, ad giả fail/skip/slow/none, máy yếu (CPU 4×, 1.6 Mbps). Bộ `basic` (desktop, mobile dọc/ngang, ad lỗi; ~25s) cho cổng P3/P4, `full` (~35s) cho P5. Chụp ảnh vào `.gamekit/smoke/`, bắt lỗi console/tải, cuộn trang, canvas tràn, màn trống, hình đứng yên, Settings + đổi ngôn ngữ, đo thời gian vào game và FPS theo `budget`. Cổng `{auto: smoke}`, `{auto: perf}` |
 | `fanout --wave N` | Mỗi module một worktree `../<game>.worktrees/<id>` trên nhánh `mod/<id>` + `BRIEF.md` |
 | `check-ownership` | Module chỉ sửa trong thư mục được giao, không đụng vùng shared |
 | `integrate --wave N [--cleanup]` | Merge theo phụ thuộc, test sau mỗi merge, đỏ thì hoàn tác |

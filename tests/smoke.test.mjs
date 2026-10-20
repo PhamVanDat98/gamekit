@@ -8,7 +8,8 @@ import { spawnSync } from 'node:child_process';
 import { tmpDir, write, read, solidPng, gk, sh, CLI, editYaml } from './helpers.mjs';
 import { decodePng, dominantShare } from '../scripts/lib/png.mjs';
 import { cachedChromium, serveDir } from '../scripts/lib/browser.mjs';
-import { parseStep, smokeConfig, fpsStats, judge, DEFAULT_SMOKE, SCENARIOS } from '../scripts/smoke.mjs';
+import { parseStep, smokeConfig, fpsStats, judge, pickScenarios, DEFAULT_SMOKE, SCENARIOS, SCENARIO_SETS } from '../scripts/smoke.mjs';
+import { smokeSetFor, parseGate } from '../scripts/gate.mjs';
 import { crc32 } from '../scripts/lib/zip.mjs';
 
 /** Encode RGBA rows with a given PNG filter per row, so the decoder's unfiltering is really exercised. */
@@ -70,6 +71,23 @@ test('smoke: start steps parse or fail with the accepted forms; config falls bac
   assert.equal(cfg.playSec, DEFAULT_SMOKE.playSec);
   assert.deepEqual(cfg.start, [{ kind: 'click', x: 0.5, y: 0.5 }]);
   assert.deepEqual(smokeConfig({ smoke: { start: ['key Enter'], playSec: 3 } }).start, [{ kind: 'key', key: 'Enter' }]);
+});
+
+test('smoke: scenario sets — basic for P3/P4, full by default and wherever perf is judged', () => {
+  const ids = (args) => pickScenarios(args).map((s) => s.id);
+  assert.deepEqual(ids({}), SCENARIOS.map((s) => s.id));
+  assert.deepEqual(ids({ scenarios: 'basic' }), ['desktop', 'mobile-portrait', 'mobile-landscape', 'ad-fail']);
+  assert.deepEqual(ids({ scenarios: 'full' }), ids({}));
+  assert.deepEqual(ids({ quick: true }), ['desktop']);
+  assert.deepEqual(ids({ scenarios: 'basic', only: 'ad-fail' }), ['ad-fail']);
+  assert.deepEqual(ids({ 'no-perf': true }), SCENARIOS.filter((s) => s.id !== 'weak-phone').map((s) => s.id));
+  assert.throws(() => pickScenarios({ scenarios: 'tiny' }), /basic, full/);
+  assert.ok(!SCENARIO_SETS.basic.includes('weak-phone'), 'basic never judges perf');
+  const items = (t) => parseGate(t);
+  assert.equal(smokeSetFor('P3', items('- [ ] a {auto: smoke}')), 'basic');
+  assert.equal(smokeSetFor('P4', items('- [ ] a {auto: smoke}')), 'basic');
+  assert.equal(smokeSetFor('P5', items('- [ ] a {auto: smoke}')), 'full');
+  assert.equal(smokeSetFor('P3', items('- [ ] a {auto: smoke}\n- [ ] b {auto: perf}')), 'full', 'perf in any gate needs weak-phone');
 });
 
 test('smoke: fps from frame timestamps', () => {

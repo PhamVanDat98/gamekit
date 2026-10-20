@@ -5,12 +5,13 @@ description: Dùng từ P3 tới P5 khi cần thấy game chạy thật trong tr
 
 # Smoke test trong trình duyệt (P3–P5)
 
-`gamekit smoke` dựng bản dev-mock từ source hiện tại, mở bằng Chromium headless như người chơi thật, chơi tự động, chụp ảnh và chấm. Cổng P3, P4, P5 có mục `{auto: smoke}`; P5 thêm `{auto: perf}` (skill **perf-budget**).
+`gamekit smoke` dựng bản dev-mock từ source hiện tại, mở bằng Chromium headless như người chơi thật, chơi tự động, chụp ảnh và chấm. Cổng P3, P4, P5 có mục `{auto: smoke}`; P5 thêm `{auto: perf}` (skill **perf-budget**). Cổng P3/P4 chạy bộ `basic`; P5 (hoặc cổng nào có `{auto: perf}`) chạy bộ `full`. Kịch bản đo FPS (`desktop`, `weak-phone`) chạy riêng, các kịch bản khác chạy song song.
 
 ## 1. Chạy
 | Lệnh | Khi nào |
 | --- | --- |
-| `gamekit smoke` | Đủ 8 kịch bản, khoảng một phút |
+| `gamekit smoke` | Đủ 8 kịch bản (`--scenarios full`), khoảng nửa phút |
+| `gamekit smoke --scenarios basic` | `desktop`, `mobile-portrait`, `mobile-landscape`, `ad-fail`: bộ cổng P3/P4 chạy |
 | `gamekit smoke --quick` | Chỉ `desktop`, khi đang sửa nhanh |
 | `gamekit smoke --only mobile-portrait,ad-fail` | Chỉ vài kịch bản |
 | `gamekit smoke --no-perf` | Bỏ `weak-phone` |

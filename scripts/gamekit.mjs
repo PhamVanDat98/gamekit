@@ -29,8 +29,10 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   provenance list [--label]
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
   release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)
-  smoke [--quick] [--only a,b] [--no-perf] [--version [V]] [--json]   Mở game trong trình duyệt headless (desktop, mobile dọc/ngang,
-                                            ad giả, máy yếu): chụp ảnh vào .gamekit/smoke/, bắt lỗi console, kiểm bố cục, đo FPS/thời gian vào game
+  smoke [--quick | --scenarios basic|full] [--only a,b] [--no-perf] [--version [V]] [--json]
+                                            Mở game trong trình duyệt headless (desktop, mobile dọc/ngang, ad giả, máy yếu): chụp ảnh
+                                            vào .gamekit/smoke/, bắt lỗi console, kiểm bố cục, đo FPS/thời gian vào game.
+                                            basic = desktop, mobile dọc/ngang, ad lỗi (cổng P3/P4); full = đủ 8 kịch bản (mặc định, P5)
   fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
   check-ownership [--module id]             Module chỉ sửa trong thư mục được giao
   integrate --wave N [--test "cmd"] [--cleanup]   Merge theo phụ thuộc, test sau mỗi lần

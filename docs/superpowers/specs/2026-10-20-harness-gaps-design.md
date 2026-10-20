@@ -18,7 +18,7 @@ Bản 0.2.0 kiểm chứng tự động được logic (`core/`, parity) và gó
 - Kịch bản cố định (`SCENARIOS`), chơi bằng PRNG có seed theo `smoke.start/keys/playSec` trong `game.yaml`. Kịch bản ad chạy song song và chơi lâu hơn (quảng cáo chỉ có giữa các vòng). Máy yếu = cấu hình mobile của Lighthouse (CPU 4×, 1.6 Mbps, 150 ms).
 - Chấm (`judge`, hàm thuần, test không cần trình duyệt): lỗi console/JS/tải, loading không tắt, cuộn trang, canvas tràn, màn một màu (giải mã PNG không phụ thuộc thư viện), hình không đổi qua 3 ảnh, thiếu `loadingEnd`/`gameplayStart` (cảnh báo trước P4, lỗi từ P4), footer Settings, đổi ngôn ngữ; perf: FPS < 90% ngân sách (rAF headless tối đa ~60), thời gian vào game trên máy yếu.
 - Chromium báo `ERR_ABORTED` cho `framework.js` đọc bằng stream dù đã nhận đủ 200: chỉ bỏ qua đúng trường hợp có response OK.
-- Cổng: `{auto: smoke}` (P3, P4, P5), `{auto: perf}` (P5); gate chạy smoke một lần bằng tiến trình con (`smoke --json`) cho cả hai mục.
+- Cổng: `{auto: smoke}` (P3, P4, P5), `{auto: perf}` (P5); gate chạy smoke một lần bằng tiến trình con (`smoke --json`) cho cả hai mục. P3/P4 chạy bộ `basic` (desktop, mobile dọc/ngang, ad lỗi), P5 hoặc cổng có `{auto: perf}` chạy `full`. Chỉ kịch bản đo FPS/thời gian vào game (`desktop`, `weak-phone`) chạy riêng; còn lại song song.
 
 ### Bằng chứng từ game gốc (2, 5)
 - `recon`: đọc tĩnh thư mục hoặc archive (zip reader riêng, mở cả APK con trong XAPK), luật nhận diện theo file đặc trưng, phiên bản từ vài KB đầu của file. Bỏ thư mục cache (`Library/`, `node_modules/`…).

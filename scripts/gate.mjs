@@ -48,12 +48,17 @@ export function gateItemsFor(game, text) {
 }
 
 /**
- * {auto: smoke} and {auto: perf} share one browser run per gate check (it takes about a minute).
+ * {auto: smoke} and {auto: perf} share one browser run per gate check (basic before P5, full at P5).
  * Run as a child process: smoke is async, the gate is not.
  */
+/** Scenario set for a gate: the full run at release (P5) or wherever perf is judged, the basic one before. */
+export function smokeSetFor(phase, items) {
+  return phase === 'P5' || items.some((it) => it.auto === 'perf') ? 'full' : 'basic';
+}
+
 function smokeOnce(root, memo) {
   if (!memo.smoke) {
-    const r = spawnSync(process.execPath, [path.join(HERE, 'gamekit.mjs'), 'smoke', '--json'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const r = spawnSync(process.execPath, [path.join(HERE, 'gamekit.mjs'), 'smoke', '--json', '--scenarios', memo.smokeSet ?? 'full'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
     try {
       memo.smoke = { report: JSON.parse(r.stdout) };
     } catch {
@@ -67,7 +72,8 @@ function smokeItem(root, memo, cat) {
   const s = smokeOnce(root, memo);
   if (s.error) return { ok: false, detail: s.error };
   const bad = s.report.issues.filter((i) => i.level === 'error' && i.cat === cat);
-  return { ok: bad.length === 0, detail: bad.slice(0, 3).map((i) => `${i.where}: ${i.msg}`).join('; ') + (bad.length ? ' — xem .gamekit/smoke/' : '') };
+  const detail = bad.slice(0, 3).map((i) => `${i.where}: ${i.msg}`).join('; ') + (bad.length ? ' — xem .gamekit/smoke/' : '');
+  return { ok: bad.length === 0, detail: detail || (cat === 'smoke' ? `(${s.report.scenarioSet}: ${s.report.scenarios.map((x) => x.id).join(', ')})` : '') };
 }
 
 function runAuto(root, name, phase, memo = {}) {
@@ -116,7 +122,7 @@ export function evaluateGate(root, phase) {
   const items = gateItemsFor(loadGame(root), fs.readFileSync(file, 'utf8'));
   // An empty checklist would pass vacuously; treat it as a broken gate file instead.
   if (!items.length) throw new GkError(`gates/${phase}.md không có mục nào dạng "- [ ] …" — cổng không thể rỗng`);
-  const memo = {};
+  const memo = { smokeSet: smokeSetFor(phase, items) };
   return items.map((it) => {
     if (it.auto) {
       const r = runAuto(root, it.auto, phase, memo);

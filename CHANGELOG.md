@@ -4,7 +4,7 @@
 AI nhìn thấy game chạy:
 - Lệnh `smoke`: dựng bản dev-mock từ source (hoặc `--version` cho gói đã pack), mở trong Chromium headless (playwright-core của game; Chrome/Edge có sẵn, chromium của playwright, hoặc `GK_BROWSER`). 8 kịch bản: desktop, mobile dọc/ngang, ad giả fail/skip/slow/none (song song), máy yếu (CPU 4×, 1.6 Mbps/150 ms). Ảnh chụp trong `.gamekit/smoke/` để agent mở xem.
 - Bắt: lỗi console/JS/tải, loading không tắt, trang cuộn, canvas tràn hay quá nhỏ, màn một màu, hình đứng yên khi chơi, thiếu `loadingEnd`/`gameplayStart` (lỗi từ P4), footer Settings, đổi ngôn ngữ; đo thời gian vào game, FPS trung bình/p5, heap theo `budget`.
-- Cổng: P3 `{auto: smoke}`; P4 `{auto: smoke}` (ad giả không làm treo); P5 `{auto: perf}` + `{auto: smoke}` thay cho checklist tay. Gate chạy smoke một lần cho cả hai mục.
+- Cổng: P3 `{auto: smoke}`; P4 `{auto: smoke}` (ad giả lỗi không làm treo); P5 `{auto: perf}` + `{auto: smoke}` thay cho checklist tay. Gate chạy smoke một lần cho cả hai mục; P3/P4 dùng bộ `basic` (desktop, mobile dọc/ngang, ad lỗi), P5 dùng `full`. Kịch bản không đo FPS chạy song song: bộ đủ khoảng 35 giây, `basic` khoảng 25 giây.
 - Template: `playwright-core`, mục `smoke:` trong `game.yaml` (bước vào game, phím, thời gian chơi), task VS Code, `.gamekit/smoke/` gitignored.
 
 Bằng chứng từ game gốc:

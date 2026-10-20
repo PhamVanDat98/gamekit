@@ -44,6 +44,15 @@ export const SCENARIOS = [
   { id: 'weak-phone', device: 'mobile-portrait', throttle: true, fps: 'minFpsMobile', timeToPlay: true, perf: true },
 ];
 
+/**
+ * Named sets. basic: what P3/P4 need (layouts + one failing ad), about half the time of full.
+ * full: everything, including the other ad modes and the weak phone (perf) — P5 and `gamekit smoke` by default.
+ */
+export const SCENARIO_SETS = {
+  basic: ['desktop', 'mobile-portrait', 'mobile-landscape', 'ad-fail'],
+  full: SCENARIOS.map((s) => s.id),
+};
+
 /** Headless rAF runs at the display rate (60), so a 60 fps budget is met at ~58–60; allow 10 %. */
 export const FPS_SLACK = 0.9;
 const BLANK_SHARE = 0.98;
@@ -346,13 +355,20 @@ export function judge(results, game) {
   return issues;
 }
 
-function pickScenarios(args) {
+const measured = (sc) => Boolean(sc.fps || sc.timeToPlay);
+
+export function pickScenarios(args) {
   if (args.quick) return SCENARIOS.filter((s) => s.id === 'desktop');
   let list = SCENARIOS;
+  if (args.scenarios) {
+    const ids = SCENARIO_SETS[args.scenarios];
+    if (!ids) throw new GkError(`--scenarios: "${args.scenarios}" không có (có: ${Object.keys(SCENARIO_SETS).join(', ')})`);
+    list = SCENARIOS.filter((s) => ids.includes(s.id));
+  }
   if (args.only) {
     const want = String(args.only).split(',').map((s) => s.trim());
     for (const id of want) if (!SCENARIOS.some((s) => s.id === id)) throw new GkError(`--only: không có kịch bản "${id}" (có: ${SCENARIOS.map((s) => s.id).join(', ')})`);
-    list = SCENARIOS.filter((s) => want.includes(s.id));
+    list = list.filter((s) => want.includes(s.id));
   }
   if (args['no-perf']) list = list.filter((s) => !s.perf);
   return list;
@@ -387,14 +403,14 @@ export async function smokeForGame(root, args = {}) {
   const server = await serveDir(pkgDir);
   const results = [];
   try {
-    // Measured scenarios run alone; the fake-ad ones only look for errors, so they share the CPU.
-    for (const sc of scenarios.filter((s) => !s.ad)) {
+    // Scenarios that measure FPS / time-to-play run alone; the others only look for errors, so they share the CPU.
+    for (const sc of scenarios.filter(measured)) {
       if (!args.quiet) log.dim(`  ${sc.id}…`);
       results.push(await runScenario(browser, server.url, sc, cfg, outDir));
     }
-    const ads = scenarios.filter((s) => s.ad);
-    if (ads.length && !args.quiet) log.dim(`  ${ads.map((s) => s.id).join(', ')}…`);
-    results.push(...(await Promise.all(ads.map((sc) => runScenario(browser, server.url, sc, cfg, outDir)))));
+    const rest = scenarios.filter((s) => !measured(s));
+    if (rest.length && !args.quiet) log.dim(`  ${rest.map((s) => s.id).join(', ')}…`);
+    results.push(...(await Promise.all(rest.map((sc) => runScenario(browser, server.url, sc, cfg, outDir)))));
   } finally {
     await server.close();
     await browser.close();
@@ -404,6 +420,7 @@ export async function smokeForGame(root, args = {}) {
   const report = {
     at: nowIso(),
     build: built,
+    scenarioSet: args.quick ? 'quick' : args.only ? 'only' : (args.scenarios ?? 'full'),
     browser: label,
     budget: game.budget ?? {},
     weakPhone: WEAK_PHONE,

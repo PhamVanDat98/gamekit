@@ -742,7 +742,7 @@ test('smoke: a game without its dependencies fails clearly; gate reports it on {
   const gate = gk(dir, 'gate');
   assert.equal(gate.code, 1);
   assert.match(gate.out, /✘ Ngân sách hiệu năng.*\[auto: perf\] — .*npm install/);
-  assert.match(gate.out, /✘ Smoke: load, chơi.*\[auto: smoke\] — .*npm install/);
+  assert.match(gate.out, /✘ Smoke đủ 8 kịch bản.*\[auto: smoke\] — .*npm install/);
 });
 
 test('smoke: game.yaml smoke section is schema-checked', () => {
