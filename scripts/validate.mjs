@@ -391,6 +391,12 @@ function validateAssetManifest(root, pr) {
     return;
   }
   for (const e of check('asset-manifest', man)) pr.error(where, e);
+  let en = {};
+  try {
+    en = loadLanguages(root).en ?? {};
+  } catch {
+    /* reported by validateLanguages */
+  }
   const todo = (man.assets ?? []).filter((a) => /^TODO/.test(a.brief ?? '')).map((a) => a.id);
   if (todo.length) pr.warn(where, `${todo.length} mục còn brief TODO: ${todo.slice(0, 10).join(', ')}${todo.length > 10 ? '…' : ''}`);
   const fix = (man.assets ?? []).filter((a) => a.review?.status === 'fix').map((a) => a.id);
@@ -400,7 +406,9 @@ function validateAssetManifest(root, pr) {
     const localized = a.path.startsWith('assets/i18n/');
     if (a.text && a.noText) pr.error(where, `${a.id}: text và noText không thể cùng true`);
     if (a.text && !a.path.startsWith('assets/i18n/en/')) pr.error(where, `${a.id}: ảnh có chữ phải nằm trong assets/i18n/en/ (bản gốc), mỗi ngôn ngữ một bản trong assets/i18n/<mã>/ — hiện là ${a.path}`);
-    if (localized && !a.text) pr.error(where, `${a.id}: ${a.path} nằm trong assets/i18n/ nên phải có text: true`);
+    if (localized && !a.text && !a.voice) pr.error(where, `${a.id}: ${a.path} nằm trong assets/i18n/ nên phải có text: true (ảnh có chữ) hoặc voice: true (lời thoại)`);
+    if (a.voice && (a.kind !== 'audio' || !a.path.startsWith('assets/i18n/en/'))) pr.error(where, `${a.id}: lời thoại (voice: true) phải là kind audio, path trong assets/i18n/en/`);
+    if ((a.voice || a.textKey) && !Object.hasOwn(en, a.textKey ?? '')) pr.error(where, `${a.id}: textKey ${a.textKey ?? '(thiếu)'} không có trong Language/en.json`);
     const file = path.join(root, a.path);
     if (!exists(file)) continue; // not generated yet
     if (a.kind === 'audio' || !/\.(png|jpe?g|webp|gif)$/i.test(a.path)) continue;

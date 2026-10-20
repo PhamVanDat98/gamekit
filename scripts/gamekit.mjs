@@ -29,6 +29,11 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   assets scan [--from reference|assets] [--write]   Nháp asset-manifest.json từ file có sẵn (kích thước, alpha, loại, brief TODO)
   review [--apply review.json]              Trang duyệt asset (.gamekit/local/review/): spec, bản gốc, nhãn, mọi ngôn ngữ;
                                             --apply ghi kết quả vào asset-manifest.json và notes/review.md
+  gen image [--id a,b] [--lang vi] [--dry-run] [--yes]   Sinh ảnh (OpenAI, OPENAI_API_KEY) cho asset make: image-gen;
+                                            ảnh có chữ: mỗi ngôn ngữ một bản đúng chữ trong Language/; khớp kích thước spec
+  gen voice [--id a,b] [--voice alloy]      Lời thoại (voice: true + textKey) mỗi ngôn ngữ một file
+  gen prompt [--id a]                       In prompt (dùng với Codex, ChatGPT, công cụ khác)
+  gen import <id> <file> [--lang vi]        Đưa file làm ở nơi khác vào: khớp spec, gắn nhãn
   pack [--portal a,b | --all] [--version V] [--compress] [--zip]   builds/<YYMMDDNN>/<portal>/ theo bố cục portal
   release-check [--version V] [--portal p]   Cổng phát hành cho builds/<V> (mặc định bản mới nhất)
   fanout --wave N [--dry-run]               Tạo worktree + brief cho từng module của đợt
@@ -38,7 +43,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'write', 'reanalyze']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'write', 'reanalyze', 'yes', 'force']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -76,6 +81,7 @@ const COMMANDS = {
   style: () => import('./style.mjs').then((m) => m.run),
   assets: () => import('./assets.mjs').then((m) => m.run),
   review: () => import('./review.mjs').then((m) => m.run),
+  gen: () => import('./gen.mjs').then((m) => m.run),
 };
 
 export async function main(argv = process.argv.slice(2)) {

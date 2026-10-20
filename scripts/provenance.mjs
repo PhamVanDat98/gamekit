@@ -1,11 +1,9 @@
 // gamekit provenance add|list — label where every asset came from.
 import path from 'node:path';
-import { exists, readJson, writeJson, walk, toPosix } from './lib/io.mjs';
+import { exists, readJson, walk, toPosix } from './lib/io.mjs';
 import { log, GkError } from './lib/log.mjs';
-import { requireGameRoot, nowIso } from './lib/game.mjs';
-import { check } from './lib/schema.mjs';
-
-const LABELS = ['reference', 'generated', 'own', 'licensed', 'placeholder'];
+import { requireGameRoot } from './lib/game.mjs';
+import { LABELS, labelFiles } from './lib/provenance.mjs';
 
 export async function run(args) {
   const root = requireGameRoot(args.cwd);
@@ -30,15 +28,7 @@ export async function run(args) {
       if (list.length) files.push(...list.map((f) => `${rel}/${f}`));
       else files.push(rel);
     }
-    const byPath = new Map(prov.entries.map((e) => [e.path, e]));
-    for (const f of files) {
-      const entry = { path: f, label: args.label, source: args.source ?? null, license: args.license ?? null, note: args.note ?? null, at: nowIso() };
-      byPath.set(f, entry);
-    }
-    prov.entries = [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));
-    const errs = check('provenance', prov);
-    if (errs.length) throw new GkError(`provenance không hợp lệ: ${errs.join('; ')}`);
-    writeJson(file, prov);
+    labelFiles(root, files, { label: args.label, source: args.source ?? null, license: args.license ?? null, note: args.note ?? null });
     log.ok(`Đã gắn nhãn ${args.label} cho ${files.length} file`);
     return 0;
   }
