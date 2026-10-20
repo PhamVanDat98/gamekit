@@ -5,6 +5,11 @@
   "loop": true,
   "brief": "Đứng thở 2 s: thân phồng 3% rồi xẹp (giữ khối), đầu và tay lệch pha thân 4–8 khung (overlap), đuôi đung đưa chậm, tai giật một cái (tai sau trễ 2 khung), chớp mắt một lần. Không bao giờ đứng im hẳn — moving hold.",
   "tracks": {
+    "body.bulge": [
+      { "f": 0, "v": 0 },
+      { "f": 60, "v": 0.03, "ease": "inOut" },
+      { "f": 120, "v": 0, "ease": "inOut" }
+    ],
     "body.stretch": [
       { "f": 0, "v": 1 },
       { "f": 60, "v": 1.03, "ease": "inOut" },

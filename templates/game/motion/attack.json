@@ -4,6 +4,26 @@
   "role": "telegraph",
   "brief": "Đòn lao húc của kẻ địch (telegraph). Lấy đà 24 khung: lùi người, ngả ra sau, giãn cao, hai tay vung ra sau, chân trước chống, mắt nheo quyết tâm; rướn thêm 10 khung (moving hold) — người chơi có ~0.57 s để đọc. Lao tới trong 4 khung: người đổ về trước, giãn ngang theo hướng lao (stretch 0.8), tay quăng tới, chân đạp ra sau, mắt mở to, hét. Trôi thêm rồi lùi về chỗ cũ trong 26 khung; tai, đuôi quất theo. Renderer: nháy đỏ f0–24 (tín hiệu hình).",
   "tracks": {
+    "body.bend": [
+      { "f": 0, "v": 0 },
+      { "f": 24, "v": -14, "ease": "inOut" },
+      { "f": 34, "v": -16, "ease": "out" },
+      { "f": 38, "v": 16, "ease": "out" },
+      { "f": 48, "v": -4, "ease": "inOut" },
+      { "f": 58, "v": 0, "ease": "inOut" }
+    ],
+    "body.bulge": [
+      { "f": 0, "v": 0 },
+      { "f": 36, "v": 0 },
+      { "f": 39, "v": 0.12, "ease": "out" },
+      { "f": 50, "v": 0, "ease": "inOut" }
+    ],
+    "legR.bend": [
+      { "f": 0, "v": 0 },
+      { "f": 24, "v": -10, "ease": "inOut" },
+      { "f": 38, "v": 20, "ease": "out" },
+      { "f": 50, "v": 0, "ease": "inOut" }
+    ],
     "body.x": [
       { "f": 0, "v": 0 },
       { "f": 24, "v": -14, "ease": "inOut", "beat": "anticipation" },

@@ -5,12 +5,13 @@
  *   Chơi thử: the sample character driven by keys/touch — idle loop, walk while ←/→ is held,
  *        one-shots on top, with the game-feel layer a renderer adds (flash, shake, dust): /lab.html?play=1
  *   Xuất frame: bake the motion into one PNG per frame → art/frames/<name>/ (dev server writes them).
+ *   Mềm (mesh): soft parts bend and bulge and drag behind; off = rigid cut-out, to compare (?soft=0).
  *   Ảnh từng khung: play art/frames/<name>/ (drawn/ if redrawn by `gamekit frames --codex`, else the
  *        baked poses) with a contact sheet under it: /lab.html?frames=hop
  * Swap SAMPLE_RIG for the game's real rig (same part names as the motions).
  * Dev tool text is not player-facing, so it does not go through t().
  */
-import { Animator, MOTIONS, Spring, drawRig, motionFrames, onionSkin, poseAt, worldMatrices, type Motion, type Poses, type RigPart } from './index';
+import { Animator, Drag, MOTIONS, Spring, drawRig, motionFrames, motionSeconds, onionSkin, poseAt, posesWithDrag, worldMatrices, type Motion, type Poses, type RigPart } from './index';
 import { SAMPLE_RIG, SAMPLE_SHADOW } from './sample-rig';
 import { bakeMotion } from './bake';
 import { FrameAnim, frameIndex, loadFrameAnim, type FrameMeta } from './frames';
@@ -32,6 +33,7 @@ let current: Motion | undefined = MOTIONS[q.get('m') ?? ''] ?? MOTIONS['hop'] ??
 let speed = Number(q.get('speed') ?? 1);
 let onion = q.get('onion') === '1';
 let trail = q.get('trail') !== '0';
+let soft = q.get('soft') !== '0';
 let frozen: number | null = q.has('f') ? Number(q.get('f')) : null;
 let t = 0;
 
@@ -55,6 +57,20 @@ let x = canvas.width / 2;
 let facing = 1;
 let walking = false;
 const lean = new Spring(0, 0, 3, 0.5);
+const drag = new Drag(RIG);
+
+/** Rigid comparison: no bend, no bulge (the mesh is skipped when drawing too). */
+function rigid(poses: Poses): Poses {
+  const out: Poses = {};
+  for (const [k, p] of Object.entries(poses)) out[k] = { ...p, bend: 0, bulge: 0 };
+  return out;
+}
+
+/** What the lab shows for a motion at `sec`: keys, plus drag simulated from the start when soft. */
+function posesFor(m: Motion, sec: number): Poses {
+  if (!soft) return rigid(poseAt(m, sec));
+  return posesWithDrag(RIG, (s) => poseAt(m, s), sec, { preroll: m.loop ? motionSeconds(m) : 0 });
+}
 let trauma = 0;
 let lastShot: { name: string; frame: number } | null = null;
 const dust: { x: number; y: number; vx: number; vy: number; life: number }[] = [];
@@ -93,7 +109,8 @@ async function openFrames(name: string): Promise<void> {
 
 async function bakeCurrent(): Promise<void> {
   if (!current) return;
-  const { meta, frames } = bakeMotion(RIG, current, { fps: bakeFps });
+  const m = current;
+  const { meta, frames } = bakeMotion(RIG, m, { fps: bakeFps, posesAt: (sec) => posesFor(m, sec) });
   bakeNote = `Đang ghi ${frames.length} khung…`;
   const res = await fetch('/__gk/bake', { method: 'POST', body: JSON.stringify({ meta, images: frames.map((c) => c.toDataURL('image/png')) }) });
   bakeNote = res.ok
@@ -184,6 +201,7 @@ controls.append(
     button('Xem từng chuyển động', () => (mode = 'view'), () => mode === 'view'),
     button('Chơi thử', () => (mode = 'play'), () => mode === 'play'),
     button('Ảnh từng khung', () => (mode = 'frames'), () => mode === 'frames'),
+    button('Mềm (mesh)', () => ((soft = !soft), drag.reset()), () => soft),
   ),
   viewControls,
   playControls,
@@ -218,7 +236,7 @@ function drawCharacter(cx: number, poses: Poses, alpha = 1, opts: { dir?: number
   lctx.translate(cx, GROUND);
   lctx.scale(opts.dir ?? 1, 1);
   lctx.rotate(((opts.rot ?? 0) * Math.PI) / 180);
-  drawRig(lctx, RIG, poses);
+  drawRig(lctx, RIG, poses, { soft });
   if (opts.tint) {
     lctx.setTransform(1, 0, 0, 1, 0, 0);
     lctx.globalCompositeOperation = 'source-atop';
@@ -247,7 +265,7 @@ function drawTrail(m: Motion, cx: number): void {
   // Where the head's neck pivot travels: arcs should curve, spacing shows ease (close dots = slow).
   ctx.fillStyle = '#ffd25a';
   for (let f = 0; f <= motionFrames(m); f += 2) {
-    const mat = worldMatrices(RIG, poseAt(m, f / (m.fps ?? 60))).head;
+    const mat = worldMatrices(RIG, posesFor(m, f / (m.fps ?? 60))).head;
     if (!mat) continue;
     const head = RIG.find((p) => p.name === 'head')!;
     const px = mat[0] * head.pivot[0] + mat[2] * head.pivot[1] + mat[4];
@@ -267,8 +285,8 @@ function renderView(): void {
   const sec = frozen != null ? frozen / fps() : t;
   drawShadow(cx, poseAt(m, sec));
   if (trail) drawTrail(m, cx);
-  if (onion) onionSkin(sec, (s, a) => drawCharacter(cx, poseAt(m, s), a));
-  else drawCharacter(cx, poseAt(m, sec));
+  if (onion) onionSkin(sec, (s, a) => drawCharacter(cx, posesFor(m, s), a));
+  else drawCharacter(cx, posesFor(m, sec));
   const total = motionFrames(m);
   info.textContent = `${m.name} · ${m.role}\nkhung ${Math.min(total, Math.round(sec * fps()))}/${total} @${fps()}${frozen != null ? ' (dừng)' : ''}${bakeNote ? `\n\n${bakeNote}` : ''}\n\n${m.brief ?? ''}`;
 }
@@ -280,7 +298,7 @@ function renderPlay(): void {
   ctx.save();
   ctx.translate(Math.sin(now * 61) * shake * MAX_SHAKE, Math.cos(now * 47) * shake * MAX_SHAKE);
   drawGround(-x);
-  const poses = anim.all;
+  const poses = soft ? drag.apply(anim.all) : rigid(anim.all);
   // The world scrolls under the character; wrap so it never walks off the lab.
   const cx = canvas.width / 2;
   drawShadow(cx, poses);
@@ -375,6 +393,8 @@ function updatePlay(dt: number): void {
   }
   lastShot = name ? { name, frame: f } : null;
   anim.update(dt);
+  // Walking moves the world, not the rig: tell the drag so tail and ears trail behind.
+  if (soft) drag.step(dt, anim.all, [walking ? WALK_SPEED : 0, 0]);
   trauma = Math.max(0, trauma - dt * 1.6);
   for (const d of dust) {
     d.x += d.vx * dt;

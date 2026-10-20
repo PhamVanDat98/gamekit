@@ -1,8 +1,10 @@
 import type { Motion } from './motion';
 
 export * from './animator';
+export * from './drag';
 export * from './ease';
 export * from './frames';
+export * from './mesh';
 export * from './motion';
 export * from './rig';
 export * from './spring';

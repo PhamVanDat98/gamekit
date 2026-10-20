@@ -1,12 +1,17 @@
-import { motionFrames, poseAt, type Motion } from './motion';
+import { motionFrames, poseAt, type Motion, type Poses } from './motion';
 import { drawRig, type RigPart } from './rig';
 import type { FrameMeta } from './frames';
 
 /**
  * Render a motion on a rig into one image per frame (browser only). Every frame uses the same
- * box, so the anchor (ground point under the feet) is the same pixel in all of them.
+ * box, so the anchor (ground point under the feet) is the same pixel in all of them. Pass
+ * `posesAt` to bake what the lab shows (with drag), not just the keys.
  */
-export function bakeMotion(rig: readonly RigPart[], m: Motion, { fps = 24, scale = 1, pad = 4 } = {}): { meta: FrameMeta; frames: HTMLCanvasElement[] } {
+export function bakeMotion(
+  rig: readonly RigPart[],
+  m: Motion,
+  { fps = 24, scale = 1, pad = 4, posesAt = (sec: number): Poses => poseAt(m, sec) } = {},
+): { meta: FrameMeta; frames: HTMLCanvasElement[] } {
   const SIZE = 1024;
   const origin: [number, number] = [SIZE / 2, SIZE * 0.75];
   const mfps = m.fps ?? 60;
@@ -24,7 +29,7 @@ export function bakeMotion(rig: readonly RigPart[], m: Motion, { fps = 24, scale
     wctx.clearRect(0, 0, SIZE, SIZE);
     wctx.translate(origin[0], origin[1]);
     wctx.scale(scale, scale);
-    drawRig(wctx, rig, poseAt(m, sec));
+    drawRig(wctx, rig, posesAt(sec));
     const data = wctx.getImageData(0, 0, SIZE, SIZE);
     for (let y = 0; y < SIZE; y++)
       for (let x = 0; x < SIZE; x++)

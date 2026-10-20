@@ -13,6 +13,7 @@ Vật mềm bẹp khi chạm, giãn khi nhanh — nhưng **giữ khối**: cao r
 - Pivot ở **điểm tiếp xúc**: chân khi đáp, mặt bị đánh khi trúng đòn. Pivot ở giữa làm nhân vật "lún" xuống đất.
 - Giãn **theo hướng chuyển động**: bay chéo thì xoay phần theo hướng vận tốc rồi mới giãn. Theo tốc độ: `stretchFromSpeed(v, vMax, 1.2–1.3)`.
 - Bẹp chỉ 1–3 khung lúc chạm, rồi nảy quá (1.05–1.1) và về.
+- Phần có mesh: thêm `bulge` (phồng ở giữa, khớp và đầu mút giữ nguyên) — nén/chạm 0.1–0.2, giãn −0.05. Co giãn đều cả hình chữ nhật trông như giấy bị kéo; phồng giữa trông như thịt.
 - Lỗi AI: `scale` cả hai trục cùng lúc (phồng như bóng bay, không phải co giãn).
 
 ## 2. Anticipation (chuẩn bị, lấy đà)
@@ -39,6 +40,8 @@ Thân dừng nhưng phần phụ (tóc, tai, đuôi, áo, râu) **tiếp tục**
 - Thân cũng không dừng đứng: tới đích thì vượt nhẹ (overshoot) rồi settle 4–10 khung.
 - **Moving hold**: pose đứng yên vẫn "thở" 1–3% — đứng im tuyệt đối trông như đơ.
 - `Spring`: frequency 2–5 Hz (phần dài/nặng thấp hơn), damping 0.3–0.6 (thấp = lắc nhiều, cartoon hơn).
+- **Drag tự động** (`drag` trên part có mesh, `src/view/anim/drag.ts`): phần phụ uốn ngược hướng khung chứa nó di chuyển (`vel`) và xoay (`rot`), spring đưa về. Một lần cấu hình, mọi chuyển động đều có overlap — đây là chỗ "mượt" đến nhiều nhất. Đuôi: vel 0.09, rot 0.07, 2.6 Hz, damping 0.3; tai: 0.05, 0.05, 4 Hz, 0.32; tay: 0.035, 0.025, 4.5 Hz, 0.45.
+- **Successive breaking of joints** (Williams): khớp gãy lần lượt từ gốc ra ngọn — với mesh, `bend` của lưng đi trước, tay trễ 2 khung, đuôi trễ nữa.
 
 ## 6. Slow in & slow out (ease)
 Vật sống tăng tốc và giảm tốc. Spacing (khoảng cách giữa các khung) dày ở hai đầu, thưa ở giữa.
@@ -77,7 +80,7 @@ Cartoon đẩy pose 1.5–2× mức thật: nén sâu hơn, giãn dài hơn, ngh
 ## 11. Solid drawing (khối, thể tích)
 Với rig cắt rời:
 - Khớp có phần chồng (overlap) 10–20% dưới phần kia, đầu khớp tròn → xoay ±30° không lộ hở.
-- Xoay phần 2D quá ±30–40° sẽ lộ "giấy": đổi hình (mặt nghiêng, tay co) bằng swap ảnh.
+- Xoay phần 2D quá ±30–40° sẽ lộ "giấy": đổi hình (mặt nghiêng, tay co) bằng swap ảnh, hoặc **uốn** (`bend`) thay vì xoay — tay chân cong theo cung giữ được cảm giác có thể tích mà rig cứng không có.
 - Thứ tự lớp (`z`) đúng: tay xa sau thân, tay gần trước thân.
 - Squash giữ khối (nguyên lý 1).
 

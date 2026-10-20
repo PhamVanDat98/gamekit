@@ -5,6 +5,25 @@
   "loop": true,
   "brief": "Đi tại chỗ, 20 khung/bước (Williams: contact → down → passing → up). Hông thấp nhất ngay sau contact (f4, f24), cao nhất sau passing. Tay ngược chân cùng bên, trễ 2 khung. Đầu gật trễ thân; tai nảy theo nhịp, tai sau trễ 1 khung; đuôi vẫy mỗi bước.",
   "tracks": {
+    "legL.bend": [
+      { "f": 0, "v": 0 },
+      { "f": 10, "v": 20, "ease": "inOut" },
+      { "f": 20, "v": 0, "ease": "inOut" },
+      { "f": 40, "v": 0 }
+    ],
+    "legR.bend": [
+      { "f": 0, "v": 0 },
+      { "f": 20, "v": 0 },
+      { "f": 30, "v": 20, "ease": "inOut" },
+      { "f": 40, "v": 0, "ease": "inOut" }
+    ],
+    "body.bend": [
+      { "f": 0, "v": 2 },
+      { "f": 10, "v": -1, "ease": "inOut" },
+      { "f": 20, "v": 2, "ease": "inOut" },
+      { "f": 30, "v": -1, "ease": "inOut" },
+      { "f": 40, "v": 2, "ease": "inOut" }
+    ],
     "body.y": [
       { "f": 0, "v": 2 },
       { "f": 4, "v": 3 },

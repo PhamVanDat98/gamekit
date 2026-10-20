@@ -4,6 +4,27 @@
   "role": "action",
   "brief": "Giật mình kiểu cartoon (take): co rúm 6 khung (nén 0.84, cúi đầu, nheo mắt) rồi bung ra trong 3 khung — giãn 1.32, nhảy khỏi đất, mắt to 1.4×, há miệng to, hai tay bung ra, đuôi dựng, tai vểnh. Giữ pose cực 17 khung (moving hold: vẫn xẹp dần) để mắt kịp đọc, rồi thả về trong 12–14 khung.",
   "tracks": {
+    "body.bulge": [
+      { "f": 0, "v": 0 },
+      { "f": 6, "v": 0.1, "ease": "inOut" },
+      { "f": 9, "v": -0.08, "ease": "out" },
+      { "f": 26, "v": -0.06, "ease": "inOut" },
+      { "f": 36, "v": 0, "ease": "inOut" }
+    ],
+    "body.bend": [
+      { "f": 0, "v": 0 },
+      { "f": 6, "v": 6, "ease": "inOut" },
+      { "f": 9, "v": -6, "ease": "out" },
+      { "f": 26, "v": -4, "ease": "inOut" },
+      { "f": 40, "v": 0, "ease": "inOut" }
+    ],
+    "tail.bend": [
+      { "f": 0, "v": 0 },
+      { "f": 6, "v": -20, "ease": "inOut" },
+      { "f": 9, "v": 40, "ease": "out" },
+      { "f": 26, "v": 35, "ease": "inOut" },
+      { "f": 38, "v": 0, "ease": "inOut" }
+    ],
     "body.stretch": [
       { "f": 0, "v": 1 },
       { "f": 6, "v": 0.84, "ease": "inOut", "beat": "anticipation" },

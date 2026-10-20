@@ -2,7 +2,7 @@
 
 Điểm xuất phát, không phải luật: chỉnh theo style và cảm giác người dùng duyệt. Mỗi khối JSON dưới đây đạt `gamekit motion` không cảnh báo (test của plugin chạy lại chúng); chép vào `motion/<name>.json`, thêm `"$schema": "../.gamekit/schemas/motion.schema.json"`. Bốn file mẫu có sẵn trong template: `idle`, `hop`, `hit`, `pop-in`.
 
-Ký hiệu: `s` = `stretch` (giữ khối), pivot thân ở chân trừ khi ghi khác.
+Ký hiệu: `s` = `stretch` (giữ khối), pivot thân ở chân trừ khi ghi khác. Nhân vật có mesh (như Mochi trong template): thêm `body.bulge` ở nhịp nén/chạm (0.12–0.2), `body.bend` ở lấy đà/bị đánh (±6–16°), `legX.bend` 20–30° khi bước và khi bay — xem `motion/*.json` của template.
 
 ## Nhân vật
 

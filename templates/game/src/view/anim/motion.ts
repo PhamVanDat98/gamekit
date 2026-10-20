@@ -1,7 +1,7 @@
 import { DEFAULT_EASE, EASES, type EaseName } from './ease';
 
 /** motion/*.json — schema in .gamekit/schemas/motion.schema.json; `npm run gk -- motion` checks it. */
-export type Prop = 'x' | 'y' | 'rot' | 'sx' | 'sy' | 'stretch' | 'alpha';
+export type Prop = 'x' | 'y' | 'rot' | 'bend' | 'sx' | 'sy' | 'stretch' | 'bulge' | 'alpha';
 export interface Key {
   f: number;
   v: number;
@@ -20,7 +20,10 @@ export interface Motion {
   skip?: Record<string, string>;
 }
 
-/** Offset from a part's rest pose: x/y px, rot degrees, sx/sy scale, alpha. */
+/**
+ * Offset from a part's rest pose: x/y px, rot degrees, sx/sy scale, alpha. Parts with a mesh
+ * also curve (bend, degrees from root to tip) and swell in the middle (bulge, 0 = rest).
+ */
 export interface Pose {
   x: number;
   y: number;
@@ -28,10 +31,12 @@ export interface Pose {
   sx: number;
   sy: number;
   alpha: number;
+  bend: number;
+  bulge: number;
 }
 export type Poses = Record<string, Pose>;
 
-export const rest = (): Pose => ({ x: 0, y: 0, rot: 0, sx: 1, sy: 1, alpha: 1 });
+export const rest = (): Pose => ({ x: 0, y: 0, rot: 0, sx: 1, sy: 1, alpha: 1, bend: 0, bulge: 0 });
 
 export function sampleKeys(keys: readonly Key[], f: number): number {
   const first = keys[0];
@@ -77,5 +82,14 @@ export function poseAt(m: Motion, sec: number): Poses {
 /** Layer b on top of a: offsets add, scales and alpha multiply. */
 export function combine(a: Pose, b: Pose | undefined): Pose {
   if (!b) return a;
-  return { x: a.x + b.x, y: a.y + b.y, rot: a.rot + b.rot, sx: a.sx * b.sx, sy: a.sy * b.sy, alpha: a.alpha * b.alpha };
+  return {
+    x: a.x + b.x,
+    y: a.y + b.y,
+    rot: a.rot + b.rot,
+    sx: a.sx * b.sx,
+    sy: a.sy * b.sy,
+    alpha: a.alpha * b.alpha,
+    bend: a.bend + b.bend,
+    bulge: a.bulge + b.bulge,
+  };
 }

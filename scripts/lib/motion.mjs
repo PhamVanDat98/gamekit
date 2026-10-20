@@ -52,12 +52,12 @@ const splitTrack = (name) => {
   return { part: name.slice(0, i), prop: name.slice(i + 1) };
 };
 const POSITION = new Set(['x', 'y']);
-const DEFORM = new Set(['sx', 'sy', 'stretch']);
+const DEFORM = new Set(['sx', 'sy', 'stretch', 'bulge']);
 // Below these a change is noise, not movement.
-const EPS = { x: 0.5, y: 0.5, rot: 0.5, sx: 0.005, sy: 0.005, stretch: 0.005, alpha: 0.005 };
-const REST = { x: 0, y: 0, rot: 0, sx: 1, sy: 1, stretch: 1, alpha: 1 };
+const EPS = { x: 0.5, y: 0.5, rot: 0.5, bend: 0.5, sx: 0.005, sy: 0.005, stretch: 0.005, bulge: 0.005, alpha: 0.005 };
+const REST = { x: 0, y: 0, rot: 0, bend: 0, sx: 1, sy: 1, stretch: 1, bulge: 0, alpha: 1 };
 // Which kind of change counts as "the main action" when no key says beat: action.
-const PRIORITY = { x: 3, y: 3, rot: 2, sx: 1, sy: 1, stretch: 1, alpha: 0 };
+const PRIORITY = { x: 3, y: 3, rot: 2, bend: 2, sx: 1, sy: 1, stretch: 1, bulge: 1, alpha: 0 };
 
 export function segments(m) {
   const out = [];

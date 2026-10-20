@@ -19,8 +19,9 @@ Model tạo ảnh giỏi **một ảnh đẹp**, dở **nhiều ảnh giống h�
    - Cắt từ ảnh toàn thân bằng công cụ tách lớp/xoá nền, rồi vẽ bù phần bị che ở khớp.
    - Vẽ bằng code (SVG/canvas path) khi hình đơn giản: AI viết vector cho hình cartoon đơn giản rất ổn, đổi hình bằng tham số (độ cong miệng, độ mở mắt), sắc nét ở mọi kích thước. Hợp cho UI, vật phẩm, nhân vật dạng khối.
 3. **Pivot = khớp**: đo toạ độ khớp trên từng ảnh (vai trên ảnh tay, cổ trên ảnh đầu, chân trên ảnh thân) → `pivot` của part; vị trí khớp trên ảnh cha → `at`.
-4. **Ghép rig** theo mẫu `src/view/anim/sample-rig.ts`, rồi trỏ `RIG` trong `src/view/anim/lab.ts` vào nó: thứ tự phần = cha trước con; `z` cho tay xa (âm) / tay gần (dương).
-5. **Thử khớp**: ở lab, tạm đặt `rot` ±30° cho từng phần và `stretch` 0.7 / 1.3 cho thân, chụp màn hình: khớp có hở? phần có bị cắt? Hở thì vẽ dư thêm hoặc dời pivot.
+4. **Phần mềm (mesh)**: tay, chân, đuôi, tai, thân vẽ **thẳng**, bề ngang đều dọc trục, khớp ở một đầu. Khai báo `mesh: { axis: [hướng từ khớp ra ngọn] }` và `box` (vùng ảnh, gồm cả nét viền). Thêm `drag` cho phần phụ để có follow-through tự động. Ảnh phần mềm nên ≥ 2× kích thước hiển thị: mesh kéo giãn ảnh.
+5. **Ghép rig** theo mẫu `src/view/anim/sample-rig.ts`, rồi trỏ `RIG` trong `src/view/anim/lab.ts` vào nó: thứ tự phần = cha trước con; `z` cho tay xa (âm) / tay gần (dương).
+6. **Thử khớp**: ở lab, tạm đặt `rot` ±30° cho từng phần và `stretch` 0.7 / 1.3 cho thân, chụp màn hình: khớp có hở? phần có bị cắt? Hở thì vẽ dư thêm hoặc dời pivot.
 
 ## Spec trong `asset-manifest.json`
 Mỗi phần một entry `kind: "anim"`:

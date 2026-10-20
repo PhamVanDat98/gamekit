@@ -4,6 +4,42 @@
   "role": "action",
   "brief": "Nhảy tại chỗ (pivot ở chân). Chuẩn bị: nén 0.72 trong 9 khung, cúi đầu, vung tay ra sau, giữ 3 khung. Action: bật lên 10 khung (out), giãn 1.25 lúc rời đất, tay vung lên trước, chân thu lại; tròn ở đỉnh (out rồi in = treo ở đỉnh). Rơi 12 khung (in), tay và tai bị kéo lên (drag). Chạm đất: bẹp 0.68 trong 2 khung, gật đầu, tai và đuôi quất xuống rồi dao động tắt dần, mắt nheo. Mọi phần về pose nghỉ ở cuối.",
   "tracks": {
+    "body.bulge": [
+      { "f": 0, "v": 0 },
+      { "f": 9, "v": 0.14, "ease": "inOut" },
+      { "f": 12, "v": 0.14 },
+      { "f": 15, "v": -0.06, "ease": "out" },
+      { "f": 22, "v": 0, "ease": "inOut" },
+      { "f": 34, "v": 0 },
+      { "f": 36, "v": 0.2, "ease": "out" },
+      { "f": 44, "v": -0.04, "ease": "out" },
+      { "f": 52, "v": 0, "ease": "inOut" }
+    ],
+    "body.bend": [
+      { "f": 0, "v": 0 },
+      { "f": 9, "v": 6, "ease": "inOut" },
+      { "f": 12, "v": 6 },
+      { "f": 16, "v": -8, "ease": "out" },
+      { "f": 26, "v": 0, "ease": "inOut" },
+      { "f": 34, "v": 0 },
+      { "f": 37, "v": 7, "ease": "out" },
+      { "f": 46, "v": -2, "ease": "inOut" },
+      { "f": 54, "v": 0, "ease": "inOut" }
+    ],
+    "legL.bend": [
+      { "f": 0, "v": 0 },
+      { "f": 12, "v": 0 },
+      { "f": 18, "v": 25, "ease": "out" },
+      { "f": 30, "v": 10, "ease": "inOut" },
+      { "f": 35, "v": 0, "ease": "out" }
+    ],
+    "legR.bend": [
+      { "f": 0, "v": 0 },
+      { "f": 12, "v": 0 },
+      { "f": 18, "v": 30, "ease": "out" },
+      { "f": 30, "v": 12, "ease": "inOut" },
+      { "f": 35, "v": 0, "ease": "out" }
+    ],
     "body.y": [
       { "f": 0, "v": 0 },
       { "f": 12, "v": 0 },

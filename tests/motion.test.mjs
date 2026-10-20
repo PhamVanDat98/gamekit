@@ -116,3 +116,11 @@ test('motion: a one-shot that ends off its rest pose warns (it would snap back t
   assert.deepEqual(r.errors, []);
   assert.deepEqual(r.warnings, ['rest']);
 });
+
+test('motion: soft parts — bend and bulge are keyable; bulge counts as squash, both must end at rest', () => {
+  const m = { name: 'b', role: 'action', tracks: { 'body.y': keys([0, 0], [12, 4], [20, -60, 'out', 'action'], [32, 0, 'in']), 'body.bulge': keys([0, 0], [8, 0.15], [14, -0.05, 'out'], [34, 0.2, 'out'], [44, 0]), 'tail.bend': keys([0, 0], [20, -30, 'out'], [40, 10]) } };
+  assert.deepEqual(check('motion', m), []);
+  const r = checks(m);
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.warnings, ['rest']); // tail.bend ends at 10
+});

@@ -3,7 +3,9 @@ import type { RigPart } from './rig';
 /**
  * "Mochi" — a sample cut-out character drawn in code (vector), facing right, origin on the ground
  * under the feet. 12 parts with pivots on the joints, like a rig built from AI-made parts would be.
- * The motions in motion/*.json key these part names. Replace with the game's real rig.
+ * Body, arms, legs, tail and ears are soft (mesh): they bend and bulge; tail, ears and arms also
+ * drag behind on their own (follow-through). The motions in motion/*.json key these part names.
+ * Replace with the game's real rig.
  */
 const INK = '#3b2a20';
 const FUR = '#fff1d6';
@@ -16,6 +18,10 @@ const BODY_H = 50;
 const LEG = 16;
 const HEAD_W = 84;
 const HEAD_H = 70;
+// Floppy parts drag a lot and wobble long; arms are heavier and settle sooner.
+const TAIL_DRAG = { vel: 0.09, rot: 0.07, frequency: 2.6, damping: 0.3, max: 45 };
+const EAR_DRAG = { vel: 0.05, rot: 0.05, frequency: 4, damping: 0.32, max: 30 };
+const ARM_DRAG = { vel: 0.035, rot: 0.025, frequency: 4.5, damping: 0.45, max: 25 };
 
 function shape(ctx: CanvasRenderingContext2D, fill: string, path: (ctx: CanvasRenderingContext2D) => void, line = 3): void {
   ctx.beginPath();
@@ -57,6 +63,13 @@ const ear = (inner: boolean) => (ctx: CanvasRenderingContext2D) => {
   }
 };
 
+// Limbs and ears hang from their pivot along an axis; boxes cover the drawing plus its outline.
+const LIMB = { axis: [0, 1] as [number, number], segments: 8 };
+const EAR = { axis: [0, -1] as [number, number], segments: 6 };
+const LEG_BOX: [number, number, number, number] = [-3, -2, 22, 31];
+const ARM_BOX: [number, number, number, number] = [-3, -2, 18, 38];
+const EAR_BOX: [number, number, number, number] = [-2, -2, 28, 32];
+
 export const SAMPLE_RIG: RigPart[] = [
   { name: 'root', at: [0, 0], pivot: [0, 0] },
   {
@@ -65,6 +78,8 @@ export const SAMPLE_RIG: RigPart[] = [
     parent: 'root',
     at: [0, 0],
     pivot: [BODY_W / 2, BODY_H + LEG],
+    mesh: { axis: [0, -1], segments: 6 },
+    box: [-3, -3, BODY_W + 6, BODY_H + 6],
     draw: (ctx) => {
       shape(ctx, FUR, (c) => c.roundRect(0, 0, BODY_W, BODY_H, [20, 22, 22, 22]));
       ctx.beginPath();
@@ -83,6 +98,9 @@ export const SAMPLE_RIG: RigPart[] = [
     at: [6, BODY_H - 14],
     pivot: [30, 30],
     z: -3,
+    mesh: { axis: [-24, -26], segments: 10 },
+    box: [-3, -5, 42, 44],
+    drag: TAIL_DRAG,
     draw: (ctx) => {
       ctx.lineCap = 'round';
       ctx.strokeStyle = INK;
@@ -100,10 +118,10 @@ export const SAMPLE_RIG: RigPart[] = [
       ctx.stroke();
     },
   },
-  { name: 'legL', parent: 'body', at: [BODY_W / 2 - 13, BODY_H - 6], pivot: [6, 0], z: -2, draw: leg(FUR_BACK) },
-  { name: 'legR', parent: 'body', at: [BODY_W / 2 + 7, BODY_H - 6], pivot: [6, 0], z: -1, draw: leg(FUR) },
-  { name: 'armL', parent: 'body', at: [BODY_W / 2 - 8, 12], pivot: [6, 4], z: -2, draw: arm(FUR_BACK) },
-  { name: 'armR', parent: 'body', at: [BODY_W / 2 + 12, 14], pivot: [6, 4], z: 5, draw: arm(FUR) },
+  { name: 'legL', parent: 'body', at: [BODY_W / 2 - 13, BODY_H - 6], pivot: [6, 0], z: -2, draw: leg(FUR_BACK), mesh: LIMB, box: LEG_BOX },
+  { name: 'legR', parent: 'body', at: [BODY_W / 2 + 7, BODY_H - 6], pivot: [6, 0], z: -1, draw: leg(FUR), mesh: LIMB, box: LEG_BOX },
+  { name: 'armL', parent: 'body', at: [BODY_W / 2 - 8, 12], pivot: [6, 4], z: -2, draw: arm(FUR_BACK), mesh: LIMB, box: ARM_BOX, drag: ARM_DRAG },
+  { name: 'armR', parent: 'body', at: [BODY_W / 2 + 12, 14], pivot: [6, 4], z: 5, draw: arm(FUR), mesh: LIMB, box: ARM_BOX, drag: ARM_DRAG },
   {
     // Pivot at the neck: nods and drags turn around it.
     name: 'head',
@@ -125,8 +143,8 @@ export const SAMPLE_RIG: RigPart[] = [
       }
     },
   },
-  { name: 'earL', parent: 'head', at: [22, 12], pivot: [12, 26], z: 1, draw: ear(false) },
-  { name: 'earR', parent: 'head', at: [56, 8], pivot: [12, 26], z: 1.5, draw: ear(true) },
+  { name: 'earL', parent: 'head', at: [22, 12], pivot: [12, 26], z: 1, draw: ear(false), mesh: EAR, box: EAR_BOX, drag: EAR_DRAG },
+  { name: 'earR', parent: 'head', at: [56, 8], pivot: [12, 26], z: 1.5, draw: ear(true), mesh: EAR, box: EAR_BOX, drag: EAR_DRAG },
   {
     name: 'eyes',
     parent: 'head',
