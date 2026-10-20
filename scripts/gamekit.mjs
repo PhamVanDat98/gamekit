@@ -15,6 +15,8 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
   init <tên> --questions --json             In danh sách câu hỏi kèm giải thích (cho agent hỏi người dùng)
   config [--portal p] [--set k=v…] [--questions --json]   Điền thông tin portal còn thiếu, thêm portal
   status | next                             Game đang ở pha nào, việc gì tiếp
+  recon [đường dẫn] [--write] [--json]      Nhận diện engine game gốc (thư mục, apk/xapk/ipa/zip), logic/dữ liệu ở đâu, kiểm kê
+                                            --write: ghi notes/recon.md và source.engine/engineVersion/path vào game.yaml
   gate [--advance]                          Kiểm tra cổng của pha hiện tại
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
   parity [--report file.json]               Đóng nghĩa vụ trong spec/obligations.yaml bằng test gắn thẻ [id:case] (chạy vitest)
@@ -29,7 +31,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
 `;
 
 // Flags that are boolean switches; they never consume the next word.
-const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party']);
+const BOOL = new Set(['all', 'advance', 'dry-run', 'cleanup', 'compress', 'zip', 'quiet', 'no-git', 'no-install', 'help', 'questions', 'json', 'no-input', 'third-party', 'write']);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -62,6 +64,7 @@ const COMMANDS = {
   'check-ownership': () => import('./parallel.mjs').then((m) => m.checkOwnership),
   integrate: () => import('./parallel.mjs').then((m) => m.integrate),
   precommit: () => import('./precommit.mjs').then((m) => m.run),
+  recon: () => import('./recon.mjs').then((m) => m.run),
 };
 
 export async function main(argv = process.argv.slice(2)) {

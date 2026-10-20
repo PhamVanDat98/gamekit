@@ -661,6 +661,28 @@ test('validate: asset-manifest — an image with words (text: true) lives in ass
   assert.match(r.out, /both: text và noText/);
 });
 
+test('recon --write: notes/recon.md + source.engine/engineVersion/path; refuses a path inside the game', () => {
+  const dir = newGame('rcn');
+  const src = path.join(path.dirname(dir), 'orig');
+  write(src, 'UnityPlayer.dll', 'x');
+  write(src, 'G_Data/Managed/Assembly-CSharp.dll', 'x');
+  write(src, 'G_Data/globalgamemanagers', '2020.3.1f1');
+  let r = gk(dir, 'recon', src, '--write');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Unity/);
+  assert.match(read(dir, 'notes/recon.md'), /Mono/);
+  const g = YAML.parse(read(dir, 'game.yaml'));
+  assert.equal(g.source.engine, 'unity');
+  assert.equal(g.source.engineVersion, '2020.3.1f1');
+  assert.equal(g.source.path, src.split(path.sep).join('/'));
+  assert.equal(gk(dir, 'validate').code, 0);
+  r = gk(dir, 'recon', '--json');
+  assert.equal(JSON.parse(r.out).backend, 'Mono', 'không có đường dẫn thì dùng source.path');
+  r = gk(dir, 'recon', 'src');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /nằm ngoài thư mục game/);
+});
+
 test('validate: Icons/web.png must be PNG, loading.webp must be WebP; builds/ must be gitignored', () => {
   const dir = newGame('vicon');
   assert.equal(gk(dir, 'validate').code, 0);
