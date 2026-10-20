@@ -11,7 +11,9 @@ import { applyTheme } from './view/theme';
 import { BUILD_ID, PauseBus, bootPlatform } from './platform';
 import { installWebGuard } from './platform/web-guard';
 
-const FIXED_HZ = 60;
+declare const __GK_FIXED_HZ__: number;
+/** game.yaml runtime.fixedStepHz, set at build time (vite.config.ts). */
+const FIXED_HZ = typeof __GK_FIXED_HZ__ === 'number' ? __GK_FIXED_HZ__ : 60;
 const MS = 1000;
 
 /** The portal shell page has no game markup (npm run dev's index.html does): create it when missing. */

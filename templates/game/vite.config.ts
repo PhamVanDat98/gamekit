@@ -3,7 +3,10 @@ import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
-const game = /^name:\s*(\S+)/m.exec(readFileSync('game.yaml', 'utf8'))?.[1] ?? 'game';
+const gameYaml = readFileSync('game.yaml', 'utf8');
+const game = /^name:\s*(\S+)/m.exec(gameYaml)?.[1] ?? 'game';
+// runtime.fixedStepHz: the original game's simulation rate (skill runtime-select).
+const fixedHz = Number(/^\s+fixedStepHz:\s*(\d+)/m.exec(gameYaml)?.[1] ?? 60);
 const portal = process.env.GK_PORTAL ?? 'dev-mock';
 
 /** `virtual:gk-adapter` → src/platform/adapters/<portal>.ts, so each package bundles only its own SDK. */
@@ -37,6 +40,7 @@ export default defineConfig({
     __GK_PORTAL__: JSON.stringify(process.env.GK_PORTAL ?? 'dev-mock'),
     __GK_BUILD__: JSON.stringify(process.env.GK_BUILD ?? 'dev'),
     __GK_GAME__: JSON.stringify(game),
+    __GK_FIXED_HZ__: JSON.stringify(fixedHz),
   },
   // framework.js runs from a blob: URL (the loader downloads it with progress), so asset URLs are
   // resolved against the page (document.baseURI = the version folder), not against the script.
