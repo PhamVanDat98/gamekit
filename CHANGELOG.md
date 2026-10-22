@@ -1,5 +1,8 @@
 # Changelog
 
+## Chưa phát hành
+- Skill `ui-motion` (P3): chuyển động UI (nút, popup, chuyển màn, điểm, phần thưởng) chỉ trong `view/`, chạy bằng đồng hồ của view nên không đổi replay, theo pause khi có ad/menu, tôn trọng `prefers-reduced-motion`; game `own` giữ thời lượng/easing của bản gốc. Kèm `references/motion.ts` (tween, easing), test mẫu, bảng mẫu thời lượng. Cổng P3 có thêm mục chuyển động UI.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.
