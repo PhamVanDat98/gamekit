@@ -74,6 +74,7 @@ export function stepWorld(w: WorldState, params: Params, input: InputFrame, dt: 
 export function worldHash(w: WorldState): string {
   // eslint-disable-next-line no-restricted-syntax -- rounding for the hash, not a gameplay number
   const PRECISION = 1000;
+  // eslint-disable-next-line no-restricted-properties -- hash precision only; never a gameplay value, so Math.round semantics are fine
   const r = (n: number) => Math.round(n * PRECISION) / PRECISION;
   return JSON.stringify([w.tick, r(w.score), w.over, r(w.player.x), w.obstacles.map((o) => [o.id, r(o.x), r(o.y)]), w.rng.seedState]);
 }

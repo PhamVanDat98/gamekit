@@ -9,6 +9,21 @@ import type { Params } from '../core/params';
  */
 const COLORS = { bg: '#14161a', player: '#4fb3ff', obstacle: '#ff6b5a', text: '#f2f2f2', dim: '#9aa0a6' };
 
+/** Entity positions at one tick; draw() blends from these to the current ones. */
+export interface Positions {
+  readonly player: { readonly x: number; readonly y: number };
+  readonly obstacles: ReadonlyMap<number, { readonly x: number; readonly y: number }>;
+}
+
+export function capturePositions(w: WorldState): Positions {
+  return {
+    player: { x: w.player.x, y: w.player.y },
+    obstacles: new Map(w.obstacles.map((o) => [o.id, { x: o.x, y: o.y }])),
+  };
+}
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
 
@@ -23,7 +38,8 @@ export class Renderer {
     canvas.height = params.world.height;
   }
 
-  draw(w: WorldState, overlay: string | null): void {
+  /** `prev` + `alpha` (0..1) interpolate between the previous and current tick; defaults draw the current state. */
+  draw(w: WorldState, overlay: string | null, alpha = 1, prev: Positions | null = null): void {
     const { ctx, params } = this;
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, params.world.width, params.world.height);
@@ -31,8 +47,12 @@ export class Renderer {
       ctx.fillStyle = c;
       ctx.fillRect(x - s / 2, y - s / 2, s, s);
     };
-    for (const o of w.obstacles) box(o.x, o.y, o.size, COLORS.obstacle);
-    box(w.player.x, w.player.y, w.player.size, COLORS.player);
+    for (const o of w.obstacles) {
+      const p = prev?.obstacles.get(o.id); // a new obstacle has no previous position
+      box(p ? lerp(p.x, o.x, alpha) : o.x, p ? lerp(p.y, o.y, alpha) : o.y, o.size, COLORS.obstacle);
+    }
+    const pp = prev?.player;
+    box(pp ? lerp(pp.x, w.player.x, alpha) : w.player.x, pp ? lerp(pp.y, w.player.y, alpha) : w.player.y, w.player.size, COLORS.player);
     ctx.fillStyle = COLORS.text;
     ctx.font = '600 24px system-ui, sans-serif';
     ctx.textAlign = 'left';

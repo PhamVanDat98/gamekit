@@ -6,6 +6,10 @@ Vật lý: không ánh xạ engine sang engine, mà ánh xạ từng hành vi v�
 - `fidelity` (exact / calibrated / emergent) cho nghĩa vụ; `parity` báo số đã đóng theo từng mức. Từ P2, `calibrated`/`emergent` cần oracle, `toleranceDecision`, và `calibrated` cần cả bộ `calibrate` lẫn `holdout`.
 - Oracle có `toleranceAbs` và dạng `kind: trajectory`. Template có `oracleMismatches` trong `tests/support/oracle.ts`; so theo sai số tương đối trước đây hỏng khi giá trị bằng 0.
 - Sửa: `runtime.fixedStepHz` không có tác dụng vì `main.ts` gõ cứng 60 Hz. Giờ game đọc `sim.fixedStepHz` trong `params/game.json`, `validate` báo lỗi nếu hai nơi khác nhau.
+- Template, input: cú bấm nhanh (nhấn và nhả giữa hai bước) không còn mất. `InputFrame` có thêm `pressed`/`released` (như `GetKeyDown`/`GetKeyUp`); `inputAt` đổi thành `frameAt`; phím bấm lúc tạm dừng không bắn khi tiếp tục.
+- Template, vẽ: `main.ts` dùng `alpha` của vòng lặp, vẽ nội suy giữa hai tick (`capturePositions`), để hình không giật khi tần số mô phỏng khác tần số màn hình.
+- Template, toán: `core/mathf` có `roundToInt` (làm tròn nửa về số chẵn như `Mathf.RoundToInt`) và `sign` (như `Mathf.Sign`); lint cấm `Math.round`/`Math.sign` trong `core/`.
+- Template, test: `world.test.ts`, `replay.test.ts` đọc `sim.fixedStepHz` thay vì gõ cứng 60 Hz.
 - Game cũ: xem **Nâng cấp game cũ** trong README.
 
 ## 0.2.0 — 2026-10-16

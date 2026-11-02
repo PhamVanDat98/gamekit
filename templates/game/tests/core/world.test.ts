@@ -6,8 +6,9 @@ import raw from '../../params/game.json';
 import speedOracle from '../../spec/oracles/obstacle-speed.json';
 import { oracleMismatches } from '../support/oracle';
 
-const DT = 1 / 60;
-const hold = (tick: number, ...actions: InputFrame['actions'][number][]): InputFrame => ({ tick, actions });
+const HZ = PARAMS.sim.fixedStepHz;
+const DT = 1 / HZ;
+const hold = (tick: number, ...actions: InputFrame['actions'][number][]): InputFrame => ({ tick, actions, pressed: [], released: [] });
 
 /**
  * Parity tests: expected values come from params (= the original game), with the
@@ -20,8 +21,9 @@ describe('parity with params', () => {
     w.obstacles = [];
     w.spawnTimer = Infinity;
     const x0 = w.player.x;
-    for (let i = 0; i < 30; i++) stepWorld(w, PARAMS, hold(i, 'right'), DT); // 0.5 s, stays inside the field
-    const moved = (w.player.x - x0) / 0.5;
+    const seconds = 0.5; // stays inside the field
+    for (let i = 0; i < seconds * HZ; i++) stepWorld(w, PARAMS, hold(i, 'right'), DT);
+    const moved = (w.player.x - x0) / seconds;
     expect(Math.abs(moved - raw.player.speed.value) / raw.player.speed.value).toBeLessThanOrEqual(raw.player.speed.tolerance);
   });
 
@@ -40,14 +42,14 @@ describe('parity with params', () => {
     w.player.x = -1000; // out of the way
     let spawns = 0;
     const seconds = 4;
-    for (let i = 0; i < seconds * 60; i++) spawns += stepWorld(w, PARAMS, hold(i), DT).filter((e) => e.type === 'spawn').length;
+    for (let i = 0; i < seconds * HZ; i++) spawns += stepWorld(w, PARAMS, hold(i), DT).filter((e) => e.type === 'spawn').length;
     expect(spawns).toBe(Math.ceil(seconds / raw.obstacle.spawnEvery.value));
   });
 
   it('[score.rate:normal] scores score.perSecond per second', () => {
     const w = createWorld(PARAMS, 3);
     w.spawnTimer = Infinity;
-    for (let i = 0; i < 60; i++) stepWorld(w, PARAMS, hold(i), DT);
+    for (let i = 0; i < HZ; i++) stepWorld(w, PARAMS, hold(i), DT); // 1 s
     expect(w.score).toBeCloseTo(raw.score.perSecond.value, 5);
   });
 });
@@ -68,7 +70,7 @@ describe('rules', () => {
   it('[player.move:edge] player stays inside the field', () => {
     const w = createWorld(PARAMS, 1);
     w.spawnTimer = Infinity;
-    for (let i = 0; i < 600; i++) stepWorld(w, PARAMS, hold(i, 'left'), DT);
+    for (let i = 0; i < HZ * 10; i++) stepWorld(w, PARAMS, hold(i, 'left'), DT); // long enough to cross the field
     expect(w.player.x).toBe(PARAMS.player.size / 2);
   });
 });

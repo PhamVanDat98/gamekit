@@ -48,6 +48,16 @@ export default tseslint.config(
         'error',
         { object: 'Math', property: 'random', message: 'Dùng Rng có seed.' },
         { object: 'Date', property: 'now', message: 'Thời gian lấy từ fixed step.' },
+        {
+          object: 'Math',
+          property: 'round',
+          message: 'Math.round làm tròn nửa về phía +vô cực (2.5 → 3, -0.5 → -0), khác Mathf.RoundToInt (nửa về số chẵn). Dùng roundToInt từ core/mathf. Nếu engine gốc thật sự dùng Math.round, thêm eslint-disable kèm lý do.',
+        },
+        {
+          object: 'Math',
+          property: 'sign',
+          message: 'Math.sign(0) trả 0, khác Mathf.Sign (0 → 1). Dùng sign từ core/mathf. Nếu engine gốc thật sự dùng Math.sign, thêm eslint-disable kèm lý do.',
+        },
       ],
       // Gameplay numbers live in params/*.json with a source in the original game.
       'no-magic-numbers': ['error', { ignore: [-1, 0, 1, 2], ignoreArrayIndexes: true, ignoreDefaultValues: true, enforceConst: true }],

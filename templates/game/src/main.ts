@@ -5,7 +5,7 @@ import { PARAMS } from './core/params';
 import { createWorld, stepWorld } from './core/world';
 import { t } from './view/i18n';
 import { bindInput } from './view/input-dom';
-import { Renderer } from './view/renderer';
+import { Renderer, capturePositions, type Positions } from './view/renderer';
 import { mountSettings } from './view/settings';
 import { BUILD_ID, PauseBus, bootPlatform } from './platform';
 import { installWebGuard } from './platform/web-guard';
@@ -52,6 +52,8 @@ async function main(): Promise<void> {
   let world = createWorld(PARAMS, Date.now() >>> 0);
   let state: 'ready' | 'playing' | 'over' = 'ready';
   let round = 0;
+  let prev: Positions | null = null; // positions before the latest step, for interpolation
+  let alpha = 1;
 
   const start = async () => {
     if (state === 'playing' || bus.has('ad') || bus.has('menu')) return;
@@ -63,6 +65,8 @@ async function main(): Promise<void> {
     state = 'playing';
     round++;
     input.clear();
+    prev = null;
+    alpha = 1;
     platform.track('level_start', { round });
     platform.gameplayStart();
   };
@@ -79,8 +83,10 @@ async function main(): Promise<void> {
     const elapsed = (now - last) / MS;
     last = now;
     if (state === 'playing' && !bus.paused) {
-      const { steps } = advance(step, elapsed);
-      for (let i = 0; i < steps; i++) {
+      const adv = advance(step, elapsed);
+      alpha = adv.alpha;
+      for (let i = 0; i < adv.steps; i++) {
+        prev = capturePositions(world);
         const events = stepWorld(world, PARAMS, input.frame(world.tick), step.stepSec);
         for (const e of events) {
           if (e.type === 'gameOver') {
@@ -92,12 +98,20 @@ async function main(): Promise<void> {
         }
         if (state !== 'playing') break;
       }
+      if (state !== 'playing') {
+        alpha = 1;
+        prev = null;
+      }
     } else {
       step.accumulator = 0;
+      input.clearEdges(); // a key pressed while paused or not playing must not fire on resume
+      alpha = 1;
+      prev = null;
     }
     const overlay =
       state === 'ready' ? t('game.start') : state === 'over' ? t('game.score', { score: Math.floor(world.score) }) : bus.paused ? t('game.paused') : null;
-    renderer.draw(world, overlay);
+    // Drawing runs up to one tick behind logic (it blends prev -> current), so any hitbox debug drawing must use the same interpolated positions.
+    renderer.draw(world, overlay, alpha, prev);
     if (!shown) {
       shown = true;
       window.GM_LOADER?.ready(); // first frame on screen: the portal hides its loading screen

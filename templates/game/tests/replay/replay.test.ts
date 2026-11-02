@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { InputRecorder, InputState, inputAt } from '../../src/core/input';
+import { InputRecorder, InputState, frameAt } from '../../src/core/input';
 import { PARAMS } from '../../src/core/params';
 import { Rng } from '../../src/core/rng';
 import { createWorld, stepWorld, worldHash } from '../../src/core/world';
 
-const DT = 1 / 60;
+const HZ = PARAMS.sim.fixedStepHz;
+const DT = 1 / HZ;
+const SESSION_SECONDS = 30;
+const DRIVER_EVERY_SECONDS = 1 / 3; // the scripted driver changes its mind about 3 times a second
 
 /** Play a scripted session, recording input; return the recording and final hash. */
 function playScripted(seed: number) {
@@ -12,8 +15,9 @@ function playScripted(seed: number) {
   const input = new InputState();
   const rec = new InputRecorder();
   const driver = new Rng(seed ^ 0xbeef);
-  for (let tick = 0; tick < 1800 && !w.over; tick++) {
-    if (tick % 20 === 0) {
+  const driverEvery = Math.round(DRIVER_EVERY_SECONDS * HZ);
+  for (let tick = 0; tick < SESSION_SECONDS * HZ && !w.over; tick++) {
+    if (tick % driverEvery === 0) {
       input.clear();
       const r = driver.next();
       if (r < 0.4) input.press('left');
@@ -30,7 +34,7 @@ describe('replay', () => {
   it('[run.replay:replay] same seed + recorded input → identical final state', () => {
     const live = playScripted(1234);
     const w = createWorld(PARAMS, 1234);
-    for (let t = 0; t < live.ticks; t++) stepWorld(w, PARAMS, { tick: w.tick, actions: inputAt(live.frames, w.tick) }, DT);
+    for (let t = 0; t < live.ticks; t++) stepWorld(w, PARAMS, frameAt(live.frames, w.tick), DT);
     expect(worldHash(w)).toBe(live.hash);
   });
 

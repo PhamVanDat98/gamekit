@@ -32,6 +32,11 @@ Với mỗi cơ chế trong spec:
 
 Thêm replay test cho luồng chơi chính (`tests/replay/`). Thay `src/core/world.ts` demo bằng logic game thật; giữ `worldHash` cho replay.
 
+Khi dịch code Unity vào `core/`:
+- Input: `Input.GetKeyDown`/`GetKeyUp` ↔ `input.pressed`/`input.released`; `GetKey` ↔ `input.actions`.
+- `Update` vs `FixedUpdate`: template chỉ có một nhịp cố định (`stepWorld`) để replay tất định. Logic `FixedUpdate` đưa thẳng vào. Logic `Update` dùng `Time.deltaTime` đưa vào `stepWorld` với dt cố định. Logic đếm theo frame trong `Update` (không có deltaTime) phụ thuộc fps của game gốc: chọn một fps tham chiếu từ game gốc, đổi sang giây, ghi thành một `D-n` trong DECISIONS.md. Không thêm đường bước biến thiên vào `core/`.
+- `core/` dùng `roundToInt`, `sign` từ `core/mathf` (lint cấm `Math.round`/`Math.sign`); phép chia nguyên `int` của C# phải viết rõ `Math.trunc`.
+
 ## 5. View
 `src/view/` vẽ từ state, map input thiết bị → `Action` (`src/contracts/input.ts`). Không sửa state. Không unit test; kiểm tra bằng chạy thử `npm run dev` và screenshot.
 

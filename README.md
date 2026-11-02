@@ -103,6 +103,8 @@ Sau đó: `npm run gk -- config` (điền thông tin portal: gameCode, signed…
 2. `tests/support/oracle.ts`, `tests/support/oracle.test.ts`.
 3. `sim.fixedStepHz` trong `params/game.json`, và `src/main.ts` đọc `PARAMS.sim.fixedStepHz` thay vì `FIXED_HZ`. Trước đây `runtime.fixedStepHz` trong `game.yaml` không có tác dụng: game luôn chạy 60 Hz.
 
+Sửa lỗi input, nội suy khi vẽ và làm tròn kiểu Unity: chép thêm `src/core/input.ts`, `src/contracts/input.ts`, `src/core/mathf.ts`, `src/main.ts`, `src/view/renderer.ts`, `eslint.config.js` (và `tests/core/input.test.ts`, `tests/core/mathf.test.ts`). `InputFrame` giờ bắt buộc có `pressed` và `released`, và `inputAt` đã đổi thành `frameAt` (trả cả `InputFrame`): sửa mọi chỗ tạo `InputFrame` bằng tay (test) và mọi chỗ gọi `inputAt`. Lint mới cấm `Math.round`/`Math.sign` trong `core/`: đổi sang `roundToInt`/`sign`.
+
 **Game tạo trước khi có `source.ownership`** được coi là `own`, nhưng `gates/*.md` cũ vẫn giữ mục của chế độ làm lại game (forbiddenTerms, reskin). Game của bạn: chép `gates/P0.md`…`P3.md` từ `templates/game/gates/`. Game làm lại của người khác: thêm `ownership: third-party` dưới `source:` trong `game.yaml`.
 
 ## Lộ trình
