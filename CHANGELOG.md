@@ -17,6 +17,9 @@ Gói Android:
 - Đọc ZIP không thêm thư viện, có zip64. File đầu vào coi là không đáng tin: chặn đường dẫn ra ngoài thư mục đích, kiểm tra CRC và kích thước, giới hạn tổng dung lượng (`--max-gb`, mặc định 20), không ghi đè file chỉ khác hoa thường. Không cho giải nén vào repo game, trừ `reference/` và `decompiled/`.
 - Skill `re-notes` nói rõ vị trí file của gói nhiều phần và đường dẫn Unity trên Android.
 
+Skill P1:
+- Thêm `engine-unity` (kèm `references/GkTraceRecorder.cs` ghi trace từ project Unity), `gameplay-spec`, `asset-inventory`, `ui-extract`. `gamekit status` ở P1 không còn báo các skill này là chưa có; engine khác Unity vẫn chưa có skill `engine-*` riêng.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.

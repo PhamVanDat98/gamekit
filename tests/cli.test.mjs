@@ -31,6 +31,22 @@ test('status reports phase and pending human decisions', () => {
   assert.match(out, /bạn quyết/);
 });
 
+test('status at P1: engine-<engine> resolves to engine-unity, other engines are not shipped yet', () => {
+  const dir = newGame();
+  editYaml(dir, (g) => {
+    g.phase = 'P1';
+  });
+  const { out } = gk(dir, 'status');
+  for (const s of ['engine-unity', 're-notes', 'gameplay-spec', 'asset-inventory', 'ui-extract', 'physics-assess']) {
+    assert.match(out, new RegExp(`- ${s}`));
+    assert.doesNotMatch(out, new RegExp(`- ${s}.*chưa có`));
+  }
+  editYaml(dir, (g) => {
+    g.source.engine = 'godot';
+  });
+  assert.match(gk(dir, 'status').out, /- engine-godot.*chưa có/);
+});
+
 test('params: every value needs a source; TODO is a warning before P2 and an error from P2', () => {
   const dir = newGame();
   editJson(dir, 'params/game.json', (p) => {
