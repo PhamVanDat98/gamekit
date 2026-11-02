@@ -1,5 +1,13 @@
 # Changelog
 
+## Chưa phát hành
+Vật lý: không ánh xạ engine sang engine, mà ánh xạ từng hành vi và đo độ lệch.
+- Skill `physics-assess` (cuối P1) và `spec/physics-assessment.yaml`: kiểm kê cách game gốc dùng vật lý, chấm mức ảnh hưởng từng cơ chế, đề xuất thư viện, chạy thử cơ chế rủi ro. Cổng P1 có `{auto: physics}` và mục người dùng duyệt.
+- `fidelity` (exact / calibrated / emergent) cho nghĩa vụ; `parity` báo số đã đóng theo từng mức. Từ P2, `calibrated`/`emergent` cần oracle, `toleranceDecision`, và `calibrated` cần cả bộ `calibrate` lẫn `holdout`.
+- Oracle có `toleranceAbs` và dạng `kind: trajectory`. Template có `oracleMismatches` trong `tests/support/oracle.ts`; so theo sai số tương đối trước đây hỏng khi giá trị bằng 0.
+- Sửa: `runtime.fixedStepHz` không có tác dụng vì `main.ts` gõ cứng 60 Hz. Giờ game đọc `sim.fixedStepHz` trong `params/game.json`, `validate` báo lỗi nếu hai nơi khác nhau.
+- Game cũ: xem **Nâng cấp game cũ** trong README.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.

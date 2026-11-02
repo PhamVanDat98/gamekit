@@ -10,7 +10,11 @@
     "source": { "type": "string", "minLength": 1, "description": "Lấy từ đâu trong game gốc: file + hàm/offset, bảng data, hoặc đo từ video" },
     "confidence": { "enum": ["observed", "derived", "inferred"] },
     "description": { "type": "string" },
+    "kind": { "enum": ["table", "trajectory"], "default": "table", "description": "table: đầu vào → kết quả. trajectory: mẫu theo tick, in = { scene, tick }, out = các số đo tại tick đó" },
+    "stepHz": { "type": "integer", "minimum": 1, "description": "Tần số bước khi ghi; bắt buộc với trajectory" },
     "tolerance": { "type": "number", "minimum": 0, "description": "Sai số tương đối mặc định cho mọi case" },
+    "toleranceAbs": { "type": "number", "minimum": 0, "description": "Sai số tuyệt đối mặc định, cùng đơn vị với out. Dùng khi giá trị có thể gần 0; bắt buộc với trajectory" },
+    "toleranceDecision": { "type": "string", "pattern": "^D-\\d+$", "description": "Mục trong DECISIONS.md giải thích ngưỡng; bắt buộc khi nghĩa vụ có fidelity calibrated hoặc emergent" },
     "cases": {
       "type": "array",
       "minItems": 1,
@@ -22,6 +26,8 @@
           "in": { "description": "Đầu vào" },
           "out": { "description": "Kết quả của game gốc" },
           "tolerance": { "type": "number", "minimum": 0 },
+          "toleranceAbs": { "type": "number", "minimum": 0 },
+          "role": { "enum": ["calibrate", "holdout"], "description": "calibrate: được dùng để tinh chỉnh tham số · holdout: chỉ dùng để chấm" },
           "note": { "type": "string" }
         }
       }

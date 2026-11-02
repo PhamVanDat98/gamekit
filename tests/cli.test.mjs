@@ -5,10 +5,10 @@ import path from 'node:path';
 import os from 'node:os';
 import { gk, newGame, token, sh, write, read, editJson, editYaml } from './helpers.mjs';
 import { parseGate } from '../scripts/gate.mjs';
-import { checkModulePlan } from '../scripts/validate.mjs';
+import { checkModulePlan, physicsImpact } from '../scripts/validate.mjs';
 import { ownershipProblems, topo } from '../scripts/parallel.mjs';
 import { parseArgs } from '../scripts/gamekit.mjs';
-import { evaluateParity, testsFromVitestReport } from '../scripts/parity.mjs';
+import { evaluateParity, fidelitySummary, testsFromVitestReport } from '../scripts/parity.mjs';
 import YAML from 'yaml';
 
 test('init creates a valid game with git, hook and schemas', () => {
@@ -425,6 +425,245 @@ test('validate: oracle tables in spec/oracles need a source and cases', () => {
   assert.equal(gk(dir, 'validate').code, 1, 'cần ít nhất một case');
   write(dir, 'spec/oracles/pan.json', JSON.stringify({ source: 'Game.exe 0x406400', confidence: 'observed', cases: [{ in: { x: 0 }, out: 0.5 }] }));
   assert.equal(gk(dir, 'validate').code, 0);
+});
+
+const trajectory = (over = {}) => ({
+  source: 'Unity Editor, cảnh Calib',
+  kind: 'trajectory',
+  stepHz: 60,
+  toleranceAbs: 0.05,
+  cases: [{ in: { scene: 'a', tick: 10 }, out: { x: 1, y: 0 } }],
+  ...over,
+});
+
+test('validate: trajectory oracles need stepHz, { scene, tick }, numeric samples and an absolute tolerance', () => {
+  const dir = newGame('traj');
+  const put = (o) => write(dir, 'spec/oracles/t.json', JSON.stringify(o));
+  put(trajectory());
+  assert.equal(gk(dir, 'validate').code, 0);
+  put(trajectory({ stepHz: undefined }));
+  assert.match(gk(dir, 'validate').out, /stepHz/);
+  put(trajectory({ toleranceAbs: undefined }));
+  assert.match(gk(dir, 'validate').out, /toleranceAbs/);
+  put(trajectory({ cases: [{ in: { tick: 10 }, out: { x: 1 } }] }));
+  assert.match(gk(dir, 'validate').out, /scene, tick/);
+  put(trajectory({ cases: [{ in: { scene: 'a', tick: 1 }, out: { x: 'xa' } }] }));
+  assert.equal(gk(dir, 'validate').code, 1);
+  put(trajectory({ stepHz: 50 }));
+  const r = gk(dir, 'validate');
+  assert.equal(r.code, 0, 'khác tần số chỉ là cảnh báo');
+  assert.match(r.out, /50 Hz/);
+});
+
+test('validate: calibrated and emergent obligations need an oracle, a reasoned threshold and, when tuned, a holdout set', () => {
+  const dir = newGame('fid');
+  const put = (extra) => write(dir, 'spec/obligations.yaml', `obligations:\n  - { id: ball, title: B, cases: [oracle], ${extra} }\n`);
+  put('fidelity: calibrated');
+  assert.equal(gk(dir, 'validate').code, 0, 'trước P2 chỉ cảnh báo');
+  assert.match(gk(dir, 'validate', '--stage', 'P2').out, /cần file oracle/);
+  write(dir, 'spec/oracles/ball.json', JSON.stringify(trajectory()));
+  put('fidelity: calibrated, oracle: spec/oracles/ball.json');
+  let r = gk(dir, 'validate', '--stage', 'P2');
+  assert.match(r.out, /toleranceDecision/);
+  assert.match(r.out, /holdout/);
+  const c = { in: { scene: 'a', tick: 1 }, out: { x: 1 } };
+  write(dir, 'spec/oracles/ball.json', JSON.stringify(trajectory({ toleranceDecision: 'D-7', cases: [{ ...c, role: 'calibrate' }, { ...c, role: 'holdout' }] })));
+  assert.match(gk(dir, 'validate', '--stage', 'P2').out, /D-7/);
+  fs.appendFileSync(path.join(dir, 'DECISIONS.md'), '\n## D-7 Ngưỡng bóng\n');
+  r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 0, r.out);
+  put('fidelity: emergent, oracle: spec/oracles/ball.json');
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0, 'emergent không cần holdout');
+  write(dir, 'spec/obligations.yaml', 'obligations:\n  - { id: ball, title: B, cases: [normal], fidelity: emergent, oracle: spec/oracles/ball.json }\n');
+  assert.match(gk(dir, 'validate', '--stage', 'P2').out, /cần case oracle/);
+  write(dir, 'spec/obligations.yaml', 'obligations:\n  - { id: ball, title: B, cases: [normal], fidelity: nearly }\n');
+  assert.equal(gk(dir, 'validate').code, 1);
+});
+
+test('parity: closed obligations are reported by fidelity, without implying identical results', () => {
+  const items = [
+    { required: true, state: 'closed', fidelity: 'exact' },
+    { required: true, state: 'closed', fidelity: 'calibrated' },
+    { required: true, state: 'closed' },
+    { required: true, state: 'open', fidelity: 'emergent' },
+    { required: false, state: 'closed', fidelity: 'exact' },
+  ];
+  const line = fidelitySummary(items);
+  assert.match(line, /exact 1 · calibrated 1 · emergent 0 · chưa khai 1/);
+  assert.match(line, /không phải trùng khớp/);
+  assert.equal(fidelitySummary([{ required: true, state: 'closed' }]), null);
+  const r = evaluateParity({ obligations: [{ id: 'a', title: 'A', cases: ['normal'], fidelity: 'exact' }], tests: [{ name: '[a:normal] x', status: 'passed' }] });
+  assert.equal(r.items[0].fidelity, 'exact');
+});
+
+test('fixed step: the rate in params is what runs, and game.yaml must agree with it', () => {
+  const dir = newGame('hz');
+  assert.match(read(dir, 'src/main.ts'), /createFixedStep\(PARAMS\.sim\.fixedStepHz\)/);
+  editJson(dir, 'params/game.json', (p) => {
+    p.sim.fixedStepHz.value = 50;
+  });
+  const r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /sim\.fixedStepHz = 50/);
+  editYaml(dir, (g) => {
+    g.runtime.fixedStepHz = 50;
+  });
+  assert.equal(gk(dir, 'validate').code, 0);
+});
+
+// ---------- physics assessment (spec/physics-assessment.yaml) ----------
+const mechanic = (over = {}) => ({
+  id: 'ball.bounce',
+  title: 'Bóng bật khỏi tường',
+  usage: ['AddForce'],
+  solver: true,
+  outcome: 'decisive',
+  sensitivity: 'high',
+  impact: 'high',
+  fidelity: 'calibrated',
+  ...over,
+});
+const candidate = (over = {}) => ({ library: 'planck', passed: true, deviation: '0.04 m', gzipKB: 60, stepMs: 0.8, device: 'Android', ...over });
+const physicsFile = (rec = {}, mechanics = [mechanic()], original = {}) =>
+  YAML.stringify({
+    original: { kind: '2d', fixedStepHz: 60, source: 'TimeManager.asset', ...original },
+    scope: 'Assembly-CSharp, toàn bộ scene',
+    mechanics,
+    recommendation: {
+      library: 'planck',
+      rationale: '2D có bóng dynamic',
+      decision: 'D-3',
+      spike: { mechanics: ['ball.bounce'], result: 'spec/spikes/physics.md', confidence: 'observed', candidates: [candidate()] },
+      ...rec,
+    },
+  });
+/** A game whose assessment is complete; tests break one thing at a time. */
+function physicsGame(name) {
+  const dir = newGame(name);
+  write(dir, 'spec/physics-assessment.yaml', physicsFile());
+  write(dir, 'spec/spikes/physics.md', '# Kết quả chạy thử\n');
+  fs.appendFileSync(path.join(dir, 'DECISIONS.md'), '\n## D-3 Dùng planck\n');
+  editYaml(dir, (g) => {
+    g.runtime.physics = 'planck';
+  });
+  return dir;
+}
+const gateP1 = (dir) => {
+  write(dir, 'game.yaml', read(dir, 'game.yaml').replace(/^phase: P0/m, 'phase: P1'));
+  return gk(dir, 'gate');
+};
+const physicsLine = (out) => out.split('\n').find((l) => l.includes('[auto: physics]'));
+
+test('physics: impact follows outcome and sensitivity', () => {
+  assert.equal(physicsImpact('decisive', 'high'), 'high');
+  assert.equal(physicsImpact('decisive', 'low'), 'medium');
+  assert.equal(physicsImpact('feel', 'high'), 'medium');
+  assert.equal(physicsImpact('feel', 'low'), 'low');
+  assert.equal(physicsImpact('cosmetic', 'high'), 'low');
+});
+
+test('physics gate: blocked until the assessment exists and the user approves', () => {
+  const dir = newGame('phy0');
+  assert.match(read(dir, 'gates/P1.md'), /\{auto: physics\}/);
+  let r = gateP1(dir);
+  assert.equal(r.code, 1);
+  assert.match(physicsLine(r.out), /chưa có spec\/physics-assessment\.yaml/);
+  assert.match(r.out, /Đã duyệt kết quả đánh giá vật lý.*\[bạn quyết\]/);
+  const done = physicsGame('phy1');
+  r = gateP1(done);
+  assert.doesNotMatch(physicsLine(r.out), /—/, r.out);
+});
+
+test('physics: a game without physics declares none with its inventory and needs no spike', () => {
+  const dir = newGame('phy2');
+  const none = { library: 'none', rationale: 'Không tìm thấy', decision: undefined, spike: undefined };
+  write(dir, 'spec/physics-assessment.yaml', physicsFile(none, [], { fixedStepHz: null }));
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0);
+  assert.doesNotMatch(physicsLine(gateP1(dir).out), /—/);
+  const noScope = YAML.parse(physicsFile(none, [], { fixedStepHz: null }));
+  delete noScope.scope;
+  write(dir, 'spec/physics-assessment.yaml', YAML.stringify(noScope));
+  assert.match(gk(dir, 'validate').out, /scope/);
+  const kinematic = mechanic({ solver: false, fidelity: 'exact' });
+  write(dir, 'spec/physics-assessment.yaml', physicsFile(none, [kinematic], { fixedStepHz: null }));
+  write(dir, 'spec/obligations.yaml', 'obligations:\n  - { id: ball.bounce, title: B, cases: [normal], fidelity: exact }\n');
+  assert.equal(gk(dir, 'validate', '--stage', 'P2').code, 0, 'mức high không phụ thuộc solver thì không cần chạy thử');
+  write(dir, 'spec/physics-assessment.yaml', physicsFile(none, [mechanic()], { fixedStepHz: null }));
+  const r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /phụ thuộc solver nhưng library là none/);
+  write(dir, 'spec/physics-assessment.yaml', physicsFile(none, [mechanic({ outcome: 'cosmetic', sensitivity: 'low', impact: 'low' })], { fixedStepHz: null }));
+  assert.equal(gk(dir, 'validate').code, 0, 'vật lý trang trí không cần thư viện');
+});
+
+test('physics: contradictions are errors at any phase', () => {
+  const dir = physicsGame('phy3');
+  const put = (...a) => write(dir, 'spec/physics-assessment.yaml', physicsFile(...a));
+  put({}, [mechanic({ impact: 'low' })]);
+  let r = gk(dir, 'validate');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /là mức high, không phải low/);
+  put({}, [mechanic(), mechanic()]);
+  assert.match(gk(dir, 'validate').out, /trùng id ball\.bounce/);
+  put({ spike: { mechanics: ['gone'], result: 'spec/spikes/physics.md', confidence: 'observed', candidates: [candidate()] } });
+  assert.match(gk(dir, 'validate').out, /cơ chế không có: gone/);
+  put({ spike: { mechanics: ['ball.bounce'], result: 'spec/spikes/physics.md', confidence: 'observed', candidates: [candidate({ gzipKB: 20480 })] } });
+  assert.match(gk(dir, 'validate').out, /vượt budget\.initialLoadMB/);
+  write(dir, 'spec/physics-assessment.yaml', 'original: [\n');
+  assert.equal(gk(dir, 'validate').code, 1);
+});
+
+test('physics: an unfinished assessment warns before P2, then blocks the gate and validate', () => {
+  const dir = physicsGame('phy4');
+  const spike = (over = {}) => ({ mechanics: ['ball.bounce'], result: 'spec/spikes/physics.md', confidence: 'observed', candidates: [candidate()], ...over });
+  const cases = [
+    [{ spike: undefined }, /cần chạy thử/],
+    [{ decision: undefined }, /cần decision/],
+    [{ decision: 'D-9' }, /D-9/],
+    [{ spike: spike({ result: 'spec/spikes/none.md' }) }, /không có file kết quả/],
+    [{ spike: spike({ candidates: [candidate({ library: 'other' })] }) }, /spike chưa thử planck/],
+    [{ spike: spike({ candidates: [candidate({ passed: false })] }) }, /chưa đạt khi chạy thử/],
+    [{ library: 'matter-js', spike: spike({ candidates: [candidate({ library: 'matter-js' })] }) }, /khác runtime\.physics/],
+  ];
+  for (const [rec, msg] of cases) {
+    write(dir, 'spec/physics-assessment.yaml', physicsFile(rec));
+    const soft = gk(dir, 'validate');
+    assert.equal(soft.code, 0, soft.out);
+    assert.match(soft.out, msg);
+    const hard = gk(dir, 'validate', '--stage', 'P2');
+    assert.equal(hard.code, 1);
+    assert.match(hard.out, msg);
+  }
+  write(dir, 'spec/physics-assessment.yaml', physicsFile({ spike: spike({ candidates: [candidate({ passed: false })] }) }));
+  assert.match(physicsLine(gateP1(dir).out), /chưa đạt khi chạy thử/);
+});
+
+test('physics: running at another rate than the original needs a decision', () => {
+  const dir = physicsGame('phy5');
+  write(dir, 'spec/physics-assessment.yaml', physicsFile({}, [mechanic()], { fixedStepHz: 50 }));
+  assert.match(physicsLine(gateP1(dir).out), /game gốc chạy 50 Hz, bản web 60 Hz/);
+  write(dir, 'spec/physics-assessment.yaml', physicsFile({}, [mechanic()], { fixedStepHz: 50, fixedStepDecision: 'D-3' }));
+  assert.doesNotMatch(physicsLine(gk(dir, 'gate').out), /—/);
+});
+
+test('physics: from P2 each mechanic that affects play has an obligation of the same id and fidelity', () => {
+  const dir = physicsGame('phy6');
+  let r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /ball\.bounce: spec\/obligations\.yaml chưa có nghĩa vụ/);
+  assert.equal(gk(dir, 'validate').code, 0, 'P1 chưa cần nghĩa vụ');
+  write(dir, 'spec/obligations.yaml', 'obligations:\n  - { id: ball.bounce, title: B, cases: [normal], fidelity: exact }\n');
+  assert.match(gk(dir, 'validate', '--stage', 'P2').out, /fidelity calibrated khác nghĩa vụ \(exact\)/);
+  write(dir, 'spec/physics-assessment.yaml', physicsFile({}, [mechanic({ fidelity: 'exact' })]));
+  r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 0, r.out);
+});
+
+test('physics: a game without the assessment still validates from P2, with a warning', () => {
+  const dir = newGame('phy7');
+  const r = gk(dir, 'validate', '--stage', 'P2');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /physics-assess/);
 });
 
 test('params: confidence is observed|derived|inferred; inferred needs a tolerance from P2', () => {

@@ -24,7 +24,9 @@ Parity không phải cảm giác "chơi thấy giống". Nó là danh sách ngh�
 - `required: false` cho thứ có thì tốt (hiệu ứng phụ). Mặc định là bắt buộc.
 - Không làm được hoặc không làm: `status: blocked | out-of-scope`, kèm `decision: D-n` trong `DECISIONS.md`. Chỉ người dùng đặt `approved: true`. Nghĩa vụ bỏ qua được ghi lại, **không bao giờ tính là đã đóng**.
 
-`gamekit validate` kiểm tra schema, id trùng, `params` có tồn tại, file oracle có thật.
+- `fidelity`: mức giống game gốc mà test chứng minh. `exact` (trùng công thức), `calibrated` (quỹ đạo trong ngưỡng), `emergent` (chỉ số thống kê trong ngưỡng). Cơ chế trong `spec/physics-assessment.yaml` (trừ `cosmetic`) phải có nghĩa vụ cùng `id`, cùng `fidelity`.
+
+`gamekit validate` kiểm tra schema, id trùng, `params` có tồn tại, file oracle có thật, và từ P2 kiểm tra đủ bằng chứng cho `calibrated`/`emergent` (xem mục 2).
 
 ## 2. Bảng oracle: nhiều điểm so sánh hơn vài số lẻ
 Công thức có nhiều nhánh (sát thương theo level, đường bay, đường cong tốc độ, bảng rơi đồ) thì đừng chỉ so 1–2 giá trị. Lập bảng `spec/oracles/<tên>.json` gồm `source`, `confidence`, `tolerance` và `cases: [{ in, out }]`, phủ cả lưới đầu vào và các biên. Test dùng `it.each(oracle.cases)` (xem `tests/core/world.test.ts` trong template).
@@ -35,6 +37,31 @@ Lấy `out` từ đâu (ghi vào `confidence`):
 - `inferred`: đo từ video hoặc chơi thử. Bắt buộc có `tolerance`.
 
 Chạy code của game gốc để sinh oracle (harness, emulator, Unity Editor): với game của người dùng (`own`) cứ làm, đây là cách có oracle `observed` tốt nhất. Với `third-party` đó là chạy binary của người khác: chỉ làm khi người dùng đồng ý, và ghi lại thành `D-n`.
+
+**Ngưỡng sai số.** `tolerance` là tương đối, vô nghĩa khi giá trị gần 0. Vị trí, vận tốc thì dùng `toleranceAbs`, cùng đơn vị với `out`. Mỗi case có thể ghi đè. So bằng `oracleMismatches` trong `tests/support/oracle.ts`: đạt khi nằm trong một trong hai ngưỡng, không có ngưỡng thì phải bằng đúng.
+
+**Oracle quỹ đạo** cho cơ chế `calibrated`: ghi từ game gốc mỗi `FixedUpdate`, rồi phát lại cùng cảnh và input trong `core/`.
+
+```json
+{
+  "source": "Unity Editor, cảnh Calib_Ball, ghi mỗi FixedUpdate",
+  "confidence": "observed",
+  "kind": "trajectory",
+  "stepHz": 50,
+  "toleranceAbs": 0.05,
+  "toleranceDecision": "D-4",
+  "cases": [
+    { "in": { "scene": "wall-45", "tick": 60 }, "out": { "x": 1.42, "y": 0.87 }, "role": "calibrate" },
+    { "in": { "scene": "wall-30", "tick": 60 }, "out": { "x": 1.88, "y": 0.31 }, "role": "holdout" }
+  ]
+}
+```
+
+Luật cho `calibrated` và `emergent`, từ P2 `validate` chặn nếu thiếu:
+- Có `oracle`, `cases` có `oracle`, và `toleranceDecision` trỏ tới mục `D-n` giải thích vì sao ngưỡng này chấp nhận được. Nới ngưỡng thì cập nhật mục đó và hỏi người dùng; không nới để test xanh.
+- `calibrated` có cả case `role: calibrate` và `role: holdout`. Chỉ tinh chỉnh tham số theo bộ `calibrate`; bộ `holdout` chỉ dùng để chấm, để tránh khớp ngưỡng nhờ học thuộc cảnh. `validate` chỉ kiểm tra có đủ hai bộ, không biết bạn đã tinh chỉnh theo bộ nào, nên phải tự giữ đúng luật này. Test phải chạy cả hai bộ.
+
+`emergent` so chỉ số thống kê qua nhiều lần chạy (tỉ lệ đổ, thời gian ổn định) bằng oracle dạng bảng; ghi số lần chạy vào `in`.
 
 ## 3. Gắn thẻ test
 Tên test chứa `[id:case]`, viết ở `it` hoặc `describe`:
@@ -61,4 +88,4 @@ Giá trị kỳ vọng lấy từ `params/` hoặc oracle, **không** gõ lại 
 Test xanh có thể chỉ đang so một giá trị với chính nó. Với mỗi nghĩa vụ quan trọng, phá thử một lần: đổi một giá trị trong `params/` hoặc một dòng oracle, chạy `gamekit parity`, phải thấy nghĩa vụ đó đỏ. Xong thì hoàn tác. Nếu vẫn xanh, test chưa chạm tới hành vi thật: viết lại test.
 
 ## 6. Báo cáo
-Báo người dùng: số nghĩa vụ bắt buộc đã đóng / tổng, các nghĩa vụ bỏ qua kèm D-n, các nghĩa vụ chỉ dựa trên `inferred` hoặc `derived`, và những gì **chưa** kiểm chứng. Chỉ báo những lệnh đã thật sự chạy.
+Báo người dùng: số nghĩa vụ bắt buộc đã đóng / tổng, số đóng theo từng `fidelity` (`calibrated`, `emergent` là đạt trong ngưỡng, không phải giống hệt), các nghĩa vụ bỏ qua kèm D-n, các nghĩa vụ chỉ dựa trên `inferred` hoặc `derived`, và những gì **chưa** kiểm chứng. Test `replay` chỉ chứng minh bản web tất định, không chứng minh giống game gốc. Chỉ báo những lệnh đã thật sự chạy.

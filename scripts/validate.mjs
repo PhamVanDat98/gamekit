@@ -36,8 +36,10 @@ export function validateGame(root, { stage } = {}) {
   const st = stage ?? Math.max(0, phaseIndex(game.phase));
 
   const paramKeys = validateParams(root, st, pr);
+  validateFixedStep(root, game, pr);
   validateObligations(root, st, pr, paramKeys);
-  validateOracles(root, pr);
+  validateOracles(root, game, pr);
+  validatePhysics(root, game, st, pr);
   validatePortalSettings(game, st, pr);
   validateLanguages(root, game, pr);
   validateIcons(root, pr);
@@ -100,6 +102,20 @@ function validateParams(root, st, pr) {
   return keys;
 }
 
+/** The rate the game really runs at lives in params (main.ts reads it); game.yaml must not say otherwise. */
+function validateFixedStep(root, game, pr) {
+  const f = path.join(root, 'params', 'game.json');
+  if (!exists(f)) return;
+  let hz;
+  try {
+    hz = readJson(f).sim?.fixedStepHz?.value;
+  } catch {
+    return; // validateParams reports the broken file
+  }
+  if (hz != null && game.runtime?.fixedStepHz != null && hz !== game.runtime.fixedStepHz)
+    pr.error('game.yaml', `runtime.fixedStepHz = ${game.runtime.fixedStepHz} nhưng params/game.json sim.fixedStepHz = ${hz}: game chạy theo params`);
+}
+
 // ---------- spec/obligations.yaml: parity obligations ----------
 export const OBLIGATIONS_FILE = 'spec/obligations.yaml';
 
@@ -129,6 +145,7 @@ function validateObligations(root, st, pr, paramKeys) {
     seen.add(o.id);
     for (const k of o.params ?? []) if (!paramKeys.has(k)) pr.error(where, `${o.id}: params ${k} không có trong params/`);
     if (o.oracle && !exists(path.join(root, o.oracle))) pr.error(where, `${o.id}: không có file oracle ${o.oracle}`);
+    if ((o.status ?? 'active') === 'active') for (const e of fidelityGaps(root, o, decisions)) (strict ? pr.error : pr.warn).call(pr, where, `${o.id}: ${e}`);
     if ((o.status ?? 'active') !== 'active') {
       if (!o.decision) pr.error(where, `${o.id}: ${o.status} cần decision D-n trong DECISIONS.md`);
       else if (!decisions.has(o.decision)) pr.error(where, `${o.id}: trỏ tới ${o.decision} nhưng DECISIONS.md không có mục này`);
@@ -137,16 +154,158 @@ function validateObligations(root, st, pr, paramKeys) {
   }
 }
 
+/**
+ * "Within a threshold" only means something when the threshold has a recorded reason and,
+ * for tuned parameters, was checked on cases the tuning never saw.
+ */
+function fidelityGaps(root, o, decisions) {
+  if (o.fidelity !== 'calibrated' && o.fidelity !== 'emergent') return [];
+  const gaps = [];
+  if (!o.cases.includes('oracle')) gaps.push(`fidelity ${o.fidelity} cần case oracle`);
+  if (!o.oracle) return [...gaps, `fidelity ${o.fidelity} cần file oracle`];
+  const f = path.join(root, o.oracle);
+  if (!exists(f)) return gaps; // reported above
+  let oracle;
+  try {
+    oracle = readJson(f);
+  } catch {
+    return gaps; // validateOracles reports the broken file
+  }
+  if (!oracle.toleranceDecision) gaps.push(`${o.oracle} cần toleranceDecision (D-n giải thích ngưỡng)`);
+  else if (!decisions.has(oracle.toleranceDecision)) gaps.push(`${o.oracle} trỏ tới ${oracle.toleranceDecision} nhưng DECISIONS.md không có mục này`);
+  if (o.fidelity === 'calibrated') {
+    const roles = new Set((oracle.cases ?? []).map((c) => c.role));
+    if (!roles.has('calibrate') || !roles.has('holdout')) gaps.push(`${o.oracle} cần cả case role calibrate và holdout (tinh chỉnh trên bộ này, chấm trên bộ kia)`);
+  }
+  return gaps;
+}
+
 // ---------- spec/oracles/*.json: input → output tables from the original game ----------
-function validateOracles(root, pr) {
+function validateTrajectory(oracle, game, where, pr) {
+  if (oracle.stepHz == null) pr.error(where, 'trajectory cần stepHz');
+  else if (game.runtime?.fixedStepHz != null && oracle.stepHz !== game.runtime.fixedStepHz)
+    pr.warn(where, `ghi ở ${oracle.stepHz} Hz nhưng game chạy ${game.runtime.fixedStepHz} Hz: tick không tương ứng, phải đổi sang cùng mốc thời gian khi so`);
+  (oracle.cases ?? []).forEach((c, i) => {
+    if (typeof c.in?.scene !== 'string' || !Number.isInteger(c.in?.tick) || c.in.tick < 0) pr.error(where, `cases[${i}]: in phải là { scene, tick }`);
+    const out = c.out && typeof c.out === 'object' ? Object.values(c.out) : [];
+    if (!out.length || !out.every(Number.isFinite)) pr.error(where, `cases[${i}]: out phải là các số đo, vd { x, y }`);
+    if ((c.toleranceAbs ?? oracle.toleranceAbs) == null) pr.error(where, `cases[${i}]: trajectory cần toleranceAbs (vị trí, vận tốc có thể gần 0)`);
+  });
+}
+
+function validateOracles(root, game, pr) {
   const dir = path.join(root, 'spec', 'oracles');
   for (const rel of walk(dir).filter((f) => f.endsWith('.json'))) {
     const where = `spec/oracles/${rel}`;
     try {
-      for (const e of check('oracle', readJson(path.join(dir, rel)))) pr.error(where, e);
+      const oracle = readJson(path.join(dir, rel));
+      const errs = check('oracle', oracle);
+      for (const e of errs) pr.error(where, e);
+      if (!errs.length && oracle.kind === 'trajectory') validateTrajectory(oracle, game, where, pr);
     } catch (e) {
       pr.error(where, e.message);
     }
+  }
+}
+
+// ---------- spec/physics-assessment.yaml: how much the port depends on a physics engine ----------
+export const PHYSICS_FILE = 'spec/physics-assessment.yaml';
+
+const IMPACT = {
+  decisive: { high: 'high', low: 'medium' },
+  feel: { high: 'medium', low: 'low' },
+  cosmetic: { high: 'low', low: 'low' },
+};
+export const physicsImpact = (outcome, sensitivity) => IMPACT[outcome][sensitivity];
+
+/**
+ * errors = the file is wrong or contradicts itself, an error at any phase.
+ * gaps = the assessment is not finished; blocks the P1 gate and validate from P2 on.
+ */
+export function assessPhysics(root, game) {
+  let data;
+  try {
+    data = readYaml(path.join(root, PHYSICS_FILE));
+  } catch (e) {
+    return { errors: [e.message], gaps: [], data: null };
+  }
+  const errors = check('physics-assessment', data);
+  if (errors.length) return { errors, gaps: [], data: null };
+
+  const gaps = [];
+  const decisions = decisionIds(root);
+  const { original, mechanics, recommendation: rec } = data;
+  const ids = new Set();
+  for (const m of mechanics) {
+    if (ids.has(m.id)) errors.push(`trùng id ${m.id}`);
+    ids.add(m.id);
+    const want = physicsImpact(m.outcome, m.sensitivity);
+    if (m.impact !== want) errors.push(`${m.id}: outcome ${m.outcome} + sensitivity ${m.sensitivity} là mức ${want}, không phải ${m.impact}`);
+    if (rec.library === 'none' && m.solver && m.outcome !== 'cosmetic')
+      errors.push(`${m.id}: phụ thuộc solver nhưng library là none (tự viết thì khai custom)`);
+  }
+
+  if (rec.library !== 'none') {
+    if (!rec.decision) gaps.push(`library ${rec.library} cần decision D-n trong DECISIONS.md`);
+    else if (!decisions.has(rec.decision)) gaps.push(`trỏ tới ${rec.decision} nhưng DECISIONS.md không có mục này`);
+  }
+  if ((game.runtime?.physics ?? 'none') !== rec.library) gaps.push(`library ${rec.library} khác runtime.physics ${game.runtime?.physics ?? 'none'} trong game.yaml`);
+
+  const runHz = game.runtime?.fixedStepHz;
+  if (original.fixedStepHz != null && runHz != null && original.fixedStepHz !== runHz) {
+    if (!original.fixedStepDecision) gaps.push(`game gốc chạy ${original.fixedStepHz} Hz, bản web ${runHz} Hz: đổi cho khớp hoặc ghi fixedStepDecision`);
+    else if (!decisions.has(original.fixedStepDecision)) gaps.push(`trỏ tới ${original.fixedStepDecision} nhưng DECISIONS.md không có mục này`);
+  }
+
+  const risky = mechanics.filter((m) => m.impact === 'high' && m.solver).map((m) => m.id);
+  const spike = rec.spike;
+  if (risky.length && !spike) gaps.push(`cần chạy thử vì có cơ chế mức high phụ thuộc solver: ${risky.join(', ')}`);
+  if (spike) {
+    for (const id of spike.mechanics) if (!ids.has(id)) errors.push(`spike trỏ tới cơ chế không có: ${id}`);
+    if (risky.length && !spike.mechanics.some((id) => risky.includes(id))) gaps.push(`spike phải thử ít nhất một trong: ${risky.join(', ')}`);
+    if (!exists(path.join(root, spike.result))) gaps.push(`không có file kết quả chạy thử ${spike.result}`);
+    const chosen = spike.candidates.find((c) => c.library === rec.library);
+    if (!chosen) gaps.push(`spike chưa thử ${rec.library}`);
+    else {
+      if (!chosen.passed) gaps.push(`${rec.library} chưa đạt khi chạy thử: dừng lại và hỏi người dùng (nới ngưỡng, tự viết solver hay đổi phạm vi)`);
+      const budget = game.budget?.initialLoadMB;
+      if (budget != null && chosen.gzipKB / 1024 > budget) errors.push(`${rec.library} ${chosen.gzipKB} KB vượt budget.initialLoadMB ${budget} MB`);
+    }
+  }
+  return { errors, gaps, data };
+}
+
+/** Gate check: the assessment exists and is finished. */
+export function physicsReady(root, game) {
+  if (!exists(path.join(root, PHYSICS_FILE))) return { ok: false, detail: `chưa có ${PHYSICS_FILE} (skill physics-assess)` };
+  const { errors, gaps } = assessPhysics(root, game);
+  const all = [...errors, ...gaps];
+  return { ok: all.length === 0, detail: all.slice(0, 5).join('; ') };
+}
+
+function validatePhysics(root, game, st, pr) {
+  const strict = st >= PHASES.indexOf('P2');
+  if (!exists(path.join(root, PHYSICS_FILE))) {
+    if (strict) pr.warn(PHYSICS_FILE, 'chưa đánh giá ảnh hưởng của engine vật lý (skill physics-assess)');
+    return;
+  }
+  const { errors, gaps, data } = assessPhysics(root, game);
+  for (const e of errors) pr.error(PHYSICS_FILE, e);
+  for (const g of gaps) (strict ? pr.error : pr.warn).call(pr, PHYSICS_FILE, g);
+  if (!data || !strict) return;
+  // From P2 on, each mechanic that affects play is closed by an obligation of the same id.
+  let obligations = [];
+  try {
+    obligations = loadObligations(root)?.obligations ?? [];
+  } catch {
+    return; // validateObligations reports the broken file
+  }
+  const byId = new Map(obligations.map((o) => [o.id, o]));
+  for (const m of data.mechanics) {
+    if (m.outcome === 'cosmetic') continue;
+    const o = byId.get(m.id);
+    if (!o) pr.error(PHYSICS_FILE, `${m.id}: ${OBLIGATIONS_FILE} chưa có nghĩa vụ cùng id`);
+    else if (o.fidelity !== m.fidelity) pr.error(PHYSICS_FILE, `${m.id}: fidelity ${m.fidelity} khác nghĩa vụ (${o.fidelity ?? 'chưa khai'})`);
   }
 }
 

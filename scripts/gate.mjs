@@ -9,7 +9,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 import { log, GkError } from './lib/log.mjs';
 import { requireGameRoot, loadGame, updateGame, nowIso, ownershipOf } from './lib/game.mjs';
 import { PHASES, nextPhase, phaseInfo } from './lib/phases.mjs';
-import { validateGame } from './validate.mjs';
+import { physicsReady, validateGame } from './validate.mjs';
 import { parityDetail, parityForGame } from './parity.mjs';
 
 /**
@@ -60,6 +60,7 @@ function runAuto(root, name, phase) {
       return { ok: false, detail: e.message };
     }
   }
+  if (name === 'physics') return physicsReady(root, loadGame(root));
   if (name.startsWith('field:')) {
     // field:release.forbiddenTerms → the game.yaml value must be non-empty
     const key = name.slice(6).trim();

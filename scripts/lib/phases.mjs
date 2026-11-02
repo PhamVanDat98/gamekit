@@ -4,7 +4,7 @@ export const PHASES = ['P0', 'P1', 'P2', 'P3', 'P4', 'P5'];
 
 export const PHASE_INFO = {
   P0: { name: 'Intake', skills: ['game-recon', 'triage'], human: 'Bạn quyết định làm hay bỏ (triage).' },
-  P1: { name: 'Phân tích', skills: ['engine-<engine>', 're-notes', 'gameplay-spec', 'asset-inventory', 'ui-extract'] },
+  P1: { name: 'Phân tích', skills: ['engine-<engine>', 're-notes', 'gameplay-spec', 'asset-inventory', 'ui-extract', 'physics-assess'], human: 'Bạn duyệt thư viện vật lý.' },
   P2: { name: 'Dựng lại', skills: ['runtime-select', 'module-plan', 'rebuild-game', 'integrate', 'parity-check'] },
   P3: {
     name: 'Chuyển sang web',
@@ -20,6 +20,7 @@ export const PHASE_INFO = {
 export const AVAILABLE_SKILLS = new Set([
   'using-gamekit',
   're-notes',
+  'physics-assess',
   'rebuild-game',
   'parity-check',
   'module-plan',

@@ -13,8 +13,10 @@ Mục tiêu cổng P2: chơi được trọn vẹn (`own`: với asset gốc nh�
 - Đã có (đi từ P0/P1): kiểm tra `gamekit status` báo P2.
 
 ## 2. Chọn runtime (thay cho skill runtime-select chưa có)
-- 2D đơn giản, ít sprite: canvas thuần (template sẵn). Nhiều sprite, hiệu ứng: Pixi. Cần scene/physics có sẵn: Phaser. 3D: Three.js. Vật lý phức tạp: Rapier (wasm) hoặc viết riêng nếu game gốc dùng công thức đơn giản — ưu tiên **tái hiện đúng công thức gốc** hơn thay bằng engine vật lý khác.
+- 2D đơn giản, ít sprite: canvas thuần (template sẵn). Nhiều sprite, hiệu ứng: Pixi. Cần scene có sẵn: Phaser. 3D: Three.js.
+- Vật lý: dùng đúng thư viện đã chốt trong `spec/physics-assessment.yaml` (skill **physics-assess**), không tự chọn lại. Cơ chế `exact` viết công thức trong `core/`, kể cả khi game có thư viện vật lý: ưu tiên **tái hiện đúng công thức gốc** hơn thay bằng engine vật lý khác. Không dùng vật lý tích hợp của Phaser cho `core/`.
 - Ghi lựa chọn + lý do vào `DECISIONS.md` và `runtime` trong game.yaml. Thư viện render chỉ được dùng trong `view/`.
+- Thư viện vật lý nằm trong `core/`, sau một lớp bọc mỏng giữ đúng thứ tự `FixedUpdate → physics step → callback` của game gốc. Bước mô phỏng chỉ lấy từ fixed step; `worldHash` phải gồm trạng thái các vật thể. Thư viện wasm cần khởi tạo bất đồng bộ trước `createWorld`, cả trong test.
 
 ## 3. Số liệu trước, code sau
 - Mọi số gameplay vào `params/*.json`: `{ "value", "unit", "source", "confidence"?, "tolerance"? }`. `source` trỏ tới chỗ trong game gốc; `confidence` là `observed | derived | inferred` (`inferred` phải có `tolerance`). Chưa biết thì `"TODO: …"` — validate sẽ chặn ở cổng P2.

@@ -10,7 +10,6 @@ import { mountSettings } from './view/settings';
 import { BUILD_ID, PauseBus, bootPlatform } from './platform';
 import { installWebGuard } from './platform/web-guard';
 
-const FIXED_HZ = 60;
 const MS = 1000;
 
 /** The portal shell page has no game markup (npm run dev's index.html does): create it when missing. */
@@ -49,7 +48,7 @@ async function main(): Promise<void> {
 
   const renderer = new Renderer(canvas, PARAMS);
   const input = new InputState();
-  const step = createFixedStep(FIXED_HZ);
+  const step = createFixedStep(PARAMS.sim.fixedStepHz);
   let world = createWorld(PARAMS, Date.now() >>> 0);
   let state: 'ready' | 'playing' | 'over' = 'ready';
   let round = 0;

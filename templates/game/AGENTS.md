@@ -19,7 +19,7 @@ Game này được port bằng **GameKit**. Trạng thái nằm trong `game.yaml
 - `src/platform/` interface chung cho mọi portal. Gameplay chỉ gọi `Platform`; adapter nằm trong `src/platform/adapters/`. Event analytics chỉ dùng tên trong `src/platform/events.ts`.
 - `src/contracts/` type dùng chung giữa các module — chỉ agent chính sửa.
 - `Language/` mỗi ngôn ngữ một file (`en.json` bắt buộc) · `public/Icons/` (`web.png`, `loading.webp`) · `builds/` đầu ra của pack (gitignored, không commit).
-- `params/` số liệu có nguồn và `confidence` · `spec/` gameplay spec, `obligations.yaml`, `oracles/` · `notes/` ghi chú RE, `QUESTIONS.md` · `gates/` checklist cổng · `DECISIONS.md` lý do và sai khác.
+- `params/` số liệu có nguồn và `confidence` · `spec/` gameplay spec, `physics-assessment.yaml`, `obligations.yaml`, `oracles/` · `notes/` ghi chú RE, `QUESTIONS.md` · `gates/` checklist cổng · `DECISIONS.md` lý do và sai khác.
 
 ## Lệnh
 | Việc | Lệnh |

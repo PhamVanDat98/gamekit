@@ -24,6 +24,7 @@
             "items": { "enum": ["normal", "edge", "invalid", "oracle", "replay"] },
             "description": "Loại case phải có test: normal (giá trị điển hình), edge (biên: tường, max, 0), invalid (input sai), oracle (bảng spec/oracles), replay (luồng chơi ghi lại)"
           },
+          "fidelity": { "enum": ["exact", "calibrated", "emergent"], "description": "Mức giống game gốc mà test chứng minh: exact (trùng công thức), calibrated (quỹ đạo trong ngưỡng), emergent (chỉ số thống kê trong ngưỡng)" },
           "params": { "type": "array", "items": { "type": "string" }, "description": "Khoá params liên quan, vd player.speed" },
           "oracle": { "type": "string", "description": "File bảng oracle, vd spec/oracles/pan.json" },
           "source": { "type": "string", "description": "Ghi chú RE mô tả hành vi, vd notes/player.md" },

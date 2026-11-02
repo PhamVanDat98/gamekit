@@ -61,7 +61,7 @@ export function evaluateParity({ obligations, tests, decisions = new Set() }) {
     else if (unverified.length) state = 'unknown';
     else if (missing.length) state = 'open';
     else state = 'closed';
-    items.push({ id: o.id, title: o.title, required: o.required !== false, status, decision: o.decision, state, missing, failing, unverified });
+    items.push({ id: o.id, title: o.title, required: o.required !== false, fidelity: o.fidelity, status, decision: o.decision, state, missing, failing, unverified });
   }
 
   const mustClose = items.filter((i) => i.required && i.state !== 'waived');
@@ -95,6 +95,17 @@ export function parityForGame(root, { report, cwd = root } = {}) {
   return evaluateParity({ obligations: data.obligations, tests: testsFromVitestReport(json), decisions: decisionIds(root) });
 }
 
+/** How close "closed" really is: "within a threshold" must never read as "identical". Null when nothing declares it. */
+export function fidelitySummary(items) {
+  const closed = items.filter((i) => i.required && i.state === 'closed');
+  if (!closed.some((i) => i.fidelity)) return null;
+  const count = (f) => closed.filter((i) => i.fidelity === f).length;
+  const parts = ['exact', 'calibrated', 'emergent'].map((f) => `${f} ${count(f)}`);
+  const undeclared = closed.filter((i) => !i.fidelity).length;
+  if (undeclared) parts.push(`chưa khai ${undeclared}`);
+  return `nghĩa vụ đã đóng theo mức: ${parts.join(' · ')} (calibrated, emergent là đạt trong ngưỡng, không phải trùng khớp)`;
+}
+
 /** One line for gate output: what still blocks parity. */
 export function parityDetail(result) {
   const open = result.items.filter((i) => i.required && !['closed', 'waived'].includes(i.state)).map((i) => `${i.id} (${i.state})`);
@@ -121,5 +132,7 @@ export async function run(args) {
   const must = result.items.filter((i) => i.required && i.state !== 'waived');
   const closed = must.filter((i) => i.state === 'closed').length;
   (result.ok ? log.ok : log.fail)(`parity: ${closed}/${must.length} nghĩa vụ bắt buộc đã đóng`);
+  const fidelity = fidelitySummary(result.items);
+  if (fidelity) log.info(fidelity);
   return result.ok ? 0 : 1;
 }

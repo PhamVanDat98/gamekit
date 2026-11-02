@@ -51,7 +51,7 @@ Trong VS Code: Ctrl+Shift+B = pack, task "GameKit: …" cho các lệnh khác, d
 | `config [--portal p] [--set k=v]` | Điền thông tin portal còn thiếu hoặc thêm portal (chép checklist vào `gates/P4.md`) |
 | `status` / `next` | Pha, thời gian ở pha (cảnh báo vượt dự kiến), việc còn mở, skill tiếp theo |
 | `gate [--advance]` | Chấm `gates/<pha>.md`: mục `{auto: …}` chạy script, mục `(bạn)` chỉ người dùng tick |
-| `validate [--stage Px]` | Schema `game.yaml`, `params/*.json` (mọi giá trị có `source`; `confidence` = observed/derived/inferred, inferred cần `tolerance` từ P2), `spec/obligations.yaml`, `spec/oracles/*.json`, provenance, `module-plan.yaml`, `asset-manifest.json` |
+| `validate [--stage Px]` | Schema `game.yaml`, `params/*.json` (mọi giá trị có `source`; `confidence` = observed/derived/inferred, inferred cần `tolerance` từ P2), `spec/obligations.yaml`, `spec/oracles/*.json`, `spec/physics-assessment.yaml`, provenance, `module-plan.yaml`, `asset-manifest.json` |
 | `parity [--report file.json]` | Chạy vitest, đóng từng nghĩa vụ trong `spec/obligations.yaml` bằng test gắn thẻ `[id:case]`. Test đỏ, skip/todo, thiếu case hay thẻ lạ đều tính là chưa đạt |
 | `provenance add <file…> --label …` | Nhãn `reference / generated / own / licensed / placeholder` |
 | `pack [--portal] [--all] [--version V] [--compress] [--zip]` | `builds/<YYMMDDNN>/<portal>/{index.html, preview.html, version.txt, <v>/…}` + `builds/<v>/manifest.json` (+ zip) |
@@ -96,6 +96,12 @@ Game tạo từ template trước bố cục az-v1 build ra `index.html` + `Buil
 9. Xoá `public/TemplateData/`; dữ liệu tĩnh để trong `public/StreamingAssets/`.
 
 Sau đó: `npm run gk -- config` (điền thông tin portal: gameCode, signed…), `npm run gk -- validate`, `npm test`, `npm run typecheck`, rồi `npm run gk -- pack --all`.
+
+Đánh giá vật lý (skill `physics-assess`): game cũ vẫn chạy được, từ P2 `validate` chỉ cảnh báo khi thiếu `spec/physics-assessment.yaml`. Muốn dùng đầy đủ, chép thêm từ `templates/game/`:
+
+1. Mục vật lý trong `gates/P1.md` (game chưa qua P1).
+2. `tests/support/oracle.ts`, `tests/support/oracle.test.ts`.
+3. `sim.fixedStepHz` trong `params/game.json`, và `src/main.ts` đọc `PARAMS.sim.fixedStepHz` thay vì `FIXED_HZ`. Trước đây `runtime.fixedStepHz` trong `game.yaml` không có tác dụng: game luôn chạy 60 Hz.
 
 **Game tạo trước khi có `source.ownership`** được coi là `own`, nhưng `gates/*.md` cũ vẫn giữ mục của chế độ làm lại game (forbiddenTerms, reskin). Game của bạn: chép `gates/P0.md`…`P3.md` từ `templates/game/gates/`. Game làm lại của người khác: thêm `ownership: third-party` dưới `source:` trong `game.yaml`.
 

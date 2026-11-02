@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gamekit/physics-assessment.schema.json",
+  "title": "spec/physics-assessment.yaml — game gốc dựa vào engine vật lý tới đâu, và bản web dùng thư viện vật lý nào (skill physics-assess)",
+  "type": "object",
+  "required": ["original", "scope", "mechanics", "recommendation"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "original": {
+      "type": "object",
+      "required": ["kind", "fixedStepHz", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["2d", "3d"] },
+        "fixedStepHz": { "type": ["integer", "null"], "minimum": 1, "description": "Tần số bước vật lý của game gốc; null nếu game gốc không có fixed step" },
+        "source": { "type": "string", "minLength": 1, "description": "Lấy từ đâu, vd ProjectSettings/TimeManager.asset" },
+        "fixedStepDecision": { "type": "string", "pattern": "^D-\\d+$", "description": "Bắt buộc khi bản web chạy tần số khác game gốc" }
+      }
+    },
+    "scope": { "type": "string", "minLength": 1, "description": "Phạm vi đã kiểm kê: code, scene, prefab, thiết lập nào. library: none dựa vào mục này làm bằng chứng" },
+    "mechanics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "usage", "solver", "outcome", "sensitivity", "impact", "fidelity"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "description": "Từ P2 trùng id nghĩa vụ trong spec/obligations.yaml" },
+          "title": { "type": "string", "minLength": 1 },
+          "usage": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "API và component dùng, vd AddForce, OnCollisionEnter2D" },
+          "solver": { "type": "boolean", "description": "Kết quả có phụ thuộc solver không. false: chỉ gán vận tốc, raycast/overlap, trigger" },
+          "outcome": { "enum": ["decisive", "feel", "cosmetic"], "description": "decisive: quyết định thắng/thua, điểm số · feel: chỉ ảnh hưởng cảm giác · cosmetic: chỉ để trang trí" },
+          "sensitivity": { "enum": ["high", "low"], "description": "high: lệch một chút thì kết quả đổi hẳn" },
+          "impact": { "enum": ["high", "medium", "low"], "description": "Suy ra từ outcome + sensitivity; validate đối chiếu" },
+          "fidelity": { "enum": ["exact", "calibrated", "emergent"], "description": "exact: viết lại công thức · calibrated: tinh chỉnh theo quỹ đạo gốc · emergent: so chỉ số thống kê" },
+          "source": { "type": "string", "description": "Ghi chú mô tả cơ chế, vd notes/ball.md" }
+        }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "required": ["library", "rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "library": { "type": "string", "minLength": 1, "description": "none, custom hoặc tên gói npm; phải khớp runtime.physics trong game.yaml" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "alternatives": { "type": "array", "items": { "type": "string" } },
+        "decision": { "type": "string", "pattern": "^D-\\d+$", "description": "Mục trong DECISIONS.md; bắt buộc trừ khi library: none" },
+        "spike": {
+          "type": "object",
+          "required": ["mechanics", "result", "confidence", "candidates"],
+          "additionalProperties": false,
+          "description": "Chạy thử; bắt buộc khi có cơ chế mức high phụ thuộc solver",
+          "properties": {
+            "mechanics": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+            "result": { "type": "string", "minLength": 1, "description": "File ghi kết quả, vd spec/spikes/physics.md" },
+            "confidence": { "enum": ["observed", "derived", "inferred"], "description": "Độ tin cậy của dữ liệu đem so; đo từ video là inferred" },
+            "candidates": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["library", "passed", "deviation", "gzipKB", "stepMs", "device"],
+                "additionalProperties": false,
+                "properties": {
+                  "library": { "type": "string", "minLength": 1 },
+                  "passed": { "type": "boolean", "description": "Có đạt ngưỡng của oracle không" },
+                  "deviation": { "type": "string", "minLength": 1, "description": "Độ lệch đo được so với oracle" },
+                  "gzipKB": { "type": "number", "minimum": 0, "description": "Dung lượng thư viện trong bản build, sau gzip" },
+                  "stepMs": { "type": "number", "minimum": 0, "description": "Thời gian một bước mô phỏng" },
+                  "device": { "type": "string", "minLength": 1, "description": "Thiết bị đo stepMs" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

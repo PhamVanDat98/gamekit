@@ -4,6 +4,7 @@ import { PARAMS } from '../../src/core/params';
 import { createWorld, obstacleSpeed, stepWorld } from '../../src/core/world';
 import raw from '../../params/game.json';
 import speedOracle from '../../spec/oracles/obstacle-speed.json';
+import { oracleMismatches } from '../support/oracle';
 
 const DT = 1 / 60;
 const hold = (tick: number, ...actions: InputFrame['actions'][number][]): InputFrame => ({ tick, actions });
@@ -31,7 +32,7 @@ describe('parity with params', () => {
 
   // Oracle: every row of the table taken from the original game must match within tolerance.
   it.each(speedOracle.cases)('[obstacle.speed:oracle] t=$in.t s → $out px/s', (c) => {
-    expect(Math.abs(obstacleSpeed(PARAMS, c.in.t) - c.out) / c.out).toBeLessThanOrEqual(speedOracle.tolerance);
+    expect(oracleMismatches(obstacleSpeed(PARAMS, c.in.t), c, speedOracle)).toEqual([]);
   });
 
   it('[obstacle.spawn:normal] spawns one obstacle every spawnEvery seconds', () => {

@@ -2,6 +2,7 @@
 # Đóng bằng test gắn thẻ [id:case] trong tên, vd it('[player.move:edge] …'). `gamekit parity` chấm.
 # Case: normal | edge | invalid | oracle (bảng spec/oracles) | replay.
 # Không làm một nghĩa vụ: status blocked|out-of-scope + decision D-n + approved (người dùng duyệt).
+# Mức giống game gốc: fidelity exact | calibrated | emergent. Hai mức sau cần oracle và D-n giải thích ngưỡng.
 # Các mục dưới đây là của game demo trong template — thay bằng cơ chế của game gốc ở P2.
 obligations:
   - id: player.move

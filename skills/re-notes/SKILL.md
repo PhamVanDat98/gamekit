@@ -50,4 +50,4 @@ Mỗi kết luận trong `notes/<chủ đề>.md` (`third-party`: viết bằng 
 Số liệu đưa vào `params/*.json` với `source` trỏ tới vị trí và `confidence`. Giá trị `inferred` phải có `tolerance`; từ P2 `validate` sẽ chặn nếu thiếu. Bảng nhiều điểm (theo level, theo thời gian) đưa vào `spec/oracles/` (xem skill parity-check).
 
 ## 5. Đóng pha
-Xem lại `notes/QUESTIONS.md`: mỗi câu là `đã trả lời` (kèm link ghi chú), `một phần` hoặc `mở`. Câu chưa xong phải ghi lý do và ảnh hưởng tới bản port. Không nói "phân tích xong" khi còn câu bắt buộc chưa trả lời. Sau đó viết `spec/gameplay-spec.md` từ các ghi chú, chạy `gamekit validate`, rồi `gamekit gate`.
+Xem lại `notes/QUESTIONS.md`: mỗi câu là `đã trả lời` (kèm link ghi chú), `một phần` hoặc `mở`. Câu chưa xong phải ghi lý do và ảnh hưởng tới bản port. Không nói "phân tích xong" khi còn câu bắt buộc chưa trả lời. Sau đó viết `spec/gameplay-spec.md` từ các ghi chú, đánh giá vật lý bằng skill **physics-assess**, chạy `gamekit validate`, rồi `gamekit gate`.

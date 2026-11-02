@@ -1,5 +1,8 @@
 {
   "$schema": "../.gamekit/schemas/params.schema.json",
+  "sim": {
+    "fixedStepHz": { "value": 60, "unit": "Hz", "source": "template-demo: thiết kế mẫu, không phải port. Khi port: lấy từ game gốc (Unity: TimeManager.asset)" }
+  },
   "world": {
     "width": { "value": 480, "unit": "px", "source": "template-demo: thiết kế mẫu, không phải port" },
     "height": { "value": 720, "unit": "px", "source": "template-demo: thiết kế mẫu, không phải port" }

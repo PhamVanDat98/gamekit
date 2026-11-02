@@ -105,9 +105,10 @@
         },
         "physics": {
           "type": "string",
-          "description": "none, custom, rapier, matter, planck…"
+          "description": "Thư viện vật lý: none, custom hoặc tên gói npm. Chốt bằng spec/physics-assessment.yaml (skill physics-assess)"
         },
         "fixedStepHz": {
+          "description": "Tần số fixed step; phải khớp sim.fixedStepHz trong params/game.json (giá trị game thật sự chạy)",
           "type": "integer",
           "minimum": 10,
           "maximum": 240

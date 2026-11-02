@@ -12,8 +12,8 @@ source:
 runtime:
   kind: 2d
   renderer: canvas
-  physics: none
-  fixedStepHz: 60
+  physics: none             # chốt bằng spec/physics-assessment.yaml
+  fixedStepHz: 60           # phải khớp sim.fixedStepHz trong params/game.json
 portals:
   - dev-mock
 portalSettings: {}           # thông tin từng portal — gamekit config --portal <id>
