@@ -9,6 +9,7 @@ import { checkModulePlan, physicsImpact } from '../scripts/validate.mjs';
 import { ownershipProblems, topo } from '../scripts/parallel.mjs';
 import { parseArgs } from '../scripts/gamekit.mjs';
 import { evaluateParity, fidelitySummary, testsFromVitestReport } from '../scripts/parity.mjs';
+import { zipDir } from '../scripts/lib/zip.mjs';
 import YAML from 'yaml';
 
 test('init creates a valid game with git, hook and schemas', () => {
@@ -955,4 +956,159 @@ test('ownership: game.yaml without the field counts as own; unknown values are r
   const r = gk(dir, 'validate');
   assert.equal(r.code, 1);
   assert.match(r.out, /ownership/);
+});
+
+// ---------- unpack ----------
+const UNITY_HEAD = Buffer.concat([Buffer.from('UnityFS\0', 'latin1'), Buffer.from([0, 0, 0, 8]), Buffer.from('5.x.x\x002022.3.20f1\0', 'latin1'), Buffer.alloc(64)]);
+const METADATA = Buffer.concat([Buffer.from([0xaf, 0x1b, 0xb1, 0xfa]), Buffer.from([31, 0, 0, 0]), Buffer.alloc(32)]);
+
+/** Zip a { relPath: content } tree into `file`. */
+function zipTree(file, tree) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gamekit-zip-'));
+  for (const [rel, content] of Object.entries(tree)) {
+    fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+    fs.writeFileSync(path.join(dir, rel), content);
+  }
+  zipDir(dir, file);
+  return file;
+}
+
+/** An XAPK shaped like Play's split delivery: logic and data in separate APKs. */
+function splitXapk(parent, { metadata = METADATA, withSplit = true } = {}) {
+  const apks = fs.mkdtempSync(path.join(os.tmpdir(), 'gamekit-apks-'));
+  const tree = {
+    'manifest.json': JSON.stringify({ package_name: 'com.example.game', name: 'Example', version_name: '1.2', version_code: '12' }),
+    'base.apk': fs.readFileSync(zipTree(path.join(apks, 'base.apk'), { 'AndroidManifest.xml': 'x', 'assets/bin/Data/Managed/Metadata/global-metadata.dat': metadata, 'assets/bin/Data/data.unity3d': UNITY_HEAD })),
+    'UnityDataAssetPack.apk': fs.readFileSync(zipTree(path.join(apks, 'pack.apk'), { 'AndroidManifest.xml': 'x', 'assets/bin/Data/datapack.unity3d': UNITY_HEAD })),
+  };
+  if (withSplit) tree['config.arm64_v8a.apk'] = fs.readFileSync(zipTree(path.join(apks, 'split.apk'), { 'AndroidManifest.xml': 'x', 'lib/arm64-v8a/libil2cpp.so': 'il2cpp', 'lib/arm64-v8a/libunity.so': 'unity' }));
+  return zipTree(path.join(parent, 'game.xapk'), tree);
+}
+
+test('unpack: split XAPK finds Unity IL2CPP across APKs and records it in the game', () => {
+  const dir = newGame();
+  const parent = path.dirname(dir);
+  const out = path.join(parent, 'src');
+  const { code, out: text } = gk(dir, 'unpack', splitXapk(parent), '--out', out);
+  assert.equal(code, 0, text);
+  assert.match(text, /Engine: unity 2022\.3\.20f1, il2cpp, arm64-v8a/);
+  const report = JSON.parse(read(out, 'unpack-report.json'));
+  assert.equal(report.kind, 'bundle');
+  assert.equal(report.package.packageName, 'com.example.game');
+  assert.equal(report.unity.libil2cpp, 'apk/config.arm64_v8a/lib/arm64-v8a/libil2cpp.so');
+  assert.equal(report.unity.metadata.path, 'apk/base/assets/bin/Data/Managed/Metadata/global-metadata.dat');
+  assert.deepEqual([report.unity.metadata.state, report.unity.metadata.version], ['plain', 31]);
+  assert.deepEqual(report.warnings, []);
+  assert.ok(!fs.existsSync(path.join(out, 'bundle', 'base.apk')), 'bản sao APK con đã giải nén được bỏ');
+  const yaml = YAML.parse(read(dir, 'game.yaml'));
+  assert.equal(yaml.source.path, out);
+  assert.equal(yaml.source.engineVersion, '2022.3.20f1');
+  assert.match(read(dir, 'notes/source-unpack.md'), /libil2cpp\.so/);
+  assert.equal(gk(dir, 'validate').code, 0);
+});
+
+test('unpack: warns when a split is missing or the metadata is protected', () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'gamekit-'));
+  const missing = gk(parent, 'unpack', splitXapk(parent, { withSplit: false }), '--out', path.join(parent, 'a'));
+  assert.equal(missing.code, 0);
+  assert.match(missing.out, /thiếu libil2cpp\.so/);
+  const locked = gk(parent, 'unpack', splitXapk(parent, { metadata: Buffer.alloc(40, 7) }), '--out', path.join(parent, 'b'));
+  assert.match(locked.out, /không có magic chuẩn/);
+});
+
+test('unpack: OBB holds Mono logic; plain APK and other engines are recognised', () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'gamekit-'));
+  const apks = fs.mkdtempSync(path.join(os.tmpdir(), 'gamekit-apks-'));
+  const xapk = zipTree(path.join(parent, 'mono.xapk'), {
+    'base.apk': fs.readFileSync(zipTree(path.join(apks, 'b.apk'), { 'AndroidManifest.xml': 'x', 'lib/armeabi-v7a/libunity.so': 'u', 'lib/armeabi-v7a/libmonobdwgc-2.0.so': 'm' })),
+    'Android/obb/com.x/main.1.com.x.obb': fs.readFileSync(zipTree(path.join(apks, 'o.zip'), { 'assets/bin/Data/Managed/Assembly-CSharp.dll': 'il', 'assets/bin/Data/sharedassets0.assets': 'd' })),
+  });
+  const mono = gk(parent, 'unpack', xapk, '--out', path.join(parent, 'm'));
+  assert.equal(mono.code, 0, mono.out);
+  const report = JSON.parse(read(path.join(parent, 'm'), 'unpack-report.json'));
+  assert.equal(report.unity.backend, 'mono');
+  assert.equal(report.unity.assemblyCSharp, 'obb/main.1.com.x/assets/bin/Data/Managed/Assembly-CSharp.dll');
+
+  const godot = zipTree(path.join(parent, 'g.apk'), { 'AndroidManifest.xml': 'x', 'lib/arm64-v8a/libgodot_android.so': 'g' });
+  const r = gk(parent, 'unpack', godot, '--out', path.join(parent, 'g'));
+  assert.match(r.out, /Engine: godot/);
+  assert.equal(JSON.parse(read(path.join(parent, 'g'), 'unpack-report.json')).kind, 'apk');
+});
+
+test('unpack: hostile names stay inside the output folder; case-only duplicates are not overwritten', () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'gamekit-'));
+  const file = zipTree(path.join(parent, 'x.apk'), { 'AndroidManifest.xml': 'x', 'zz/evil.txt': 'pwn', 'res/a.txt': 'first', 'res/b.txt': 'second' });
+  const buf = fs.readFileSync(file);
+  const swap = (from, to) => {
+    for (let i = buf.indexOf(from); i >= 0; i = buf.indexOf(from, i + 1)) buf.write(to, i, 'latin1');
+  };
+  swap('zz/evil', '../evil');
+  swap('res/b.txt', 'RES/A.txt');
+  fs.writeFileSync(file, buf);
+  const out = path.join(parent, 'sub', 'out');
+  const r = gk(parent, 'unpack', file, '--out', out);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /ra ngoài thư mục giải nén/);
+  assert.match(r.out, /trùng tên/);
+  assert.ok(!fs.existsSync(path.join(out, 'apk', 'evil.txt')));
+  assert.equal(read(path.join(out, 'apk', 'x'), 'res/a.txt'), 'first');
+});
+
+test('unpack: corrupted entry is reported and not left on disk', () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'gamekit-'));
+  const file = zipTree(path.join(parent, 'x.apk'), { 'AndroidManifest.xml': 'x', 'data.bin': 'abcdefgh'.repeat(200) });
+  const buf = fs.readFileSync(file);
+  buf[buf.indexOf('data.bin') + 'data.bin'.length + 4] ^= 0xff;
+  fs.writeFileSync(file, buf);
+  const out = path.join(parent, 'o');
+  const r = gk(parent, 'unpack', file, '--out', out);
+  assert.match(r.out, /data\.bin: không giải nén được/);
+  assert.ok(!fs.existsSync(path.join(out, 'apk', 'x', 'data.bin')));
+});
+
+test('unpack: reads a zip64 directory', () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'gamekit-'));
+  const plain = fs.readFileSync(zipTree(path.join(parent, 'p.zip'), { 'AndroidManifest.xml': 'manifest' }));
+  const at = plain.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  const [count, size, offset] = [plain.readUInt16LE(at + 10), plain.readUInt32LE(at + 12), plain.readUInt32LE(at + 16)];
+  const rec = Buffer.alloc(56);
+  rec.writeUInt32LE(0x06064b50, 0);
+  rec.writeBigUInt64LE(44n, 4);
+  rec.writeBigUInt64LE(BigInt(count), 24);
+  rec.writeBigUInt64LE(BigInt(count), 32);
+  rec.writeBigUInt64LE(BigInt(size), 40);
+  rec.writeBigUInt64LE(BigInt(offset), 48);
+  const locator = Buffer.alloc(20);
+  locator.writeUInt32LE(0x07064b50, 0);
+  locator.writeBigUInt64LE(BigInt(at), 8);
+  locator.writeUInt32LE(1, 16);
+  const eocd = Buffer.alloc(22, 0xff);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 20);
+  const file = path.join(parent, 'z64.apk');
+  fs.writeFileSync(file, Buffer.concat([plain.subarray(0, at), rec, locator, eocd]));
+  const out = path.join(parent, 'o');
+  const r = gk(parent, 'unpack', file, '--out', out);
+  assert.equal(r.code, 0, r.out);
+  assert.equal(read(path.join(out, 'apk', 'z64'), 'AndroidManifest.xml'), 'manifest');
+});
+
+test('unpack: refuses bad input, a used output folder, a folder inside the game repo and an oversized package', () => {
+  const dir = newGame();
+  const parent = path.dirname(dir);
+  write(parent, 'not.apk', 'hello');
+  assert.match(gk(parent, 'unpack', path.join(parent, 'not.apk')).out, /không phải file ZIP/);
+  assert.match(gk(parent, 'unpack', path.join(parent, 'none.apk')).out, /Không thấy file/);
+  const notAndroid = zipTree(path.join(parent, 'plain.zip'), { 'readme.txt': 'x' });
+  assert.match(gk(parent, 'unpack', notAndroid).out, /không phải gói Android/);
+  const apk = zipTree(path.join(parent, 'g.apk'), { 'AndroidManifest.xml': 'x'.repeat(4096) });
+  write(parent, 'used/keep.txt', 'giữ');
+  const used = gk(parent, 'unpack', apk, '--out', path.join(parent, 'used'));
+  assert.notEqual(used.code, 0);
+  assert.match(used.out, /không rỗng/);
+  const inside = gk(dir, 'unpack', apk, '--out', path.join(dir, 'src-goc'));
+  assert.notEqual(inside.code, 0);
+  assert.match(inside.out, /nằm trong repo game/);
+  assert.equal(gk(dir, 'unpack', apk, '--out', path.join(dir, 'reference', 'goc')).code, 0);
+  assert.match(gk(parent, 'unpack', apk, '--out', path.join(parent, 'big'), '--max-gb', '0.000001').out, /vượt giới hạn/);
 });

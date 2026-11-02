@@ -26,7 +26,7 @@ Trước khi mở công cụ, xem lại `notes/` và `params/` đã có gì. Kh�
 | Unreal | Blueprint / native trong `.pak` | `.uasset` | FModel / UModel; native: Ghidra |
 | Native cũ (C/C++) | exe/dll | file data riêng | Ghidra / IDA |
 
-APK: nhìn `lib/*/` để nhận engine (`libunity.so`, `libil2cpp.so`, `libcocos2djs.so`, `libgodot_android.so`).
+APK, XAPK, APKS, OBB: chạy `gamekit unpack <file> --out <thư mục ngoài repo>`. Lệnh giải nén cả các APK con và OBB, nhận diện engine, kiểu build, rồi ghi `notes/source-unpack.md` và `source.path`. Với gói nhiều phần, các file cần thiết thường nằm rải rác: `libil2cpp.so` trong split theo kiến trúc (`config.arm64_v8a.apk`), `global-metadata.dat` trong APK gốc hoặc OBB, dữ liệu trong asset pack (`UnityDataAssetPack.apk`) hoặc OBB. Trên Android, thư mục dữ liệu Unity là `assets/bin/Data/` (tương đương `*_Data/`). Bundle tải từ server khi chạy thì không có trong gói.
 
 Nếu phiên có công cụ MCP reverse engineering (ví dụ rea: `open_binary`, `analyze_function`, `analyze_javascript_application`, `inspect_managed_artifact`), dùng chúng cho bước phân tích tĩnh. Bắt đầu từ bản tóm tắt; chỉ đào sâu khi còn một câu hỏi cụ thể; không chạy lại một phân tích y hệt.
 

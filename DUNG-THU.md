@@ -38,7 +38,7 @@ Khởi động lại Claude Code. Lần đầu GameKit tự cài thư viện c�
 
 ## Bắt đầu với một game
 
-1. Đặt project (hoặc file APK/bản build) của game gốc ở một thư mục riêng, ví dụ `D:\games-src\ten-game`. Đừng đặt bên trong thư mục game web sắp tạo.
+1. Đặt project (hoặc file APK/XAPK/bản build) của game gốc ở một thư mục riêng, ví dụ `D:\games-src\ten-game`. Đừng đặt bên trong thư mục game web sắp tạo. File APK/XAPK được giải nén bằng lệnh `gamekit unpack`.
 2. Mở Claude Code ở thư mục sẽ chứa game web (ví dụ `D:\games`) và nói:
    > Tạo game GameKit mới tên `ten-game` cho game Unity ở `D:\games-src\ten-game`.
 

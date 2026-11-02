@@ -12,8 +12,9 @@ const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
   return c >>> 0;
 });
 
-export function crc32(buf) {
-  let c = 0xffffffff;
+/** `prev` continues an earlier result, for data read in chunks. */
+export function crc32(buf, prev = 0) {
+  let c = (prev ^ 0xffffffff) >>> 0;
   for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
 }

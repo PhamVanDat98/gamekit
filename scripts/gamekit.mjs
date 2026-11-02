@@ -14,6 +14,7 @@ Dùng: gamekit <lệnh> [tuỳ chọn]
                                             Mặc định là game của bạn; --third-party khi làm lại game người khác (bắt buộc reskin)
   init <tên> --questions --json             In danh sách câu hỏi kèm giải thích (cho agent hỏi người dùng)
   config [--portal p] [--set k=v…] [--questions --json]   Điền thông tin portal còn thiếu, thêm portal
+  unpack <file> [--out dir] [--game dir] [--max-gb 20]   Giải nén APK/XAPK/APKS/OBB, nhận diện engine và nơi chứa logic, dữ liệu
   status | next                             Game đang ở pha nào, việc gì tiếp
   gate [--advance]                          Kiểm tra cổng của pha hiện tại
   validate [--stage P2]                     Kiểm tra game.yaml, params, obligations, oracle, provenance, module-plan, asset-manifest
@@ -50,6 +51,7 @@ export function parseArgs(argv) {
 const COMMANDS = {
   init: () => import('./init.mjs').then((m) => m.run),
   config: () => import('./config.mjs').then((m) => m.run),
+  unpack: () => import('./unpack.mjs').then((m) => m.run),
   status: () => import('./status.mjs').then((m) => m.run),
   next: () => import('./status.mjs').then((m) => m.run),
   gate: () => import('./gate.mjs').then((m) => m.run),

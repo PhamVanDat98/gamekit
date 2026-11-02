@@ -12,6 +12,11 @@ Vật lý: không ánh xạ engine sang engine, mà ánh xạ từng hành vi v�
 - Template, test: `world.test.ts`, `replay.test.ts` đọc `sim.fixedStepHz` thay vì gõ cứng 60 Hz.
 - Game cũ: xem **Nâng cấp game cũ** trong README.
 
+Gói Android:
+- Lệnh `gamekit unpack <file>`: giải nén APK, XAPK, APKS, OBB cùng các APK con, nhận diện engine; với Unity báo thêm phiên bản, Mono hay IL2CPP, kiến trúc, vị trí logic, metadata và dữ liệu. Có `--game` (hoặc chạy trong thư mục game) thì ghi `notes/source-unpack.md` và `source.path`, `source.engine`, `source.engineVersion`.
+- Đọc ZIP không thêm thư viện, có zip64. File đầu vào coi là không đáng tin: chặn đường dẫn ra ngoài thư mục đích, kiểm tra CRC và kích thước, giới hạn tổng dung lượng (`--max-gb`, mặc định 20), không ghi đè file chỉ khác hoa thường. Không cho giải nén vào repo game, trừ `reference/` và `decompiled/`.
+- Skill `re-notes` nói rõ vị trí file của gói nhiều phần và đường dẫn Unity trên Android.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.
