@@ -29,8 +29,11 @@ export const AVAILABLE_SKILLS = new Set([
   'parity-check',
   'module-plan',
   'integrate',
+  'web-relayout',
   'platform-sdk',
   'package-web-build',
+  'perf-budget',
+  'qa-smoke',
   'release-check',
 ]);
 

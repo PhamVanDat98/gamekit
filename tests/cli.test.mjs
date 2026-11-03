@@ -47,6 +47,26 @@ test('status at P1: engine-<engine> resolves to engine-unity, other engines are 
   assert.match(gk(dir, 'status').out, /- engine-godot.*chưa có/);
 });
 
+test('status at P3 and P5: web-relayout, perf-budget, qa-smoke ship; store-assets does not yet', () => {
+  const dir = newGame();
+  editYaml(dir, (g) => {
+    g.phase = 'P3';
+  });
+  assert.doesNotMatch(gk(dir, 'status').out, /- web-relayout.*chưa có/);
+  editYaml(dir, (g) => {
+    g.phase = 'P5';
+  });
+  const { out } = gk(dir, 'status');
+  for (const s of ['perf-budget', 'qa-smoke']) assert.doesNotMatch(out, new RegExp(`- ${s}.*chưa có`));
+  assert.match(out, /- store-assets.*chưa có/);
+});
+
+test('smoke: without a build it says what to run', () => {
+  const r = gk(newGame(), 'smoke');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /Chưa có bản build/);
+});
+
 test('params: every value needs a source; TODO is a warning before P2 and an error from P2', () => {
   const dir = newGame();
   editJson(dir, 'params/game.json', (p) => {
