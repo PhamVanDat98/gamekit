@@ -15,8 +15,8 @@
       #gmLoader.gmHasError #gmLoaderError { display: block; }
       #gmLoader.gmHasError .gmLoaderProgress { display: none; }
       #gmLoaderRetry { margin-top: 8px; padding: 8px 18px; border: 0; border-radius: 8px; font: inherit; cursor: pointer; }
-      .gmLoaderBrand { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); height: 28px; opacity: .85; }
-      .gmLoaderVersion { position: absolute; right: 10px; bottom: 6px; font-size: 11px; opacity: .5; }
+      .gmLoaderBrand { position: absolute; bottom: calc(16px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); height: 28px; opacity: .85; }
+      .gmLoaderVersion { position: absolute; right: calc(10px + env(safe-area-inset-right)); bottom: calc(6px + env(safe-area-inset-bottom)); font-size: 11px; opacity: .5; }
       @keyframes gmSpin { to { transform: rotate(360deg); } }
     </style>
     <div id="gmLoader">

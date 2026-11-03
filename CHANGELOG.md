@@ -24,6 +24,10 @@ Skill P3, P5:
 - Thêm `web-relayout`, `perf-budget`, `qa-smoke`. `gamekit status` ở P3 và P5 không còn báo các skill này là chưa có; `store-assets` vẫn chưa có.
 - Lệnh `gamekit smoke`: chạy gói build trong Chromium qua Playwright (cài riêng, không phải dependency của plugin), đo thời gian vào game và FPS, bắt lỗi console, màn trắng, thiếu footer Settings, ngôn ngữ không tải được; `--browser` dùng Chrome hoặc Edge có sẵn. Cổng P5 chưa chạy lệnh này tự động.
 
+Safe area:
+- `shell.html` của `dev-mock` và `azgames` có `viewport-fit=cover`. Trước đây `env(safe-area-inset-*)` luôn bằng 0 trong bản build, chỉ có tác dụng ở `npm run dev`.
+- `.gk-gear` của template, logo và số phiên bản ở màn loading né safe area. Game cũ cần sửa `style.css`: xem **Nâng cấp game cũ** trong README.
+
 ## 0.2.0 — 2026-10-16
 Bản dùng thử (xem `DUNG-THU.md`):
 - Plugin tự cài thư viện của nó (`yaml`, `ajv`) ở lệnh đầu tiên, chạy ở đâu cũng được — trước đây cài từ Claude Code thì `init` lỗi cho tới khi mở một thư mục game.

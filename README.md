@@ -84,6 +84,8 @@ tests/            node --test
 
 ## Nâng cấp game cũ
 
+Từ khi shell của portal có `viewport-fit=cover`, trang vẽ tràn vùng tai thỏ: trong `src/view/style.css` của game cũ, đổi `.gk-gear` thành `top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right));`, và cộng inset tương tự cho mọi phần tử tự đặt `position: absolute` hoặc `fixed` sát cạnh màn hình.
+
 Game tạo từ template trước bố cục az-v1 build ra `index.html` + `Build/` (hoặc `dist/`); `pack` bây giờ dừng với lỗi "vite.config.ts của game là bản cũ". Chép từ `templates/game/` của GameKit sang game (giữ phần code gameplay của bạn trong `src/core/`, `src/view/` nếu đã sửa — so sánh rồi gộp):
 
 1. `vite.config.ts` (ra `framework.js`, `css/style.css`, `assets/{img,art,audio,fonts}/`).

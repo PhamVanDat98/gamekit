@@ -22,9 +22,7 @@ Trong `notes/web-layout.md`: hướng màn hình gốc, độ phân giải thi�
 - Thử cả máy tính ngang, điện thoại dọc và ngang, kéo cỡ cửa sổ liên tục: không vỡ, không cuộn trang, không méo hình. Không chặn bằng màn "xoay máy" nếu game vẫn chơi được.
 
 ## 3. Safe area
-`#stage` đệm `env(safe-area-inset-*)`, nhưng các giá trị này chỉ khác 0 khi trang có `viewport-fit=cover`. `index.html` của game có; `shell.html` của các portal hiện **chưa có**, nên trong bản build trang không vẽ tràn vào vùng tai thỏ và inset bằng 0. Kiểm tra trên bản build, đừng chỉ trên `npm run dev`.
-
-Phần tử `position: absolute` trong `#stage` không tự tránh tai thỏ, kể cả nút `.gk-gear` của template (đang `top: 10px; right: 10px`): cộng `env(safe-area-inset-*)` vào vị trí, hoặc đặt trong một khung đã đệm. Nút và HUD không nằm dưới thanh hệ thống.
+Trang (`index.html` của game và `shell.html` của portal) có `viewport-fit=cover`, nên trang vẽ tràn cả vùng tai thỏ; `#stage` đệm `env(safe-area-inset-*)`. Phần tử `position: absolute` trong `#stage` không tự tránh vùng đó: cộng `env(safe-area-inset-*)` vào vị trí như `.gk-gear`, hoặc đặt trong một khung đã đệm. Nút và HUD không nằm dưới thanh hệ thống.
 
 ## 4. Input → `Action`
 `core/` chỉ hiểu `Action` trong `src/contracts/input.ts`; thiết bị map ở `src/view/input-dom.ts` (`KEYMAP` + pointer). Thêm hành động mới là đổi contract: chỉ agent chính sửa, kèm test core.

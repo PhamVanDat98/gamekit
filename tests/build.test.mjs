@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 import { assemblePortal } from '../scripts/lib/assemble.mjs';
 import { initialLoadBytes } from '../scripts/lib/budget.mjs';
 import { zipDir } from '../scripts/lib/zip.mjs';
-import { tmpDir, write, read, solidPng, tinyWebp, token } from './helpers.mjs';
+import { ROOT, tmpDir, write, read, solidPng, tinyWebp, token } from './helpers.mjs';
 import { PassThrough } from 'node:stream';
 import YAML from 'yaml';
 import { newGame, gk, sh } from './helpers.mjs';
@@ -292,6 +292,17 @@ test('release-check: corrupt manifest and compressed code are reported, not thro
     fs.writeFileSync(path.join(dir, 'builds/26101601/manifest.json'), text);
     assert.match(checkBuild(dir, '26101601', 'azgames', game, loadProvenance(dir)).errors.join('\n'), /manifest\.json hỏng/, text);
   }
+});
+
+test('safe area: every portal shell lets env(safe-area-inset-*) work, edge elements stay clear of it', () => {
+  for (const id of fs.readdirSync(path.join(ROOT, 'portals'))) {
+    const shell = path.join(ROOT, 'portals', id, 'shell.html');
+    if (fs.existsSync(shell)) assert.match(fs.readFileSync(shell, 'utf8'), /name="viewport"[^>]*viewport-fit=cover/, id);
+  }
+  assert.match(fs.readFileSync(path.join(ROOT, 'templates/game/src/view/style.css'), 'utf8'), /\.gk-gear \{[^}]*top: calc\(10px \+ env\(safe-area-inset-top\)\)/);
+  const loading = fs.readFileSync(path.join(ROOT, 'portals/shared/loading.html'), 'utf8');
+  assert.match(loading, /\.gmLoaderBrand \{[^}]*env\(safe-area-inset-bottom\)/);
+  assert.match(loading, /\.gmLoaderVersion \{[^}]*env\(safe-area-inset-bottom\)/);
 });
 
 test('budget: initial load = outer page + loader + framework + css + Icons + the biggest language; compressed copies and assets excluded', async () => {
